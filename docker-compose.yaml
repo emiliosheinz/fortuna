@@ -4,6 +4,8 @@ services:
     image: ghcr.io/emiliosheinz/fortuna-cli:latest
     volumes:
       - .:/fortuna
+    environment:
+      - CI=true
     command: sh -lc "pnpm install"
     restart: "no"
 

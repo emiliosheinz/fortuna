@@ -20,14 +20,12 @@ const description = "A simple, frictionless app to manage your finances";
 export const metadata: Metadata = {
   title,
   description,
-  icons: "/favicon.svg",
   openGraph: {
     title,
     type: "website",
     siteName: title,
     locale: "en-US",
     description: description,
-    images: "/og-banner.png",
   },
   robots: {
     index: true,
@@ -39,7 +37,6 @@ export const metadata: Metadata = {
   },
   twitter: {
     title,
-    images: "/og-banner.png",
     card: "summary_large_image",
   },
 };
