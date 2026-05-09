@@ -8,7 +8,8 @@
       "commitMessage": "chore(release): publish new version [skip release]"
     },
     "version": {
-      "conventionalCommits": true
+      "conventionalCommits": true,
+      "fallbackCurrentVersionResolver": "disk"
     },
     "releaseTag": {
       "pattern": "{projectName}@{version}"
