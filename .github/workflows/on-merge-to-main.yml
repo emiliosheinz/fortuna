@@ -34,6 +34,6 @@ jobs:
         run: pnpm nx report
 
       - name: Release
-        run: pnpm nx release --skip-publish
+        run: pnpm nx release --skip-publish --first-release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
