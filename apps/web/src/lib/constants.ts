@@ -1,0 +1,8 @@
+export const GITHUB_PROJECT_URL = "https://github.com/emiliosheinz/fortuna";
+export const GITHUB_BOARD_URL =
+  "https://github.com/users/emiliosheinz/projects/3";
+export const GITHUB_RELEASES_URL =
+  "https://github.com/emiliosheinz/fortuna/releases";
+export const GITHUB_WIKI_URL = "https://github.com/emiliosheinz/fortuna/wiki";
+export const GITHUB_CONTRIBUTING_URL =
+  "https://github.com/emiliosheinz/fortuna?tab=contributing-ov-file#contributing-to-fortuna";

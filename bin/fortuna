@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+if [ $# -eq 0 ]; then
+  docker exec -it workspace sh
+else
+  docker exec -it workspace "$@"
+fi

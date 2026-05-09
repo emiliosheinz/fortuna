@@ -1,0 +1,15 @@
+{
+  "extends": ["@fortuna/config/biome"],
+  "root": false,
+  "linter": {
+    "rules": {
+      "suspicious": {
+        "noUnknownAtRules": "off"
+      }
+    },
+    "domains": {
+      "next": "recommended",
+      "react": "recommended"
+    }
+  }
+}

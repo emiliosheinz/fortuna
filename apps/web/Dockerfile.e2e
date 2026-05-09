@@ -1,0 +1,30 @@
+# syntax=docker/dockerfile:1.18-labs
+# -------- Production --------
+FROM ghcr.io/emiliosheinz/fortuna-playwright:latest AS prod
+
+RUN corepack enable pnpm && corepack install -g pnpm@10.14.0
+
+WORKDIR /fortuna
+
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml turbo.json ./
+COPY apps/web/package.json apps/web/
+COPY --parents packages/*/package.json ./
+
+RUN pnpm install --frozen-lockfile
+
+# Copy in only what the web app needs
+COPY apps/web apps/web
+COPY packages packages
+
+CMD ["pnpm", "turbo", "test:e2e", "--filter=web"]
+
+
+
+# -------- Development --------
+FROM ghcr.io/emiliosheinz/fortuna-playwright:latest AS dev
+
+RUN corepack enable pnpm && corepack install -g pnpm@10.14.0
+
+WORKDIR /fortuna
+
+CMD ["pnpm", "turbo", "test:e2e", "--filter=web"]

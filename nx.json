@@ -1,0 +1,28 @@
+{
+  "$schema": "./node_modules/nx/schemas/nx-schema.json",
+  "release": {
+    "projectChangelogs": true,
+    "projectsRelationship": "independent",
+    "projects": ["apps/*", "packages/*"],
+    "git": {
+      "commitMessage": "chore(release): publish new version [skip release]"
+    },
+    "version": {
+      "conventionalCommits": true
+    },
+    "releaseTag": {
+      "pattern": "{projectName}@{version}"
+    },
+    "changelog": {
+      "projectChangelogs": {
+        "createRelease": "github",
+        "renderOptions": {
+          "authors": true,
+          "applyUsernameToAuthors": true,
+          "commitReferences": true,
+          "versionTitleDate": true
+        }
+      }
+    }
+  }
+}

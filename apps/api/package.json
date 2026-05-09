@@ -1,0 +1,52 @@
+{
+  "name": "api",
+  "version": "0.1.0",
+  "description": "The Fortuna API",
+  "private": true,
+  "main": "dist/main.js",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "nest build",
+    "start:dev": "nest start --watch",
+    "lint": "biome lint .",
+    "format": "biome format .",
+    "check": "biome check .",
+    "lint:fix": "biome lint . --fix",
+    "format:fix": "biome format . --write",
+    "check:fix": "biome check . --fix",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:cov": "jest --coverage",
+    "test:e2e": "jest --config ./test/jest-e2e.json",
+    "docker:build": "docker build -f Dockerfile --target prod -t emiliosheinz/fortuna-api:latest $(git rev-parse --show-toplevel)"
+  },
+  "dependencies": {
+    "@fortuna/config": "workspace:*",
+    "@nestjs/common": "11.1.6",
+    "@nestjs/core": "11.1.6",
+    "@nestjs/platform-express": "11.1.6",
+    "reflect-metadata": "0.2.2",
+    "rxjs": "7.8.2"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "catalog:",
+    "@nestjs/cli": "11.0.10",
+    "@nestjs/schematics": "11.0.7",
+    "@nestjs/testing": "11.1.6",
+    "@types/express": "5.0.3",
+    "@types/jest": "catalog:",
+    "@types/node": "catalog:",
+    "@types/supertest": "6.0.3",
+    "globals": "16.4.0",
+    "jest": "catalog:",
+    "source-map-support": "0.5.21",
+    "supertest": "7.1.4",
+    "ts-jest": "29.4.1",
+    "ts-loader": "9.5.4",
+    "ts-node": "10.9.2",
+    "tsconfig-paths": "4.2.0",
+    "typescript": "catalog:"
+  }
+}
