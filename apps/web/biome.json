@@ -1,6 +1,11 @@
 {
   "extends": ["@fortuna/config/biome"],
   "root": false,
+  "css": {
+    "parser": {
+      "tailwindDirectives": true
+    }
+  },
   "linter": {
     "rules": {
       "suspicious": {
