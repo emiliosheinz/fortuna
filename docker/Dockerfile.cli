@@ -1,7 +1,7 @@
 # General-purpose Node image with pnpm available
 
 ARG NODE_TAG=24-alpine
-ARG PNPM_VERSION=10.14.0
+ARG PNPM_VERSION=11.1.0
 
 FROM node:${NODE_TAG}
 

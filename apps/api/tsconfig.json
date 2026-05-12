@@ -13,7 +13,9 @@
     "sourceMap": true,
     "incremental": true,
     "baseUrl": ".",
+    "rootDir": ".",
     "outDir": "./dist",
-    "paths": { "@/*": ["./src/*"] }
+    "paths": { "@/*": ["./src/*"] },
+    "types": ["node", "jest"]
   }
 }
