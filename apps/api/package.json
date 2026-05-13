@@ -20,7 +20,11 @@
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:e2e": "jest --config ./test/jest-e2e.json",
-    "docker:build": "docker build -f Dockerfile --target prod -t emiliosheinz/fortuna-api:latest $(git rev-parse --show-toplevel)"
+    "docker:build": "docker build -f Dockerfile --target prod -t emiliosheinz/fortuna-api:latest $(git rev-parse --show-toplevel)",
+    "migration:generate": "node --env-file=.env node_modules/.bin/ts-node node_modules/.bin/typeorm migration:generate -d src/data-source.ts",
+    "migration:run": "node --env-file=.env node_modules/.bin/ts-node node_modules/.bin/typeorm migration:run -d src/data-source.ts",
+    "migration:revert": "node --env-file=.env node_modules/.bin/ts-node node_modules/.bin/typeorm migration:revert -d src/data-source.ts",
+    "migration:show": "node --env-file=.env node_modules/.bin/ts-node node_modules/.bin/typeorm migration:show -d src/data-source.ts"
   },
   "dependencies": {
     "@fortuna/config": "workspace:*",

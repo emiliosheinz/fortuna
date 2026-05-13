@@ -1,4 +1,19 @@
 services:
+  postgres:
+    container_name: postgres
+    image: postgres:17-alpine
+    env_file:
+      - ./.env
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
   api:
     container_name: api
     build:
@@ -7,6 +22,9 @@ services:
       dockerfile: apps/api/Dockerfile
     env_file:
       - ./apps/api/.env
+    depends_on:
+      postgres:
+        condition: service_healthy
     ports:
       - "3000:3000"
 
@@ -46,3 +64,6 @@ networks:
   default:
     name: fortuna
     driver: bridge
+
+volumes:
+  db-data:

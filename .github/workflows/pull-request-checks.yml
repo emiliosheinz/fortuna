@@ -140,10 +140,62 @@ jobs:
         if: always()
         run: docker compose -f docker-compose.prod.yaml down -v || true
 
+  migration-check:
+    name: Migration Check
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: fortuna
+          POSTGRES_USER: fortuna
+          POSTGRES_PASSWORD: fortuna
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U fortuna -d fortuna"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Setup Node dependencies
+        uses: ./.github/actions/setup-node-dependencies
+
+      - name: Run migrations
+        working-directory: apps/api
+        env:
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_NAME: fortuna
+          DB_USER: fortuna
+          DB_PASSWORD: fortuna
+          DB_SSL: "false"
+        run: node node_modules/.bin/ts-node node_modules/.bin/typeorm migration:run -d src/data-source.ts
+
+      - name: Assert no pending migrations
+        working-directory: apps/api
+        env:
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_NAME: fortuna
+          DB_USER: fortuna
+          DB_PASSWORD: fortuna
+          DB_SSL: "false"
+        run: |
+          output=$(node node_modules/.bin/ts-node node_modules/.bin/typeorm migration:show -d src/data-source.ts)
+          echo "$output"
+          if echo "$output" | grep -q "\[ \]"; then
+            echo "Pending migrations found. Run migration:run before merging."
+            exit 1
+          fi
+
   all-checks-pass:
     name: All Checks Pass
     runs-on: ubuntu-latest
-    needs: [lint-format, test, build, docker-build, conventional-commits, e2e-tests]
+    needs: [lint-format, test, build, docker-build, conventional-commits, e2e-tests, migration-check]
     if: always()
 
     steps:
