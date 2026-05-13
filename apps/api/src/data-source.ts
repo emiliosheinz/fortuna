@@ -1,11 +1,5 @@
-import { existsSync } from "node:fs";
 import path from "node:path";
 import { DataSource } from "typeorm";
-
-const envPath = path.join(__dirname, "..", ".env");
-if (existsSync(envPath)) {
-  process.loadEnvFile(envPath);
-}
 
 export const AppDataSource = new DataSource({
   type: "postgres",
