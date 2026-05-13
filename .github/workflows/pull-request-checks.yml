@@ -123,9 +123,9 @@ jobs:
           API_HOST: ${{ vars.API_HOST }}
           API_DB_HOST: ${{ vars.API_DB_HOST }}
           API_DB_PORT: ${{ vars.API_DB_PORT }}
-          API_DB_NAME: ${{ vars.API_DB_NAME }}
-          API_DB_USER: ${{ secrets.API_DB_USER }}
-          API_DB_PASSWORD: ${{ secrets.API_DB_PASSWORD }}
+          API_DB_NAME: ${{ vars.ROOT_POSTGRES_DB }}
+          API_DB_USER: ${{ secrets.ROOT_POSTGRES_USER }}
+          API_DB_PASSWORD: ${{ secrets.ROOT_POSTGRES_PASSWORD }}
           API_DB_SSL: ${{ vars.API_DB_SSL }}
 
       - name: Run E2E Tests for ${{ matrix.app }}
@@ -166,14 +166,14 @@ jobs:
           API_HOST: ${{ vars.API_HOST }}
           API_DB_HOST: ${{ vars.API_DB_HOST }}
           API_DB_PORT: ${{ vars.API_DB_PORT }}
-          API_DB_NAME: ${{ vars.API_DB_NAME }}
-          API_DB_USER: ${{ secrets.API_DB_USER }}
-          API_DB_PASSWORD: ${{ secrets.API_DB_PASSWORD }}
+          API_DB_NAME: ${{ vars.ROOT_POSTGRES_DB }}
+          API_DB_USER: ${{ secrets.ROOT_POSTGRES_USER }}
+          API_DB_PASSWORD: ${{ secrets.ROOT_POSTGRES_PASSWORD }}
           API_DB_SSL: ${{ vars.API_DB_SSL }}
           # ROOT
-          ROOT_POSTGRES_DB: ${{ vars.API_DB_NAME }}
-          ROOT_POSTGRES_USER: ${{ secrets.API_DB_USER }}
-          ROOT_POSTGRES_PASSWORD: ${{ secrets.API_DB_PASSWORD }}
+          ROOT_POSTGRES_DB: ${{ vars.ROOT_POSTGRES_DB }}
+          ROOT_POSTGRES_USER: ${{ secrets.ROOT_POSTGRES_USER }}
+          ROOT_POSTGRES_PASSWORD: ${{ secrets.ROOT_POSTGRES_PASSWORD }}
 
       - name: Run migrations
         run: docker compose -f docker-compose.prod.yaml --profile migration run --rm -T migration migration:run
