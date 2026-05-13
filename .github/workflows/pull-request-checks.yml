@@ -94,6 +94,9 @@ jobs:
   e2e-tests:
     name: E2E Tests
     runs-on: ubuntu-latest
+    environment:
+      name: ci
+      deployment: false
     strategy:
       matrix:
         app: [web]
@@ -143,6 +146,9 @@ jobs:
   migration-check:
     name: Migration Check
     runs-on: ubuntu-latest
+    environment:
+      name: ci
+      deployment: false
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
