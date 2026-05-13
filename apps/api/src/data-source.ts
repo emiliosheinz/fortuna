@@ -1,10 +1,10 @@
+import { existsSync } from "node:fs";
 import path from "node:path";
 import { DataSource } from "typeorm";
 
-try {
-  process.loadEnvFile(path.join(__dirname, "..", ".env"));
-} catch {
-  // .env is optional; in Docker and CI env vars are injected directly
+const envPath = path.join(__dirname, "..", ".env");
+if (existsSync(envPath)) {
+  process.loadEnvFile(envPath);
 }
 
 export const AppDataSource = new DataSource({
