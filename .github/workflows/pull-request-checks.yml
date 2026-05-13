@@ -114,19 +114,9 @@ jobs:
         with:
           apps: web
         env:
-          # WEB
           WEB_PORT: ${{ vars.WEB_PORT }}
           WEB_HOST: ${{ vars.WEB_HOST }}
           WEB_E2E_APP_BASE_URL: ${{ vars.WEB_E2E_APP_BASE_URL }}
-          # API
-          API_PORT: ${{ vars.API_PORT }}
-          API_HOST: ${{ vars.API_HOST }}
-          API_DB_HOST: ${{ vars.API_DB_HOST }}
-          API_DB_PORT: ${{ vars.API_DB_PORT }}
-          API_DB_NAME: ${{ vars.ROOT_POSTGRES_DB }}
-          API_DB_USER: ${{ secrets.ROOT_POSTGRES_USER }}
-          API_DB_PASSWORD: ${{ secrets.ROOT_POSTGRES_PASSWORD }}
-          API_DB_SSL: ${{ vars.API_DB_SSL }}
 
       - name: Run E2E Tests for ${{ matrix.app }}
         run: docker compose -f docker-compose.prod.yaml --profile e2e up --exit-code-from ${{ matrix.app }}-e2e ${{ matrix.app }}-e2e
