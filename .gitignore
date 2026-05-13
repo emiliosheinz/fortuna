@@ -77,6 +77,9 @@
 **/*.tsbuildinfo
 **/next-env.d.ts
 
+# Docker Compose local overrides
+docker-compose.override.yaml
+
 # Turbo
 **/.turbo/
 
