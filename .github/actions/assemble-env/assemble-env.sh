@@ -66,8 +66,8 @@ echo "Wrote $out_path with $written_count variables (prefix=$prefix)"
 
 if [ -n "$missing_keys" ]; then
   echo ""
-  echo "The following variables were missing and must be defined before running:" >&2
-  for m in $missing_keys; do echo "   - $m" >&2; done
+  echo "The following variables were missing and must be defined before running:"
+  for m in $missing_keys; do echo "   - $m"; done
   echo ""
   exit 1
 fi
