@@ -39,6 +39,16 @@ CMD ["node", "dist/main"]
 
 
 
+# -------- Migration Runner --------
+FROM builder AS migration
+
+WORKDIR /fortuna/apps/api
+
+ENTRYPOINT ["node", "node_modules/.bin/ts-node", "node_modules/.bin/typeorm", "-d", "src/data-source.ts"]
+CMD ["migration:run"]
+
+
+
 # -------- Dev (with hot reload) --------
 FROM node:24-alpine AS dev
 

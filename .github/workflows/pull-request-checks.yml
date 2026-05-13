@@ -143,54 +143,50 @@ jobs:
   migration-check:
     name: Migration Check
     runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:17-alpine
-        env:
-          POSTGRES_DB: fortuna
-          POSTGRES_USER: fortuna
-          POSTGRES_PASSWORD: fortuna
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U fortuna -d fortuna"
-          --health-interval 5s
-          --health-timeout 3s
-          --health-retries 10
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
 
-      - name: Setup Node dependencies
-        uses: ./.github/actions/setup-node-dependencies
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Assemble environment variables
+        uses: ./.github/actions/assemble-env
+        with:
+          apps: api
+        env:
+          API_PORT: ${{ vars.API_PORT }}
+          API_HOST: ${{ vars.API_HOST }}
+          API_DB_HOST: ${{ vars.API_DB_HOST }}
+          API_DB_PORT: ${{ vars.API_DB_PORT }}
+          API_DB_NAME: ${{ vars.API_DB_NAME }}
+          API_DB_USER: ${{ secrets.API_DB_USER }}
+          API_DB_PASSWORD: ${{ secrets.API_DB_PASSWORD }}
+          API_DB_SSL: ${{ vars.API_DB_SSL }}
+
+      - name: Create root .env
+        env:
+          POSTGRES_DB: ${{ vars.API_DB_NAME }}
+          POSTGRES_USER: ${{ secrets.API_DB_USER }}
+          POSTGRES_PASSWORD: ${{ secrets.API_DB_PASSWORD }}
+        run: |
+          echo "POSTGRES_DB=$POSTGRES_DB" >> .env
+          echo "POSTGRES_USER=$POSTGRES_USER" >> .env
+          echo "POSTGRES_PASSWORD=$POSTGRES_PASSWORD" >> .env
 
       - name: Run migrations
-        working-directory: apps/api
-        env:
-          DB_HOST: localhost
-          DB_PORT: 5432
-          DB_NAME: fortuna
-          DB_USER: fortuna
-          DB_PASSWORD: fortuna
-          DB_SSL: "false"
-        run: node node_modules/.bin/ts-node node_modules/.bin/typeorm migration:run -d src/data-source.ts
+        run: docker compose -f docker-compose.prod.yaml --profile migration run --rm -T migration migration:run
 
       - name: Assert no pending migrations
-        working-directory: apps/api
-        env:
-          DB_HOST: localhost
-          DB_PORT: 5432
-          DB_NAME: fortuna
-          DB_USER: fortuna
-          DB_PASSWORD: fortuna
-          DB_SSL: "false"
         run: |
-          output=$(node node_modules/.bin/ts-node node_modules/.bin/typeorm migration:show -d src/data-source.ts)
-          echo "$output"
-          if echo "$output" | grep -q "\[ \]"; then
+          if docker compose -f docker-compose.prod.yaml --profile migration run --rm -T migration migration:show 2>&1 | grep -qF "[ ]"; then
             echo "Pending migrations found. Run migration:run before merging."
             exit 1
           fi
+
+      - name: Teardown
+        if: always()
+        run: docker compose -f docker-compose.prod.yaml down -v || true
 
   all-checks-pass:
     name: All Checks Pass

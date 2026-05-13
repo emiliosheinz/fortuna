@@ -45,6 +45,19 @@ services:
     ports:
       - "3001:3001"
 
+  migration:
+    container_name: migration
+    profiles: ["migration"]
+    build:
+      context: .
+      target: migration
+      dockerfile: apps/api/Dockerfile
+    env_file:
+      - ./apps/api/.env
+    depends_on:
+      postgres:
+        condition: service_healthy
+
   web-e2e:
     container_name: web-e2e
     profiles: ["e2e"]
