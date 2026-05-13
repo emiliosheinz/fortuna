@@ -153,8 +153,9 @@ jobs:
       - name: Assemble environment variables
         uses: ./.github/actions/assemble-env
         with:
-          apps: api
+          apps: api,root
         env:
+          # API
           API_PORT: ${{ vars.API_PORT }}
           API_HOST: ${{ vars.API_HOST }}
           API_DB_HOST: ${{ vars.API_DB_HOST }}
@@ -163,16 +164,10 @@ jobs:
           API_DB_USER: ${{ secrets.API_DB_USER }}
           API_DB_PASSWORD: ${{ secrets.API_DB_PASSWORD }}
           API_DB_SSL: ${{ vars.API_DB_SSL }}
-
-      - name: Create root .env
-        env:
-          POSTGRES_DB: ${{ vars.API_DB_NAME }}
-          POSTGRES_USER: ${{ secrets.API_DB_USER }}
-          POSTGRES_PASSWORD: ${{ secrets.API_DB_PASSWORD }}
-        run: |
-          echo "POSTGRES_DB=$POSTGRES_DB" >> .env
-          echo "POSTGRES_USER=$POSTGRES_USER" >> .env
-          echo "POSTGRES_PASSWORD=$POSTGRES_PASSWORD" >> .env
+          # ROOT
+          ROOT_POSTGRES_DB: ${{ vars.API_DB_NAME }}
+          ROOT_POSTGRES_USER: ${{ secrets.API_DB_USER }}
+          ROOT_POSTGRES_PASSWORD: ${{ secrets.API_DB_PASSWORD }}
 
       - name: Run migrations
         run: docker compose -f docker-compose.prod.yaml --profile migration run --rm -T migration migration:run
