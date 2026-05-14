@@ -43,6 +43,9 @@ services:
       dockerfile: apps/api/Dockerfile
     env_file:
       - ./apps/api/.env
+    environment:
+      TS_NODE_SKIP_PROJECT: "true"
+      TS_NODE_COMPILER_OPTIONS: '{"module":"commonjs","target":"ES2023","esModuleInterop":true}'
     depends_on:
       setup:
         condition: service_completed_successfully

@@ -44,7 +44,7 @@ FROM builder AS migration
 
 WORKDIR /fortuna/apps/api
 
-ENTRYPOINT ["pnpm", "exec", "typeorm-ts-node-commonjs", "-d", "src/data-source.ts"]
+ENTRYPOINT ["pnpm", "exec", "typeorm", "-d", "dist/data-source.js"]
 CMD ["migration:run"]
 
 
