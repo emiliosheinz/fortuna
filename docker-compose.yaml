@@ -39,21 +39,13 @@ services:
     container_name: migration
     build:
       context: .
-      target: dev
+      target: migration
       dockerfile: apps/api/Dockerfile
     env_file:
       - ./apps/api/.env
-    environment:
-      TS_NODE_SKIP_PROJECT: "true"
-      TS_NODE_COMPILER_OPTIONS: '{"module":"commonjs","target":"ES2023","esModuleInterop":true}'
     depends_on:
-      setup:
-        condition: service_completed_successfully
       postgres:
         condition: service_healthy
-    volumes:
-      - .:/fortuna
-    command: pnpm --filter=api migration:run
     restart: "no"
 
   api:
