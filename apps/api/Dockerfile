@@ -42,9 +42,13 @@ CMD ["node", "dist/main"]
 # -------- Migration Runner --------
 FROM builder AS migration
 
+WORKDIR /fortuna
+
+RUN pnpm install --frozen-lockfile
+
 WORKDIR /fortuna/apps/api
 
-ENTRYPOINT ["npm", "run"]
+ENTRYPOINT ["pnpm", "run"]
 CMD ["migration:run"]
 
 
