@@ -44,7 +44,7 @@ FROM builder AS migration
 
 WORKDIR /fortuna/apps/api
 
-CMD ["node", "dist/migrate.js"]
+CMD ["node", "dist/scripts/migrate.js"]
 
 
 

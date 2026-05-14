@@ -1,4 +1,4 @@
-import { AppDataSource } from "./data-source";
+import { AppDataSource } from "../src/data-source";
 
 AppDataSource.initialize()
   .then((dataSource) => dataSource.runMigrations())
