@@ -44,8 +44,7 @@ FROM builder AS migration
 
 WORKDIR /fortuna/apps/api
 
-ENTRYPOINT ["pnpm", "exec", "typeorm", "-d", "dist/data-source.js"]
-CMD ["migration:run"]
+CMD ["node", "dist/migrate.js"]
 
 
 
