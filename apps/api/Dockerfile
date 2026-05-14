@@ -40,13 +40,13 @@ CMD ["node", "dist/main"]
 
 
 # -------- Migration Runner --------
-FROM builder AS migration
+FROM node:24-alpine AS migration
+
+RUN corepack enable pnpm && corepack install -g pnpm@11.1.0
 
 WORKDIR /fortuna
 
-RUN pnpm install --frozen-lockfile
-
-WORKDIR /fortuna/apps/api
+COPY --from=builder /out ./
 
 ENTRYPOINT ["pnpm", "run"]
 CMD ["migration:run"]
