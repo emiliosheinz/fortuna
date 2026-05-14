@@ -35,6 +35,24 @@ services:
     command: sh -c "tail -f /dev/null"
     restart: "no"
 
+  migration:
+    container_name: migration
+    build:
+      context: .
+      target: dev
+      dockerfile: apps/api/Dockerfile
+    env_file:
+      - ./apps/api/.env
+    depends_on:
+      setup:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+    volumes:
+      - .:/fortuna
+    command: pnpm --filter=api migration:run
+    restart: "no"
+
   api:
     container_name: api
     build:
@@ -46,10 +64,8 @@ services:
     depends_on:
       workspace:
         condition: service_started
-      setup:
+      migration:
         condition: service_completed_successfully
-      postgres:
-        condition: service_healthy
     volumes:
       - .:/fortuna
     ports:
