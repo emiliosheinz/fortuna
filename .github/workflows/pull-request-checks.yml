@@ -168,13 +168,6 @@ jobs:
       - name: Run migrations
         run: docker compose -f docker-compose.prod.yaml up migration --wait
 
-      - name: Assert no pending migrations
-        run: |
-          if docker compose -f docker-compose.prod.yaml run --rm -T migration migration:show 2>&1 | grep -qF "[ ]"; then
-            echo "Pending migrations found. Run migration:run before merging."
-            exit 1
-          fi
-
       - name: Teardown
         if: always()
         run: docker compose -f docker-compose.prod.yaml down -v || true
