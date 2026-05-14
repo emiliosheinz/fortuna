@@ -44,7 +44,7 @@ FROM builder AS migration
 
 WORKDIR /fortuna/apps/api
 
-ENTRYPOINT ["pnpm", "run"]
+ENTRYPOINT ["npm", "run"]
 CMD ["migration:run"]
 
 
