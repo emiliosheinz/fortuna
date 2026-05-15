@@ -49,8 +49,7 @@ services:
     container_name: migration
     build:
       context: .
-      target: migration
-      dockerfile: apps/api/Dockerfile
+      dockerfile: apps/api/Dockerfile.migration
     env_file:
       - ./apps/api/.env
     depends_on:
