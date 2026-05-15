@@ -3,7 +3,6 @@ import { TypeOrmModule } from "@nestjs/typeorm";
 import { AppController } from "./app.controller";
 import { AppService } from "./app.service";
 import { MigrationsModule } from "./migrations/migrations.module";
-import { User } from "./users/user.entity";
 
 @Module({
   imports: [
@@ -16,7 +15,7 @@ import { User } from "./users/user.entity";
         username: process.env.DB_USER,
         password: process.env.DB_PASSWORD,
         ssl: process.env.DB_SSL === "true",
-        entities: [User],
+        entities: [],
         synchronize: false,
       }),
     }),
