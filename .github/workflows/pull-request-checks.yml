@@ -166,7 +166,7 @@ jobs:
           ROOT_POSTGRES_PASSWORD: ${{ secrets.ROOT_POSTGRES_PASSWORD }}
 
       - name: Run migrations
-        run: docker compose -f docker-compose.prod.yaml up migration --wait
+        run: docker compose -f docker-compose.prod.yaml run --rm migration
 
       - name: Teardown
         if: always()
