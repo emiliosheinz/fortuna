@@ -20,19 +20,21 @@ fi
 
 shopt -s nullglob
 copied_any=false
-for example in "$APPS_DIR"/*/.env.example; do
-  app_dir="$(dirname "$example")"
-  env_file="$app_dir/.env"
+
+for example in "$ROOT_DIR/.env.example" "$APPS_DIR"/*/.env.example; do
+  env_file="$(dirname "$example")/.env"
+  label="${example#"$ROOT_DIR/"}"
   if [[ -f "$env_file" && $FORCE == false ]]; then
-    echo "[skip] $(basename "$app_dir")/.env already exists"
+    echo "[skip] ${label} already has a .env"
     continue
   fi
   cp "$example" "$env_file"
-  echo "[ok]   Copied $(basename "$app_dir")/.env.example -> .env"
+  echo "[ok]   Copied ${label} -> .env"
   copied_any=true
 done
+
 shopt -u nullglob
 
 if [[ $copied_any == false ]]; then
-  echo "No .env.example files found under $APPS_DIR" >&2
+  echo "Nothing to copy — all .env files already exist"
 fi

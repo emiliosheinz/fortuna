@@ -20,15 +20,22 @@
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:e2e": "jest --config ./test/jest-e2e.json",
-    "docker:build": "docker build -f Dockerfile --target prod -t emiliosheinz/fortuna-api:latest $(git rev-parse --show-toplevel)"
+    "docker:build": "docker build -f Dockerfile --target prod -t emiliosheinz/fortuna-api:latest $(git rev-parse --show-toplevel)",
+    "migration:generate": "scripts/generate-migration.sh",
+    "migration:run": "tsx node_modules/typeorm/cli.js migration:run -d src/database/connection.ts",
+    "migration:revert": "tsx node_modules/typeorm/cli.js migration:revert -d src/database/connection.ts",
+    "migration:show": "tsx node_modules/typeorm/cli.js migration:show -d src/database/connection.ts"
   },
   "dependencies": {
     "@fortuna/config": "workspace:*",
     "@nestjs/common": "11.1.19",
     "@nestjs/core": "11.1.19",
     "@nestjs/platform-express": "11.1.19",
+    "@nestjs/typeorm": "^11.0.1",
+    "pg": "^8.20.0",
     "reflect-metadata": "0.2.2",
-    "rxjs": "7.8.2"
+    "rxjs": "7.8.2",
+    "typeorm": "^0.3.29"
   },
   "devDependencies": {
     "@biomejs/biome": "catalog:",
@@ -45,8 +52,8 @@
     "supertest": "7.2.2",
     "ts-jest": "29.4.9",
     "ts-loader": "9.5.7",
-    "ts-node": "10.9.2",
     "tsconfig-paths": "4.2.0",
+    "tsx": "^4.19.0",
     "typescript": "catalog:"
   }
 }

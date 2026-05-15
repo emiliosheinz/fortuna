@@ -49,6 +49,44 @@ bin/fortuna pnpm turbo check
 
 > Even though you can run commands on your host machine, it is highly recommended to always use the Docker container to avoid environment discrepancies.
 
+## Database Migrations
+
+Migrations are managed with TypeORM. When you run `docker compose up -d`, the `migration` service runs automatically before the API starts, so your database is always up to date in development.
+
+For manual control, use the `bin/fortuna db` subcommand, which runs commands inside the dedicated `migration` container.
+
+### Generate a new migration
+
+TypeORM compares the current entity definitions against the database schema and generates the diff automatically.
+
+```bash
+bin/fortuna db migration:generate <MigrationName>
+```
+
+The generated file will be placed in `apps/api/src/database/migrations/`. Review the generated SQL before committing — always verify that both `up` and `down` are correct.
+
+### Apply pending migrations
+
+```bash
+bin/fortuna db migration:run
+```
+
+### Revert the last migration
+
+```bash
+bin/fortuna db migration:revert
+```
+
+Rolls back only the most recently applied migration. Run it again to revert further.
+
+### Check migration status
+
+```bash
+bin/fortuna db migration:show
+```
+
+Lists all migrations and marks which ones have been applied.
+
 ## Project Structure
 
 The project is organized as a monorepo using pnpm workspaces, Turborepo, and Docker to manage multiple applications and shared packages.

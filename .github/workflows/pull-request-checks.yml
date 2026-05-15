@@ -94,6 +94,9 @@ jobs:
   e2e-tests:
     name: E2E Tests
     runs-on: ubuntu-latest
+    environment:
+      name: ci
+      deployment: false
     strategy:
       matrix:
         app: [web]
@@ -111,7 +114,6 @@ jobs:
         with:
           apps: web
         env:
-          # WEB
           WEB_PORT: ${{ vars.WEB_PORT }}
           WEB_HOST: ${{ vars.WEB_HOST }}
           WEB_E2E_APP_BASE_URL: ${{ vars.WEB_E2E_APP_BASE_URL }}
@@ -131,10 +133,49 @@ jobs:
         if: always()
         run: docker compose -f docker-compose.prod.yaml down -v || true
 
+  migration-check:
+    name: Migration Check
+    runs-on: ubuntu-latest
+    environment:
+      name: ci
+      deployment: false
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Assemble environment variables
+        uses: ./.github/actions/assemble-env
+        with:
+          apps: api,root
+        env:
+          # API
+          API_PORT: ${{ vars.API_PORT }}
+          API_HOST: ${{ vars.API_HOST }}
+          API_DB_HOST: ${{ vars.API_DB_HOST }}
+          API_DB_PORT: ${{ vars.API_DB_PORT }}
+          API_DB_NAME: ${{ vars.ROOT_POSTGRES_DB }}
+          API_DB_USER: ${{ secrets.ROOT_POSTGRES_USER }}
+          API_DB_PASSWORD: ${{ secrets.ROOT_POSTGRES_PASSWORD }}
+          API_DB_SSL: ${{ vars.API_DB_SSL }}
+          # ROOT
+          ROOT_POSTGRES_DB: ${{ vars.ROOT_POSTGRES_DB }}
+          ROOT_POSTGRES_USER: ${{ secrets.ROOT_POSTGRES_USER }}
+          ROOT_POSTGRES_PASSWORD: ${{ secrets.ROOT_POSTGRES_PASSWORD }}
+
+      - name: Run migrations
+        run: docker compose -f docker-compose.prod.yaml run --rm migration
+
+      - name: Teardown
+        if: always()
+        run: docker compose -f docker-compose.prod.yaml down -v || true
+
   all-checks-pass:
     name: All Checks Pass
     runs-on: ubuntu-latest
-    needs: [lint-format, test, build, docker-build, conventional-commits, e2e-tests]
+    needs: [lint-format, test, build, docker-build, conventional-commits, e2e-tests, migration-check]
     if: always()
 
     steps:

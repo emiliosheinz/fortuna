@@ -7,11 +7,15 @@ runs:
       shell: sh
       run: |
         chmod +x "${{ github.action_path }}/assemble-env.sh"
-        for app in $(echo "${{ inputs.apps }}" | tr ',' ' '); do [ -n "$app" ] && "${{ github.action_path }}/assemble-env.sh" "$app"; done
+        failed=0
+        for app in $(echo "${{ inputs.apps }}" | tr ',' ' '); do
+          [ -n "$app" ] && "${{ github.action_path }}/assemble-env.sh" "$app" || failed=1
+        done
+        exit $failed
 inputs:
   apps:
     required: true
-    description: "App names (comma separated, e.g. web,api)"
+    description: "App names (comma separated, e.g. web,api,root). Use 'root' to populate the repo root .env from ROOT_* vars."
 branding:
   icon: package
   color: gray-dark

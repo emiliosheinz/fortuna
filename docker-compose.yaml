@@ -1,4 +1,19 @@
 services:
+  postgres:
+    container_name: postgres
+    image: postgres:17-alpine
+    env_file:
+      - ./.env
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
   setup:
     container_name: setup
     image: ghcr.io/emiliosheinz/fortuna-cli:latest
@@ -20,6 +35,24 @@ services:
     command: sh -c "tail -f /dev/null"
     restart: "no"
 
+  migration:
+    container_name: migration
+    build:
+      context: .
+      target: dev
+      dockerfile: apps/api/Dockerfile
+    command: ["pnpm", "--filter", "api", "run", "migration:run"]
+    env_file:
+      - ./apps/api/.env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      setup:
+        condition: service_completed_successfully
+    volumes:
+      - .:/fortuna
+    restart: "no"
+
   api:
     container_name: api
     build:
@@ -29,9 +62,9 @@ services:
     env_file:
       - ./apps/api/.env
     depends_on:
-      workspace:
-          condition: service_started
       setup:
+        condition: service_completed_successfully
+      migration:
         condition: service_completed_successfully
     volumes:
       - .:/fortuna
@@ -81,3 +114,6 @@ networks:
   default:
     name: fortuna
     driver: bridge
+
+volumes:
+  db-data:
