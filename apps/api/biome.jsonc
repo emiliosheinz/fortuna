@@ -1,6 +1,11 @@
 {
   "extends": ["@fortuna/config/biome"],
   "root": false,
+  "javascript": {
+    "parser": {
+      "unsafeParameterDecoratorsEnabled": true
+    }
+  },
   "linter": {
     "rules": {
       "style": {
