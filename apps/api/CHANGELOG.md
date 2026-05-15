@@ -1,3 +1,17 @@
+## 0.3.0 (2026-05-15)
+
+### 🚀 Features
+
+- **api:** add PostgreSQL and wire TypeORM into AppModule ([#2](https://github.com/emiliosheinz/fortuna/pull/2))
+
+### 🧱 Updated Dependencies
+
+- Updated @fortuna/config to 0.2.1
+
+### ❤️ Thank You
+
+- Emilio Heinzmann @emiliosheinz
+
 ## 0.2.0 (2026-05-09)
 
 ### 🚀 Features

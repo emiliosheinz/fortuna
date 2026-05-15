@@ -1,3 +1,9 @@
+## 0.2.1 (2026-05-15)
+
+### 🧱 Updated Dependencies
+
+- Updated @fortuna/config to 0.2.1
+
 ## 0.2.0 (2026-05-09)
 
 ### 🚀 Features
