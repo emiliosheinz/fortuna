@@ -6,7 +6,6 @@
   },
   "exclude": [
     "dist",
-    "database",
     "test",
     "node_modules",
     "**/*spec.ts",
