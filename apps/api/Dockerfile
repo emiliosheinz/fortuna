@@ -39,20 +39,6 @@ CMD ["node", "dist/main"]
 
 
 
-# -------- Migration Runner --------
-FROM node:24-alpine AS migration
-
-RUN corepack enable pnpm && corepack install -g pnpm@11.1.0
-
-WORKDIR /fortuna
-
-COPY --from=builder /out ./
-
-ENTRYPOINT ["pnpm", "run"]
-CMD ["migration:run"]
-
-
-
 # -------- Dev (with hot reload) --------
 FROM node:24-alpine AS dev
 

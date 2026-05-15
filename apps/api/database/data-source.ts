@@ -10,6 +10,6 @@ export const AppDataSource = new DataSource({
   password: process.env.DB_PASSWORD,
   ssl: process.env.DB_SSL === "true",
   entities: [],
-  migrations: [path.join(__dirname, "..", "migrations", "*.{ts,js}")],
+  migrations: [path.join(__dirname, "migrations", "*.{ts,js}")],
   migrationsTableName: "migrations",
 });

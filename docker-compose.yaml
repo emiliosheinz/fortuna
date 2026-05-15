@@ -39,13 +39,14 @@ services:
     container_name: migration
     build:
       context: .
-      target: migration
-      dockerfile: apps/api/Dockerfile
+      dockerfile: apps/api/database/Dockerfile
     env_file:
       - ./apps/api/.env
     depends_on:
       postgres:
         condition: service_healthy
+    volumes:
+      - ./apps/api/database:/fortuna/apps/api/database
     restart: "no"
 
   api:
