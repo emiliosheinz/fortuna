@@ -1,6 +1,15 @@
 #!/usr/bin/env bash
-if [ $# -eq 0 ]; then
-  docker exec -it workspace sh
-else
-  docker exec -it workspace "$@"
-fi
+set -euo pipefail
+
+case "${1:-}" in
+  db)
+    shift
+    docker compose run --rm migration pnpm --filter api run "$@"
+    ;;
+  "")
+    docker exec -it workspace sh
+    ;;
+  *)
+    docker exec -it workspace "$@"
+    ;;
+esac
