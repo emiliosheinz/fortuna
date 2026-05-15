@@ -39,12 +39,16 @@ services:
     container_name: migration
     build:
       context: .
-      dockerfile: apps/api/Dockerfile.migration
+      target: dev
+      dockerfile: apps/api/Dockerfile
+    command: ["pnpm", "--filter", "api", "run", "migration:run"]
     env_file:
       - ./apps/api/.env
     depends_on:
       postgres:
         condition: service_healthy
+      setup:
+        condition: service_completed_successfully
     volumes:
       - .:/fortuna
     restart: "no"
@@ -58,8 +62,8 @@ services:
     env_file:
       - ./apps/api/.env
     depends_on:
-      workspace:
-        condition: service_started
+      setup:
+        condition: service_completed_successfully
       migration:
         condition: service_completed_successfully
     volumes:

@@ -49,7 +49,9 @@ services:
     container_name: migration
     build:
       context: .
-      dockerfile: apps/api/Dockerfile.migration
+      target: prod
+      dockerfile: apps/api/Dockerfile
+    command: ["node", "node_modules/typeorm/cli.js", "migration:run", "-d", "dist/database/connection.js"]
     env_file:
       - ./apps/api/.env
     depends_on:
