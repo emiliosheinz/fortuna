@@ -1,101 +1,43 @@
+![Fortuna Banner](./docs/images/banner.png)
+
 # Fortuna
 
-Fortuna is a personal finance app for tracking spending, net worth, investments, and financial goals — built to give you a clear, honest picture of your money over time.
+A personal finance app for tracking spending, net worth, investments, and financial goals — built to give an honest picture of money over time.
 
-## Quick Start
+## Quick start
 
-The entire development workflow should happen within Docker containers to ensure consistency across environments.
-
-```bash
-# Setup your environment
-./scripts/setup-env.sh
-
-# Start development
-docker compose up -d
-```
-
-If you want to run any CLI commands make sure to do so within the `workspace` container:
+Docker is the only host requirement.
 
 ```bash
-# Open a shell in the workspace container
-docker compose exec workspace sh
-
-# Or run a command directly
-docker compose exec workspace <command>
+./scripts/setup-env.sh        # copy every .env.example to .env
+docker compose up -d          # postgres, migrations, api, web
 ```
 
-### E2E Tests
+- API: <http://localhost:3000>
+- Web: <http://localhost:3001>
 
-E2E tests validate the system as a whole, ensuring all applications work correctly together inside Docker. They are not started automatically with the development environment.
+## Repo layout
 
-To run E2E tests, you must explicitly start the E2E services defined in `docker-compose.yaml`.
-
-Each application has its own E2E service (e.g., `web-e2e`), which spins up the required dependencies and runs tests against downstream services.
-
-```bash
-# Run the E2E service for the web app
-docker compose --profile e2e up --exit-code-from web-e2e web-e2e
+```
+apps/
+  api/        NestJS + TypeORM + Postgres
+  web/        Next.js + Tailwind + shadcn/ui
+packages/
+  config/     Shared Biome, TypeScript, and Jest config (@fortuna/config)
+docker/       Auxiliary base images (CLI, Playwright) published to GHCR
+docs/         Cross-cutting documentation and ADRs
+bin/fortuna   Helper that runs commands inside the workspace container
 ```
 
-### Using the fortuna helper
+## Where to go next
 
-For convenience, the repo includes a helper script at `bin/fortuna`. It runs commands inside the workspace container so you don't have to type `docker exec` every time:
+| If you want to                               | See                                              |
+|----------------------------------------------|--------------------------------------------------|
+| Run commands, tests, e2e, or migrations      | [`docs/development.md`](./docs/development.md)   |
+| Understand the release and publish pipeline  | [`docs/release.md`](./docs/release.md)           |
+| Read the rationale behind a technical choice | [`docs/architecture/decisions/`](./docs/architecture/decisions/) |
+| Work on the API                              | [`apps/api/README.md`](./apps/api/README.md)     |
+| Work on the web app                          | [`apps/web/README.md`](./apps/web/README.md)     |
+| Use or extend shared config                  | [`packages/config/README.md`](./packages/config/README.md) |
+| Contribute changes                           | [`CONTRIBUTING.md`](./CONTRIBUTING.md)           |
 
-```bash
-bin/fortuna pnpm install
-bin/fortuna pnpm turbo test --filter=api
-bin/fortuna pnpm turbo check
-```
-
-> Even though you can run commands on your host machine, it is highly recommended to always use the Docker container to avoid environment discrepancies.
-
-## Database Migrations
-
-Migrations are managed with TypeORM. When you run `docker compose up -d`, the `migration` service runs automatically before the API starts, so your database is always up to date in development.
-
-For manual control, use the `bin/fortuna db` subcommand, which runs commands inside the dedicated `migration` container.
-
-### Generate a new migration
-
-TypeORM compares the current entity definitions against the database schema and generates the diff automatically.
-
-```bash
-bin/fortuna db migration:generate <MigrationName>
-```
-
-The generated file will be placed in `apps/api/src/database/migrations/`. Review the generated SQL before committing — always verify that both `up` and `down` are correct.
-
-### Apply pending migrations
-
-```bash
-bin/fortuna db migration:run
-```
-
-### Revert the last migration
-
-```bash
-bin/fortuna db migration:revert
-```
-
-Rolls back only the most recently applied migration. Run it again to revert further.
-
-### Check migration status
-
-```bash
-bin/fortuna db migration:show
-```
-
-Lists all migrations and marks which ones have been applied.
-
-## Project Structure
-
-The project is organized as a monorepo using pnpm workspaces, Turborepo, and Docker to manage multiple applications and shared packages.
-
-### Apps
-
-- `api`: The backend API built with Node.js and NestJS.
-- `web`: The frontend web application built with Next.js and React.
-
-### Packages
-
-- `config`: Shared configuration files.
