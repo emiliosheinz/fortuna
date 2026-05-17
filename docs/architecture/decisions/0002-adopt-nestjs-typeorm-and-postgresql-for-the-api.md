@@ -13,24 +13,23 @@ Fortuna's API handles financial domain logic — accounts, transactions, goals, 
 - Relational integrity (a transaction's account must exist; deletes need referential rules).
 - Accurate money handling (no floating-point arithmetic for currency).
 - A backend framework with strong conventions so a solo maintainer can move quickly without re-deciding structure each time.
-- A schema that's versioned and reproducible across environments.
+- A schema that is versioned and reproducible across environments.
 
 ## Decision
 
-- **Framework:** NestJS 11. Provides modules, dependency injection, decorators, a testing harness, and an established convention for layered architecture. The opinionation pays back when the team is one person.
-- **ORM:** TypeORM 0.3. Decorator-driven entities match NestJS style and ship a first-class migration workflow.
-- **Database:** PostgreSQL 17. Strong support for `numeric` (exact money), constraints, partial indexes, generated columns, and `jsonb` for flexible attributes when relational modeling is overkill.
+- **Framework:** NestJS. Provides modules, dependency injection, decorators, a testing harness, and an established convention for layered architecture. The opinionation pays back when the team is one person.
+- **ORM:** TypeORM. Decorator-driven entities match the framework's style and ship a first-class migration workflow.
+- **Database:** PostgreSQL. Strong support for exact-precision numerics (for money), constraints, partial indexes, generated columns, and JSONB for flexible attributes when relational modeling is overkill.
 
 Schema and runtime conventions:
 
-- `synchronize: false` always. The database schema is never auto-derived from entities at runtime — migrations are the only path.
-- Migrations are generated from entity diffs (`bin/fortuna db migration:generate`), reviewed by hand before commit, and applied automatically on `docker compose up` in development and as a dedicated `migration` service in production compose.
-- The TypeORM `DataSource` used by the CLI lives in `apps/api/src/database/connection.ts`, separate from the runtime `AppModule` wiring, so migrations can run without booting the rest of the app.
+- The database schema is never auto-derived from entities at runtime. Migrations are the only path that changes the schema, in every environment.
+- Migrations are generated from entity diffs, reviewed by hand before commit, and applied automatically before the application starts.
+- The database connection used for migrations is defined separately from the application's runtime wiring, so schema changes can run without booting the rest of the app.
 
 ## Consequences
 
 - Entities are the source of truth for schema diffs, but migrations are the source of truth for what actually runs in the database. The pull request is the place to catch dangerous generated SQL.
-- Money is modeled with `numeric`, not `float`/`double`.
-- Database access stays inside `apps/api`. The web app never connects to the database directly (see also: project memory on this constraint).
+- Money is modeled with exact-precision numerics, not floating-point types.
+- Database access stays inside the API. The web app never connects to the database directly.
 - A new entity always means a new migration commit; there is no shortcut.
-- PostgreSQL features (JSONB, partial indexes, window functions) are fair game — we are not preserving portability to other databases.

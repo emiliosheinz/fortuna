@@ -1,4 +1,4 @@
-# `web`
+# Web
 
 Fortuna's frontend, built with Next.js 16 (App Router) on React 19, Tailwind CSS v4, and shadcn/ui. See [ADR-0003](../../docs/architecture/decisions/0003-adopt-nextjs-tailwind-and-shadcn-for-the-web-app.md) for the rationale.
 

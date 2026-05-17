@@ -6,23 +6,34 @@ The full rationale is in [ADR-0006](./architecture/decisions/0006-conventional-c
 
 ## The pipeline at a glance
 
-```
-PR merged to main
-        │
-        ▼
-on-merge-to-main          (nx release --skip-publish)
-        │                  ├─ bumps versions of affected projects
-        │                  ├─ writes per-project CHANGELOG.md
-        │                  ├─ creates GitHub releases
-        │                  └─ pushes tags: {projectName}@{version}
-        ▼
-   tag pushed
-        │
-        ▼
-on-tag-publish            (per project type)
-        ├─ packages/* → pnpm publish to npm
-        └─ apps/*     → multi-arch Docker images to GHCR
-                         (amd64 + arm64 → manifest)
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Dev as Developer
+    participant GH as GitHub (main + tags)
+    participant Merge as on-merge-to-main
+    participant Pub as on-tag-publish
+    participant NPM as npm
+    participant GHCR as GHCR
+
+    Dev->>GH: Merge PR to main
+    GH->>Merge: Trigger workflow
+    activate Merge
+    Note right of Merge: nx release (skip-publish)
+    Merge->>Merge: Bump versions of affected projects
+    Merge->>Merge: Write per-project CHANGELOG.md
+    Merge->>GH: Create GitHub releases
+    Merge->>GH: Push tags (projectName@version)
+    deactivate Merge
+
+    GH->>Pub: Trigger workflow on tag push
+    activate Pub
+    par packages/*
+        Pub->>NPM: pnpm publish
+    and apps/*
+        Pub->>GHCR: Push multi-arch image (amd64 + arm64 manifest)
+    end
+    deactivate Pub
 ```
 
 The release commit itself contains `[skip release]` so the workflow does not loop.
@@ -70,18 +81,3 @@ Two base images speed up local and CI builds:
 - `ghcr.io/emiliosheinz/fortuna-playwright` — Node + pre-installed Playwright browsers (chromium, firefox, webkit). Backs the e2e Dockerfiles.
 
 They are rebuilt automatically by `build-auxiliary-docker-images.yml` whenever the corresponding `docker/Dockerfile.*` changes on `main`. Multi-arch (`linux/amd64,linux/arm64`) is published in a single job using QEMU + Buildx.
-
-## Manual operations
-
-These shouldn't be necessary in normal flow, but here for reference:
-
-```bash
-# Locally cut a release without publishing (dry-run style).
-pnpm nx release --dry-run
-
-# Re-trigger publishing for an existing tag (delete and re-push the tag).
-git tag -d api@1.4.0 && git push origin :refs/tags/api@1.4.0
-git tag api@1.4.0 <sha> && git push origin api@1.4.0
-```
-
-Do not force-push to `main`. It rewrites release commits and orphans tags. Branch protection should enforce this.
