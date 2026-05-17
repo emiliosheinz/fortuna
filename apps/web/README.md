@@ -10,7 +10,7 @@ This app does not connect to the database. All data flows through the API over H
 
 ## Components
 
-Components live in [`src/components/`](./src/components/) and are managed by [shadcn/ui](https://ui.shadcn.com/) (`new-york` style, `neutral` base). They are copied into the repo, not consumed as a library — edit them freely.
+Components live in [`src/components/`](./src/components/) and are managed by [shadcn/ui](https://ui.shadcn.com/) (`new-york` style, `neutral` base). They are copied into the repo and treated as vendored code, not consumed as a library; prefer wrappers and composition for customization rather than editing the generated shadcn components directly, in line with [ADR-0003](../../docs/architecture/decisions/0003-adopt-nextjs-tailwind-and-shadcn-for-the-web-app.md).
 
 The shadcn CLI configuration is in [`components.json`](./components.json):
 

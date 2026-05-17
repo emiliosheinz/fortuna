@@ -1,4 +1,4 @@
-# Api
+# API
 
 Fortuna's backend, built with NestJS 11, TypeORM 0.3, and PostgreSQL 17. See [ADR-0002](../../docs/architecture/decisions/0002-adopt-nestjs-typeorm-and-postgresql-for-the-api.md) for the rationale behind the stack.
 
