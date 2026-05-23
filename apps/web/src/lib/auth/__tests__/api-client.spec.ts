@@ -2,6 +2,7 @@ import {
   deleteCurrentSession,
   deleteSession,
   listSessions,
+  postGoogleIdToken,
 } from "../api-client";
 
 const ORIGINAL_FETCH = global.fetch;
@@ -111,6 +112,44 @@ describe("deleteCurrentSession", () => {
     await expect(deleteCurrentSession("c")).rejects.toThrow(
       "/auth/session DELETE failed with status 500",
     );
+  });
+});
+
+describe("postGoogleIdToken", () => {
+  it("forwards the browser's user-agent so the session row carries a real device label", async () => {
+    const fetchSpy = mockFetch({
+      ok: true,
+      status: 201,
+      body: { sessionToken: "tok", expiresAt: "2026-01-01T00:00:00.000Z" },
+    });
+
+    const browserUa =
+      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+    await postGoogleIdToken("id.token", "nonce-123", { userAgent: browserUa });
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    const [, init] = fetchSpy.mock.calls[0] as [
+      string,
+      { headers: Record<string, string> },
+    ];
+    expect(init.headers["User-Agent"]).toBe(browserUa);
+    expect(init.headers["Content-Type"]).toBe("application/json");
+  });
+
+  it("omits User-Agent when none is provided", async () => {
+    const fetchSpy = mockFetch({
+      ok: true,
+      status: 201,
+      body: { sessionToken: "tok", expiresAt: "2026-01-01T00:00:00.000Z" },
+    });
+
+    await postGoogleIdToken("id.token", "nonce-123");
+
+    const [, init] = fetchSpy.mock.calls[0] as [
+      string,
+      { headers: Record<string, string> },
+    ];
+    expect(init.headers["User-Agent"]).toBeUndefined();
   });
 });
 

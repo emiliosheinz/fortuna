@@ -118,15 +118,26 @@ export interface GoogleSignInResponse {
  * Forward a Google ID token + nonce to the API so it can verify the token,
  * upsert the user, and mint a session. apps/web takes the returned
  * `sessionToken` and sets it as the session cookie itself.
+ *
+ * `userAgent` should be the browser's UA from the inbound request — the API
+ * persists it on the session row and derives the device label from it. If
+ * omitted, the session inherits Node's default fetch UA and renders as
+ * "Unknown device".
  */
 export async function postGoogleIdToken(
   idToken: string,
   nonce: string,
+  opts: { userAgent?: string } = {},
 ): Promise<GoogleSignInResponse> {
   const apiBaseUrl = requireEnv("API_BASE_URL");
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  if (opts.userAgent) headers["User-Agent"] = opts.userAgent;
+
   const res = await fetch(`${apiBaseUrl}/auth/google`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify({ idToken, nonce }),
   });
   if (!res.ok) {

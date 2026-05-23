@@ -57,7 +57,9 @@ export async function GET(req: NextRequest) {
   let sessionToken: string;
   let expiresAt: Date;
   try {
-    const result = await postGoogleIdToken(idToken, nonce);
+    const result = await postGoogleIdToken(idToken, nonce, {
+      userAgent: req.headers.get("user-agent") ?? undefined,
+    });
     sessionToken = result.sessionToken;
     expiresAt = new Date(result.expiresAt);
   } catch (err) {
