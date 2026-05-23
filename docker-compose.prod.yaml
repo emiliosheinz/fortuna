@@ -59,21 +59,6 @@ services:
         condition: service_healthy
     restart: "no"
 
-  web-e2e:
-    container_name: web-e2e
-    profiles: ["e2e"]
-    environment:
-      CI: "true"
-    build:
-      context: .
-      target: prod
-      dockerfile: apps/web/Dockerfile.e2e
-    env_file:
-      - ./apps/web/.env
-    depends_on:
-      web:
-        condition: service_healthy
-
 networks:
   default:
     name: fortuna

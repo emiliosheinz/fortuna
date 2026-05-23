@@ -6,6 +6,15 @@ case "${1:-}" in
     shift
     docker compose run --rm migration pnpm --filter api run "$@"
     ;;
+  e2e)
+    shift
+    if [ $# -eq 0 ]; then
+      trap 'docker compose -f docker-compose.e2e.yaml down' EXIT
+      docker compose -f docker-compose.e2e.yaml run --rm web-e2e
+    else
+      docker compose -f docker-compose.e2e.yaml "$@"
+    fi
+    ;;
   "")
     docker exec -it workspace sh
     ;;

@@ -1,6 +1,7 @@
+name: fortuna-e2e
+
 services:
   postgres:
-    container_name: postgres
     image: postgres:17-alpine
     env_file:
       - ./.env
@@ -15,7 +16,6 @@ services:
     restart: unless-stopped
 
   setup:
-    container_name: setup
     image: ghcr.io/emiliosheinz/fortuna-cli:latest
     volumes:
       - .:/fortuna
@@ -24,19 +24,7 @@ services:
     command: sh -lc "pnpm install"
     restart: "no"
 
-  workspace:
-    container_name: workspace
-    image: ghcr.io/emiliosheinz/fortuna-cli:latest
-    depends_on:
-      setup:
-        condition: service_completed_successfully
-    volumes:
-      - .:/fortuna
-    command: sh -c "tail -f /dev/null"
-    restart: "no"
-
   migration:
-    container_name: migration
     build:
       context: .
       target: dev
@@ -53,35 +41,49 @@ services:
       - .:/fortuna
     restart: "no"
 
+  mock-oauth2-server:
+    image: ghcr.io/navikt/mock-oauth2-server:2.1.10
+    environment:
+      SERVER_PORT: "8080"
+
   api:
-    container_name: api
     build:
       context: .
       target: dev
       dockerfile: apps/api/Dockerfile
     env_file:
       - ./apps/api/.env
+    environment:
+      OIDC_ISSUER_URL: http://mock-oauth2-server:8080/default
+      GOOGLE_CLIENT_ID: e2e-client-id
     depends_on:
       setup:
         condition: service_completed_successfully
       migration:
         condition: service_completed_successfully
+      mock-oauth2-server:
+        condition: service_started
     volumes:
       - .:/fortuna
-    ports:
-      - "3000:3000"
 
   web:
-    container_name: web
     build:
       context: .
       target: dev
       dockerfile: apps/web/Dockerfile
     env_file:
       - ./apps/web/.env
+    environment:
+      OIDC_ISSUER_URL: http://mock-oauth2-server:8080/default
+      GOOGLE_CLIENT_ID: e2e-client-id
+      GOOGLE_CLIENT_SECRET: e2e-client-secret
+      GOOGLE_REDIRECT_URI: http://web:3001/api/auth/callback/google
+      AUTH_SECRET: e2e-fixed-auth-secret-not-a-real-secret
     depends_on:
       setup:
         condition: service_completed_successfully
+      mock-oauth2-server:
+        condition: service_started
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://$${HOSTNAME}:$${PORT}/health || exit 1"]
       start_period: 10s
@@ -90,12 +92,26 @@ services:
       retries: 10
     volumes:
       - .:/fortuna
-    ports:
-      - "3001:3001"
+
+  web-e2e:
+    build:
+      context: .
+      target: dev
+      dockerfile: apps/web/Dockerfile.e2e
+    env_file:
+      - ./apps/web/.env
+    depends_on:
+      setup:
+        condition: service_completed_successfully
+      web:
+        condition: service_healthy
+      api:
+        condition: service_started
+    volumes:
+      - .:/fortuna
 
 networks:
   default:
-    name: fortuna
     driver: bridge
 
 volumes:
