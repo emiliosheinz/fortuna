@@ -87,13 +87,18 @@ describe("Auth integration", () => {
   });
 
   async function signIdToken(
-    overrides: { aud?: string; sub?: string; name?: string } = {},
+    overrides: {
+      aud?: string;
+      sub?: string;
+      name?: string;
+      email?: string;
+    } = {},
   ): Promise<string> {
     const now = Math.floor(Date.now() / 1000);
     return new SignJWT({
       nonce: NONCE,
       name: overrides.name ?? "Integration User",
-      email: "int@example.com",
+      email: overrides.email ?? "int@example.com",
       picture: "https://example.com/a.png",
     })
       .setProtectedHeader({ alg: "RS256", kid: "test-kid" })
@@ -224,5 +229,207 @@ describe("Auth integration", () => {
 
     expect(JSON.stringify(res.body).toLowerCase()).not.toContain("revoked");
     expect(JSON.stringify(res.body).toLowerCase()).not.toContain("expired");
+  });
+
+  describe("session management", () => {
+    async function signInAs(
+      opts: { sub?: string; email?: string; userAgent?: string } = {},
+    ): Promise<{ sessionToken: string; userId: string }> {
+      const idToken = await signIdToken({
+        sub: opts.sub,
+        email: opts.email,
+      });
+      const res = await request(app.getHttpServer())
+        .post("/auth/google")
+        .send({ idToken, nonce: NONCE })
+        .set("User-Agent", opts.userAgent ?? "Mozilla/5.0")
+        .expect(201);
+
+      const sessions = await dataSource.getRepository(Session).find();
+      const session = sessions.find(
+        (s) => s.tokenHash === sha256Hex(res.body.sessionToken),
+      );
+      if (!session) throw new Error("expected session to be created");
+
+      return { sessionToken: res.body.sessionToken, userId: session.userId };
+    }
+
+    it("DELETE /auth/session revokes the session, clears the cookie, and 401s subsequent requests", async () => {
+      const { sessionToken } = await signInAs();
+      const cookie = `fortuna_session=${sessionToken}`;
+
+      const signOutRes = await request(app.getHttpServer())
+        .delete("/auth/session")
+        .set("Cookie", cookie)
+        .expect(204);
+
+      const setCookieHeader = signOutRes.headers["set-cookie"] as
+        | string[]
+        | string
+        | undefined;
+      const setCookies = Array.isArray(setCookieHeader)
+        ? setCookieHeader
+        : setCookieHeader
+          ? [setCookieHeader]
+          : [];
+      const clearHeader = setCookies.find((c) =>
+        c.startsWith("fortuna_session="),
+      );
+      expect(clearHeader).toBeDefined();
+      expect(clearHeader).toContain("Max-Age=0");
+      expect(clearHeader).toContain("Path=/");
+      expect(clearHeader?.toLowerCase()).toContain("httponly");
+
+      const sessionRow = await dataSource.getRepository(Session).findOne({
+        where: { tokenHash: sha256Hex(sessionToken) },
+      });
+      expect(sessionRow?.revokedAt).not.toBeNull();
+
+      await request(app.getHttpServer())
+        .get("/users/me")
+        .set("Cookie", cookie)
+        .expect(401);
+    });
+
+    it("DELETE /auth/session without a session cookie returns 401", async () => {
+      await request(app.getHttpServer()).delete("/auth/session").expect(401);
+    });
+
+    it("GET /users/me/sessions returns only the principal's active sessions with isCurrent flag", async () => {
+      const first = await signInAs({
+        sub: "user-multi",
+        userAgent:
+          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+      });
+      const second = await signInAs({
+        sub: "user-multi",
+        userAgent:
+          "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
+      });
+      expect(first.userId).toBe(second.userId);
+
+      const listRes = await request(app.getHttpServer())
+        .get("/users/me/sessions")
+        .set("Cookie", `fortuna_session=${second.sessionToken}`)
+        .expect(200);
+
+      expect(listRes.body).toHaveLength(2);
+      const labelled = (
+        listRes.body as Array<{
+          deviceLabel: string;
+          isCurrent: boolean;
+        }>
+      ).map((s) => ({ label: s.deviceLabel, isCurrent: s.isCurrent }));
+      expect(labelled).toEqual(
+        expect.arrayContaining([
+          { label: "Chrome on macOS", isCurrent: false },
+          { label: "Safari on iOS", isCurrent: true },
+        ]),
+      );
+    });
+
+    it("GET /users/me/sessions excludes revoked sessions", async () => {
+      const first = await signInAs({ sub: "user-revoke-list" });
+      const second = await signInAs({ sub: "user-revoke-list" });
+
+      await request(app.getHttpServer())
+        .delete("/auth/session")
+        .set("Cookie", `fortuna_session=${first.sessionToken}`)
+        .expect(204);
+
+      const listRes = await request(app.getHttpServer())
+        .get("/users/me/sessions")
+        .set("Cookie", `fortuna_session=${second.sessionToken}`)
+        .expect(200);
+
+      expect(listRes.body).toHaveLength(1);
+      expect(listRes.body[0].isCurrent).toBe(true);
+    });
+
+    it("DELETE /users/me/sessions/:id revokes a non-current session owned by the principal", async () => {
+      const other = await signInAs({ sub: "user-revoke-other" });
+      const current = await signInAs({ sub: "user-revoke-other" });
+
+      // Find the other session's id.
+      const sessionsRepo = dataSource.getRepository(Session);
+      const otherSession = await sessionsRepo.findOne({
+        where: { tokenHash: sha256Hex(other.sessionToken) },
+      });
+      if (!otherSession) throw new Error("expected other session");
+
+      await request(app.getHttpServer())
+        .delete(`/users/me/sessions/${otherSession.id}`)
+        .set("Cookie", `fortuna_session=${current.sessionToken}`)
+        .expect(204);
+
+      const refreshed = await sessionsRepo.findOne({
+        where: { id: otherSession.id },
+      });
+      expect(refreshed?.revokedAt).not.toBeNull();
+
+      // The revoked session can no longer authenticate.
+      await request(app.getHttpServer())
+        .get("/users/me")
+        .set("Cookie", `fortuna_session=${other.sessionToken}`)
+        .expect(401);
+    });
+
+    it("DELETE /users/me/sessions/:id refuses to revoke the current session (400)", async () => {
+      const current = await signInAs({ sub: "user-self-revoke" });
+
+      const sessionsRepo = dataSource.getRepository(Session);
+      const session = await sessionsRepo.findOne({
+        where: { tokenHash: sha256Hex(current.sessionToken) },
+      });
+      if (!session) throw new Error("expected session");
+
+      await request(app.getHttpServer())
+        .delete(`/users/me/sessions/${session.id}`)
+        .set("Cookie", `fortuna_session=${current.sessionToken}`)
+        .expect(400);
+
+      const refreshed = await sessionsRepo.findOne({
+        where: { id: session.id },
+      });
+      expect(refreshed?.revokedAt).toBeNull();
+    });
+
+    it("DELETE /users/me/sessions/:id returns 404 (no info leak) when the session belongs to a different user", async () => {
+      const victim = await signInAs({
+        sub: "user-victim",
+        email: "victim@example.com",
+      });
+      const attacker = await signInAs({
+        sub: "user-attacker",
+        email: "attacker@example.com",
+      });
+      expect(victim.userId).not.toBe(attacker.userId);
+
+      const sessionsRepo = dataSource.getRepository(Session);
+      const victimSession = await sessionsRepo.findOne({
+        where: { tokenHash: sha256Hex(victim.sessionToken) },
+      });
+      if (!victimSession) throw new Error("expected victim session");
+
+      await request(app.getHttpServer())
+        .delete(`/users/me/sessions/${victimSession.id}`)
+        .set("Cookie", `fortuna_session=${attacker.sessionToken}`)
+        .expect(404);
+
+      const refreshed = await sessionsRepo.findOne({
+        where: { id: victimSession.id },
+      });
+      expect(refreshed?.revokedAt).toBeNull();
+    });
+
+    it("DELETE /users/me/sessions/:id returns 404 for a non-existent session id", async () => {
+      const current = await signInAs({ sub: "user-404-session" });
+      const fakeUuid = "00000000-0000-0000-0000-000000000000";
+
+      await request(app.getHttpServer())
+        .delete(`/users/me/sessions/${fakeUuid}`)
+        .set("Cookie", `fortuna_session=${current.sessionToken}`)
+        .expect(404);
+    });
   });
 });

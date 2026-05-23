@@ -134,6 +134,24 @@ describe("SessionsService", () => {
     });
   });
 
+  describe("revoke", () => {
+    it("sets revoked_at on the session row", async () => {
+      const repo = buildRepo();
+      const service = new SessionsService(repo as never);
+      const before = Date.now();
+
+      await service.revoke("session-1");
+
+      expect(repo.update).toHaveBeenCalledTimes(1);
+      const [where, patch] = repo.update.mock.calls[0];
+      expect(where).toEqual({ id: "session-1" });
+      expect(patch.revokedAt).toBeInstanceOf(Date);
+      expect((patch.revokedAt as Date).getTime()).toBeGreaterThanOrEqual(
+        before,
+      );
+    });
+  });
+
   describe("maybeSlide", () => {
     it("does not write when last_active_at is within the throttle window", async () => {
       const repo = buildRepo();

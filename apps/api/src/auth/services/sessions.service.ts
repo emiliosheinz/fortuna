@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import { Injectable } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import type { Repository } from "typeorm";
+import { IsNull, MoreThan, type Repository } from "typeorm";
 import { SESSION_DURATION_MS } from "../cookies/session-cookie";
 import { Session } from "../entities/session.entity";
 
@@ -58,6 +58,26 @@ export class SessionsService {
     return { rawToken, session };
   }
 
+  /** Look up a session by id without any active-state filtering. Returns
+   * null when not found — callers decide what to do with revoked/expired
+   * rows (e.g. ownership checks still apply). */
+  async findById(sessionId: string): Promise<Session | null> {
+    return this.sessions.findOne({ where: { id: sessionId } });
+  }
+
+  /** List every non-revoked, non-expired session for a user, newest active
+   * first. Used to render the "active sessions" UI. */
+  async listActiveForUser(userId: string): Promise<Session[]> {
+    return this.sessions.find({
+      where: {
+        userId,
+        revokedAt: IsNull(),
+        expiresAt: MoreThan(new Date()),
+      },
+      order: { lastActiveAt: "DESC" },
+    });
+  }
+
   /** Look up an active (not revoked, not expired) session by its raw token. */
   async findActiveByRawToken(rawToken: string): Promise<Session | null> {
     const session = await this.sessions.findOne({
@@ -67,6 +87,12 @@ export class SessionsService {
     if (session.revokedAt) return null;
     if (session.expiresAt.getTime() <= Date.now()) return null;
     return session;
+  }
+
+  /** Mark a session as revoked. Idempotent — re-revoking moves the timestamp
+   * forward, which is fine: the session was already invalid. */
+  async revoke(sessionId: string): Promise<void> {
+    await this.sessions.update({ id: sessionId }, { revokedAt: new Date() });
   }
 
   /**

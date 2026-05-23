@@ -3,6 +3,7 @@ import {
   type Configuration,
   discovery,
 } from "openid-client";
+import { requireEnv } from "./env";
 
 let cached: Promise<Configuration> | null = null;
 
@@ -36,15 +37,6 @@ async function buildConfig(): Promise<Configuration> {
     undefined,
     isProduction ? undefined : { execute: [allowInsecureRequests] },
   );
-}
-
-/** Read an env var, throwing if missing. Used at module load / request time. */
-export function requireEnv(name: string): string {
-  const value = process.env[name];
-  if (!value) {
-    throw new Error(`Environment variable ${name} must be set`);
-  }
-  return value;
 }
 
 /** Public OAuth redirect URI registered with the IdP. */

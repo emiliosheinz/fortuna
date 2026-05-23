@@ -40,6 +40,30 @@ function buildController(
   return new AuthController(verifier, users, sessions);
 }
 
+describe("AuthController DELETE /auth/session", () => {
+  it("revokes the principal's session and sets a clear-session-cookie header", async () => {
+    const revoke = jest.fn().mockResolvedValue(undefined);
+    const controller = buildController({ sessions: { revoke } });
+
+    const setHeader = jest.fn();
+    const req = { principal: { userId: "user-1", sessionId: "session-1" } };
+
+    await controller.signOut(req as never, { setHeader } as never);
+
+    expect(revoke).toHaveBeenCalledWith("session-1");
+    const setCookieCalls = setHeader.mock.calls.filter(
+      ([name]) => name === "Set-Cookie",
+    );
+    expect(setCookieCalls).toHaveLength(1);
+    const cookieValue = setCookieCalls[0][1] as string;
+    expect(cookieValue).toMatch(/^fortuna_session=/);
+    expect(cookieValue).toContain("Max-Age=0");
+    expect(cookieValue).toContain("Path=/");
+    expect(cookieValue.toLowerCase()).toContain("httponly");
+    expect(cookieValue.toLowerCase()).toContain("samesite=lax");
+  });
+});
+
 describe("AuthController POST /auth/google", () => {
   const validBody: GoogleSignInDto = {
     idToken: "valid.id.token",

@@ -2,18 +2,28 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Delete,
+  HttpCode,
   Logger,
   Post,
   Req,
+  Res,
   UnauthorizedException,
+  UseGuards,
 } from "@nestjs/common";
-import type { Request } from "express";
+import type { Request, Response } from "express";
+import { buildClearSessionCookieHeader } from "./cookies/session-cookie";
+import { SessionGuard } from "./guards/session.guard";
 import {
   GoogleIdTokenVerifier,
   IdTokenVerificationError,
 } from "./services/google-id-token-verifier";
 import { SessionsService } from "./services/sessions.service";
 import { UsersService } from "./services/users.service";
+
+interface AuthedRequest extends Request {
+  principal?: { userId: string; sessionId: string };
+}
 
 /** Request body for `POST /auth/google`. */
 export interface GoogleSignInDto {
@@ -93,6 +103,27 @@ export class AuthController {
       sessionToken: rawToken,
       expiresAt: session.expiresAt.toISOString(),
     };
+  }
+
+  /**
+   * Sign out the current device.
+   *
+   * Marks the principal's session `revoked_at = now()` and instructs the
+   * browser to drop the session cookie. Idempotent — re-signing-out is a
+   * no-op apart from moving the revoked timestamp forward.
+   */
+  @UseGuards(SessionGuard)
+  @Delete("session")
+  @HttpCode(204)
+  async signOut(
+    @Req() req: AuthedRequest,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<void> {
+    const principal = req.principal;
+    if (!principal) throw new UnauthorizedException();
+
+    await this.sessions.revoke(principal.sessionId);
+    res.setHeader("Set-Cookie", buildClearSessionCookieHeader());
   }
 }
 
