@@ -1,5 +1,8 @@
 import path from "node:path";
 import { DataSource } from "typeorm";
+import { Identity } from "@/auth/entities/identity.entity";
+import { Session } from "@/auth/entities/session.entity";
+import { User } from "@/auth/entities/user.entity";
 
 export const AppDataSource = new DataSource({
   type: "postgres",
@@ -9,7 +12,7 @@ export const AppDataSource = new DataSource({
   username: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
   ssl: process.env.DB_SSL === "true",
-  entities: [],
+  entities: [User, Identity, Session],
   migrations: [path.join(__dirname, "migrations", "*.{ts,js}")],
   migrationsTableName: "migrations",
 });

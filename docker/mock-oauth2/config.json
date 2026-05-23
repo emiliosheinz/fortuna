@@ -1,0 +1,21 @@
+{
+  "interactiveLogin": true,
+  "tokenCallbacks": [
+    {
+      "issuerId": "default",
+      "tokenExpiry": 600,
+      "requestMappings": [
+        {
+          "requestParam": "grant_type",
+          "match": ".*",
+          "claims": {
+            "sub": "e2e-google-sub-001",
+            "name": "E2E User",
+            "email": "e2e@example.com",
+            "picture": "https://example.com/avatar.png"
+          }
+        }
+      ]
+    }
+  ]
+}

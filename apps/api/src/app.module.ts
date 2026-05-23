@@ -1,7 +1,13 @@
+import path from "node:path";
 import { Module } from "@nestjs/common";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { AppController } from "./app.controller";
 import { AppService } from "./app.service";
+import { AuthModule } from "./auth/auth.module";
+import { Identity } from "./auth/entities/identity.entity";
+import { Session } from "./auth/entities/session.entity";
+import { User } from "./auth/entities/user.entity";
+import { UsersModule } from "./users/users.module";
 
 @Module({
   imports: [
@@ -14,10 +20,16 @@ import { AppService } from "./app.service";
         username: process.env.DB_USER,
         password: process.env.DB_PASSWORD,
         ssl: process.env.DB_SSL === "true",
-        entities: [],
+        entities: [User, Identity, Session],
+        migrations: [
+          path.join(__dirname, "database", "migrations", "*.{ts,js}"),
+        ],
+        migrationsTableName: "migrations",
         synchronize: false,
       }),
     }),
+    AuthModule,
+    UsersModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -1,0 +1,55 @@
+import { Module } from "@nestjs/common";
+import { TypeOrmModule } from "@nestjs/typeorm";
+import { AuthController } from "./auth.controller";
+import { Identity } from "./entities/identity.entity";
+import { Session } from "./entities/session.entity";
+import { User } from "./entities/user.entity";
+import { SessionGuard } from "./guards/session.guard";
+import {
+  GOOGLE_ID_TOKEN_VERIFIER_OPTIONS,
+  GoogleIdTokenVerifier,
+  type GoogleIdTokenVerifierOptions,
+} from "./services/google-id-token-verifier";
+import { SessionsService } from "./services/sessions.service";
+import { UsersService } from "./services/users.service";
+
+const googleVerifierOptionsProvider = {
+  provide: GOOGLE_ID_TOKEN_VERIFIER_OPTIONS,
+  useFactory: (): GoogleIdTokenVerifierOptions => {
+    const issuer = process.env.OIDC_ISSUER_URL;
+    const audience = process.env.GOOGLE_CLIENT_ID;
+    if (!issuer) {
+      throw new Error("OIDC_ISSUER_URL must be set");
+    }
+    if (!audience) {
+      throw new Error("GOOGLE_CLIENT_ID must be set");
+    }
+    return {
+      issuer,
+      audience,
+      jwksUri: deriveJwksUri(issuer),
+    };
+  },
+};
+
+function deriveJwksUri(issuer: string): string {
+  const trimmed = issuer.replace(/\/$/, "");
+  if (trimmed === "https://accounts.google.com") {
+    return "https://www.googleapis.com/oauth2/v3/certs";
+  }
+  return `${trimmed}/jwks`;
+}
+
+@Module({
+  imports: [TypeOrmModule.forFeature([User, Identity, Session])],
+  controllers: [AuthController],
+  providers: [
+    googleVerifierOptionsProvider,
+    GoogleIdTokenVerifier,
+    SessionsService,
+    UsersService,
+    SessionGuard,
+  ],
+  exports: [SessionsService, UsersService, SessionGuard],
+})
+export class AuthModule {}

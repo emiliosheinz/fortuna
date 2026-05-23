@@ -45,6 +45,9 @@ services:
     image: ghcr.io/navikt/mock-oauth2-server:2.1.10
     environment:
       SERVER_PORT: "8080"
+      JSON_CONFIG_PATH: /config/config.json
+    volumes:
+      - ./docker/mock-oauth2:/config:ro
 
   api:
     build:
@@ -92,6 +95,7 @@ services:
       retries: 10
     volumes:
       - .:/fortuna
+      - e2e-web-next:/fortuna/apps/web/.next
 
   web-e2e:
     build:
@@ -116,3 +120,4 @@ networks:
 
 volumes:
   db-data:
+  e2e-web-next:

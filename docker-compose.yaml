@@ -32,6 +32,7 @@ services:
         condition: service_completed_successfully
     volumes:
       - .:/fortuna
+      - /var/run/docker.sock:/var/run/docker.sock
     command: sh -c "tail -f /dev/null"
     restart: "no"
 
