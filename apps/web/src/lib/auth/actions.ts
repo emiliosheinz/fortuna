@@ -2,11 +2,7 @@
 
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import {
-  deleteAccount,
-  deleteCurrentSession,
-  deleteSession,
-} from "./api-client";
+import { deleteCurrentSession, deleteMe, deleteSession } from "./api-client";
 import { DELETE_ACCOUNT_CONFIRMATION_PHRASE } from "./constants";
 import { SESSION_COOKIE_NAME } from "./cookies";
 
@@ -83,7 +79,7 @@ export async function deleteAccountAction(formData: FormData): Promise<void> {
     redirect("/");
   }
 
-  await deleteAccount(sessionValue);
+  await deleteMe(sessionValue);
   cookieStore.set(SESSION_COOKIE_NAME, "", { path: "/", maxAge: 0 });
   redirect("/");
 }

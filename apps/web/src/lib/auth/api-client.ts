@@ -9,33 +9,6 @@ export interface MeResponse {
   avatarUrl: string | null;
 }
 
-/**
- * Server-side fetch of the authenticated user's profile from the API.
- *
- * Returns null when there's no session cookie or the API rejects with
- * 401/404 (so callers can redirect to the landing page without throwing).
- * Any other non-2xx status surfaces as an error.
- */
-export async function fetchMe(
-  sessionCookieValue: string | undefined,
-): Promise<MeResponse | null> {
-  if (!sessionCookieValue) return null;
-
-  const apiBaseUrl = requireEnv("API_BASE_URL");
-  const res = await fetch(`${apiBaseUrl}/users/me`, {
-    headers: {
-      Cookie: `${SESSION_COOKIE_NAME}=${sessionCookieValue}`,
-    },
-    cache: "no-store",
-  });
-
-  if (res.status === 401 || res.status === 404) return null;
-  if (!res.ok) {
-    throw new Error(`/users/me failed with status ${res.status}`);
-  }
-  return (await res.json()) as MeResponse;
-}
-
 /** Shape of a single item in `GET /users/me/sessions`. */
 export interface SessionListItem {
   id: string;
@@ -44,99 +17,155 @@ export interface SessionListItem {
   isCurrent: boolean;
 }
 
+/** Shape of the API's `POST /auth/google` response. */
+export interface GoogleSignInResponse {
+  sessionToken: string;
+  expiresAt: string;
+}
+
+interface ApiFetchOptions {
+  /** HTTP method. Defaults to `"GET"`. */
+  method?: "GET" | "POST" | "DELETE";
+  /** Optional session cookie value to forward to the API. */
+  sessionCookie?: string;
+  /** Request body — JSON-serialized; the helper sets Content-Type. */
+  body?: unknown;
+  /** Extra headers merged on top of the defaults. */
+  headers?: Record<string, string>;
+  /** HTTP statuses to treat as "not found / unauthenticated, return null". */
+  treatAsNull?: number[];
+}
+
+interface ApiFetchResult {
+  /** Raw Response — caller chooses how to read it (json / text / nothing). */
+  response: Response;
+  /** True iff the status matched one of `treatAsNull`. */
+  isNullStatus: boolean;
+}
+
+/**
+ * Thin wrapper over `fetch` that injects the API base URL, forwards the
+ * session cookie, serializes JSON bodies, and converts non-2xx responses into
+ * thrown errors — except for caller-listed statuses (typically 401 / 404)
+ * which surface as `isNullStatus: true` so route handlers can redirect to a
+ * public surface instead of error-boundary-ing.
+ *
+ * Every endpoint in this file goes through here; the function-per-endpoint
+ * exports below stay short and uniform.
+ */
+async function apiFetch(
+  path: string,
+  options: ApiFetchOptions = {},
+): Promise<ApiFetchResult> {
+  const headers: Record<string, string> = { ...options.headers };
+  if (options.sessionCookie) {
+    headers.Cookie = `${SESSION_COOKIE_NAME}=${options.sessionCookie}`;
+  }
+  if (options.body !== undefined) {
+    headers["Content-Type"] = headers["Content-Type"] ?? "application/json";
+  }
+
+  const init: RequestInit = {
+    method: options.method ?? "GET",
+    headers,
+    cache: "no-store",
+  };
+  if (options.body !== undefined) {
+    init.body = JSON.stringify(options.body);
+  }
+
+  const apiBaseUrl = requireEnv("API_BASE_URL");
+  const response = await fetch(`${apiBaseUrl}${path}`, init);
+
+  if (options.treatAsNull?.includes(response.status)) {
+    return { response, isNullStatus: true };
+  }
+  if (!response.ok) {
+    throw new Error(
+      `${path} ${init.method} failed with status ${response.status}`,
+    );
+  }
+  return { response, isNullStatus: false };
+}
+
+/**
+ * Server-side fetch of the authenticated user's profile.
+ *
+ * Returns null when there's no session cookie or the API rejects with
+ * 401/404 (so callers can redirect to the landing page without throwing).
+ */
+export async function getMe(
+  sessionCookie: string | undefined,
+): Promise<MeResponse | null> {
+  if (!sessionCookie) return null;
+  const { response, isNullStatus } = await apiFetch("/users/me", {
+    sessionCookie,
+    treatAsNull: [401, 404],
+  });
+  if (isNullStatus) return null;
+  return (await response.json()) as MeResponse;
+}
+
 /**
  * Server-side fetch of the user's active sessions.
  *
- * Returns null when there's no session cookie or the API rejects with 401
- * (so callers can redirect to landing). Any other non-2xx surfaces as an
- * error.
+ * Returns null when there's no session cookie or the API rejects with 401.
  */
-export async function listSessions(
-  sessionCookieValue: string | undefined,
+export async function getSessions(
+  sessionCookie: string | undefined,
 ): Promise<SessionListItem[] | null> {
-  if (!sessionCookieValue) return null;
-
-  const apiBaseUrl = requireEnv("API_BASE_URL");
-  const res = await fetch(`${apiBaseUrl}/users/me/sessions`, {
-    headers: { Cookie: `${SESSION_COOKIE_NAME}=${sessionCookieValue}` },
-    cache: "no-store",
+  if (!sessionCookie) return null;
+  const { response, isNullStatus } = await apiFetch("/users/me/sessions", {
+    sessionCookie,
+    treatAsNull: [401],
   });
-  if (res.status === 401) return null;
-  if (!res.ok) {
-    throw new Error(`/users/me/sessions failed with status ${res.status}`);
-  }
-  return (await res.json()) as SessionListItem[];
+  if (isNullStatus) return null;
+  return (await response.json()) as SessionListItem[];
 }
 
-/** Sign out the current device by revoking the session server-side. Tolerates
+/**
+ * Sign out the current device by revoking the session server-side. Tolerates
  * a missing session cookie — the caller still wants to land on the public
- * surface. */
+ * surface. A 401 means the session was already invalid, which is the desired
+ * end state anyway.
+ */
 export async function deleteCurrentSession(
-  sessionCookieValue: string | undefined,
+  sessionCookie: string | undefined,
 ): Promise<void> {
-  if (!sessionCookieValue) return;
-  const apiBaseUrl = requireEnv("API_BASE_URL");
-  const res = await fetch(`${apiBaseUrl}/auth/session`, {
+  if (!sessionCookie) return;
+  await apiFetch("/auth/session", {
     method: "DELETE",
-    headers: { Cookie: `${SESSION_COOKIE_NAME}=${sessionCookieValue}` },
-    cache: "no-store",
+    sessionCookie,
+    treatAsNull: [401],
   });
-  // 401 means the session was already invalid — desired end state anyway.
-  if (!res.ok && res.status !== 401) {
-    throw new Error(`/auth/session DELETE failed with status ${res.status}`);
-  }
 }
 
 /** Revoke one of the user's non-current sessions by id. */
 export async function deleteSession(
-  sessionCookieValue: string,
+  sessionCookie: string,
   sessionId: string,
 ): Promise<void> {
-  const apiBaseUrl = requireEnv("API_BASE_URL");
-  const res = await fetch(
-    `${apiBaseUrl}/users/me/sessions/${encodeURIComponent(sessionId)}`,
-    {
-      method: "DELETE",
-      headers: { Cookie: `${SESSION_COOKIE_NAME}=${sessionCookieValue}` },
-      cache: "no-store",
-    },
-  );
-  if (!res.ok) {
-    throw new Error(
-      `/users/me/sessions/${sessionId} DELETE failed with status ${res.status}`,
-    );
-  }
+  await apiFetch(`/users/me/sessions/${encodeURIComponent(sessionId)}`, {
+    method: "DELETE",
+    sessionCookie,
+  });
 }
 
 /**
  * Hard-delete the signed-in user's account.
  *
- * Forwards `{ confirm: true }` server-to-server; the API anonymizes
- * sign-in events and cascades sessions + identities. Caller is responsible
- * for clearing the session cookie after a successful 204 — the API also
- * sends a clear-cookie header, but the server-action layer overwrites the
- * cookie jar separately to keep behavior deterministic.
+ * Forwards `{ confirm: true }`; the API anonymizes sign-in events and
+ * cascades sessions + identities. Caller is responsible for clearing the
+ * session cookie after a successful 204 — the API also sends a clear-cookie
+ * header, but the server-action layer overwrites the cookie jar separately
+ * to keep behavior deterministic.
  */
-export async function deleteAccount(sessionCookieValue: string): Promise<void> {
-  const apiBaseUrl = requireEnv("API_BASE_URL");
-  const res = await fetch(`${apiBaseUrl}/users/me`, {
+export async function deleteMe(sessionCookie: string): Promise<void> {
+  await apiFetch("/users/me", {
     method: "DELETE",
-    headers: {
-      Cookie: `${SESSION_COOKIE_NAME}=${sessionCookieValue}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ confirm: true }),
-    cache: "no-store",
+    sessionCookie,
+    body: { confirm: true },
   });
-  if (!res.ok) {
-    throw new Error(`/users/me DELETE failed with status ${res.status}`);
-  }
-}
-
-/** Shape of the API's `POST /auth/google` response. */
-export interface GoogleSignInResponse {
-  sessionToken: string;
-  expiresAt: string;
 }
 
 /**
@@ -149,24 +178,18 @@ export interface GoogleSignInResponse {
  * omitted, the session inherits Node's default fetch UA and renders as
  * "Unknown device".
  */
-export async function postGoogleIdToken(
+export async function createGoogleSession(
   idToken: string,
   nonce: string,
   opts: { userAgent?: string } = {},
 ): Promise<GoogleSignInResponse> {
-  const apiBaseUrl = requireEnv("API_BASE_URL");
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-  };
+  const headers: Record<string, string> = {};
   if (opts.userAgent) headers["User-Agent"] = opts.userAgent;
 
-  const res = await fetch(`${apiBaseUrl}/auth/google`, {
+  const { response } = await apiFetch("/auth/google", {
     method: "POST",
     headers,
-    body: JSON.stringify({ idToken, nonce }),
+    body: { idToken, nonce },
   });
-  if (!res.ok) {
-    throw new Error(`/auth/google failed with status ${res.status}`);
-  }
-  return (await res.json()) as GoogleSignInResponse;
+  return (await response.json()) as GoogleSignInResponse;
 }

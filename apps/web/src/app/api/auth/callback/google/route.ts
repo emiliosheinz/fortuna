@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { authorizationCodeGrant } from "openid-client";
-import { postGoogleIdToken } from "@/lib/auth/api-client";
+import { createGoogleSession } from "@/lib/auth/api-client";
 import {
   clearOauthTempCookies,
   OAUTH_NONCE_COOKIE,
@@ -57,7 +57,7 @@ export async function GET(req: NextRequest) {
   let sessionToken: string;
   let expiresAt: Date;
   try {
-    const result = await postGoogleIdToken(idToken, nonce, {
+    const result = await createGoogleSession(idToken, nonce, {
       userAgent: req.headers.get("user-agent") ?? undefined,
     });
     sessionToken = result.sessionToken;

@@ -3,7 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { DeleteAccountForm } from "@/components/delete-account-form";
 import { Button } from "@/components/ui/button";
-import { fetchMe } from "@/lib/auth/api-client";
+import { getMe } from "@/lib/auth/api-client";
 import { SESSION_COOKIE_NAME } from "@/lib/auth/cookies";
 
 export const dynamic = "force-dynamic";
@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 export default async function AccountSettingsPage() {
   const cookieStore = await cookies();
   const sessionValue = cookieStore.get(SESSION_COOKIE_NAME)?.value;
-  const me = await fetchMe(sessionValue);
+  const me = await getMe(sessionValue);
   if (!me) {
     redirect("/");
   }

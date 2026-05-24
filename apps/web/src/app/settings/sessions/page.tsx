@@ -3,7 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { revokeSessionAction } from "@/lib/auth/actions";
-import { listSessions } from "@/lib/auth/api-client";
+import { getSessions } from "@/lib/auth/api-client";
 import { SESSION_COOKIE_NAME } from "@/lib/auth/cookies";
 
 export const dynamic = "force-dynamic";
@@ -16,7 +16,7 @@ const dateFormatter = new Intl.DateTimeFormat("en-US", {
 export default async function SessionsPage() {
   const cookieStore = await cookies();
   const sessionValue = cookieStore.get(SESSION_COOKIE_NAME)?.value;
-  const sessions = await listSessions(sessionValue);
+  const sessions = await getSessions(sessionValue);
 
   if (!sessions) {
     redirect("/");
