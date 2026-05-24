@@ -1,4 +1,4 @@
-import type { Provider } from "@nestjs/common";
+import type { OnModuleDestroy, Provider } from "@nestjs/common";
 import { Logger } from "@nestjs/common";
 import IORedis, { type Redis } from "ioredis";
 import { REDIS_CLIENT, type RedisClient } from "./redis.client";
@@ -18,7 +18,7 @@ export interface RedisConnectionOptions {
  * than queuing sign-in latency. Reconnects continue in the background so
  * the limiter automatically re-engages when Redis comes back.
  */
-export class IoredisClient implements RedisClient {
+export class IoredisClient implements RedisClient, OnModuleDestroy {
   private readonly logger = new Logger(IoredisClient.name);
   private readonly client: Redis;
 
@@ -59,8 +59,15 @@ export class IoredisClient implements RedisClient {
     return this.client.del(key);
   }
 
-  async close(): Promise<void> {
-    await this.client.quit().catch(() => undefined);
+  /**
+   * Nest lifecycle hook — closes the underlying ioredis socket and stops
+   * the reconnect timer on `app.close()`. Without this, integration tests
+   * see an open handle and Jest hangs after the run completes; in prod the
+   * process would never shut down cleanly on SIGTERM.
+   */
+  async onModuleDestroy(): Promise<void> {
+    if (this.client.status === "end") return;
+    await this.client.quit().catch(() => this.client.disconnect());
   }
 }
 
