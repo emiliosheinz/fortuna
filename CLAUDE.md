@@ -27,6 +27,21 @@ Full rationale + the audit-anonymization rule live in
 [`.specs/google-authentication/TECHNICAL-DESIGN.md`](./.specs/google-authentication/TECHNICAL-DESIGN.md)
 (see "Cascade contract" under "Database Changes").
 
+## Test layering
+
+Three layers, three names, no overlap:
+
+- **Unit** — `*.spec.ts` colocated with source. Pure functions or a single
+  class with collaborators stubbed. No I/O, no Nest container. Run on save.
+- **Integration** — `apps/api/test/*.integration-spec.ts`. NestJS module
+  wired against a real testcontainer Postgres and exercised via Supertest.
+  No browser. This is where API endpoints are verified end-to-end on the
+  server side. Run via `pnpm --filter api test:integration`.
+- **E2E** — `apps/web` Playwright suite only. Browser → web → API → DB.
+  Run via `pnpm --filter web test:e2e`. The API package has no `test:e2e`
+  script on purpose — anything that isn't a browser-driven flow belongs in
+  unit or integration.
+
 ## Database migrations
 
 Migrations are generated from TypeORM entities, never hand-written. Workflow:
