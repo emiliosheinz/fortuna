@@ -3,9 +3,12 @@ import { authorizationCodeGrant } from "openid-client";
 import { createGoogleSession } from "@/lib/auth/api-client";
 import {
   clearOauthTempCookies,
+  DEVICE_ID_COOKIE_NAME,
+  mintDeviceId,
   OAUTH_NONCE_COOKIE,
   OAUTH_PKCE_COOKIE,
   OAUTH_STATE_COOKIE,
+  setDeviceIdCookie,
   setSessionCookie,
 } from "@/lib/auth/cookies";
 import { getOidcConfig } from "@/lib/auth/oidc";
@@ -54,11 +57,15 @@ export async function GET(req: NextRequest) {
     return redirectToError("no_id_token");
   }
 
+  const existingDeviceId = req.cookies.get(DEVICE_ID_COOKIE_NAME)?.value;
+  const deviceId = existingDeviceId ?? mintDeviceId();
+
   let sessionToken: string;
   let expiresAt: Date;
   try {
     const result = await createGoogleSession(idToken, nonce, {
       userAgent: req.headers.get("user-agent") ?? undefined,
+      deviceId,
     });
     sessionToken = result.sessionToken;
     expiresAt = new Date(result.expiresAt);
@@ -69,6 +76,9 @@ export async function GET(req: NextRequest) {
 
   const response = relativeRedirect("/home");
   setSessionCookie(response.cookies, sessionToken, expiresAt);
+  if (!existingDeviceId) {
+    setDeviceIdCookie(response.cookies, deviceId);
+  }
   clearOauthTempCookies(response.cookies);
   return response;
 }

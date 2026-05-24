@@ -7,6 +7,7 @@ import {
   ManyToOne,
   PrimaryGeneratedColumn,
 } from "typeorm";
+import { DeviceFingerprint } from "./device-fingerprint.entity";
 import { User } from "./user.entity";
 
 /**
@@ -35,6 +36,17 @@ export class Session {
 
   @Column({ name: "token_hash", type: "text", unique: true })
   declare tokenHash: string;
+
+  @Column({ name: "device_fingerprint_id", type: "uuid", nullable: true })
+  declare deviceFingerprintId: string | null;
+
+  @ManyToOne(
+    () => DeviceFingerprint,
+    (fingerprint) => fingerprint.sessions,
+    { onDelete: "SET NULL", nullable: true },
+  )
+  @JoinColumn({ name: "device_fingerprint_id" })
+  declare deviceFingerprint: DeviceFingerprint | null;
 
   @Column({ name: "user_agent", type: "text", nullable: true })
   declare userAgent: string | null;

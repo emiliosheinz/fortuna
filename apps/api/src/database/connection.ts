@@ -1,5 +1,6 @@
 import path from "node:path";
 import { DataSource } from "typeorm";
+import { DeviceFingerprint } from "@/auth/entities/device-fingerprint.entity";
 import { Identity } from "@/auth/entities/identity.entity";
 import { Session } from "@/auth/entities/session.entity";
 import { SignInEvent } from "@/auth/entities/sign-in-event.entity";
@@ -13,7 +14,7 @@ export const AppDataSource = new DataSource({
   username: process.env.DB_USER,
   password: process.env.DB_PASSWORD,
   ssl: process.env.DB_SSL === "true",
-  entities: [User, Identity, Session, SignInEvent],
+  entities: [User, Identity, Session, SignInEvent, DeviceFingerprint],
   migrations: [path.join(__dirname, "migrations", "*.{ts,js}")],
   migrationsTableName: "migrations",
 });

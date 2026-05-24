@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { AuthController } from "./auth.controller";
+import { DeviceFingerprint } from "./entities/device-fingerprint.entity";
 import { Identity } from "./entities/identity.entity";
 import { Session } from "./entities/session.entity";
 import { SignInEvent } from "./entities/sign-in-event.entity";
@@ -8,6 +9,7 @@ import { User } from "./entities/user.entity";
 import { BadRequestAuditFilter } from "./filters/bad-request-audit.filter";
 import { SessionGuard } from "./guards/session.guard";
 import { AuthService } from "./services/auth.service";
+import { DeviceFingerprintsService } from "./services/device-fingerprints.service";
 import {
   GOOGLE_ID_TOKEN_VERIFIER_OPTIONS,
   GoogleIdTokenVerifier,
@@ -47,7 +49,15 @@ function deriveJwksUri(issuer: string): string {
 }
 
 @Module({
-  imports: [TypeOrmModule.forFeature([User, Identity, Session, SignInEvent])],
+  imports: [
+    TypeOrmModule.forFeature([
+      User,
+      Identity,
+      Session,
+      SignInEvent,
+      DeviceFingerprint,
+    ]),
+  ],
   controllers: [AuthController],
   providers: [
     googleVerifierOptionsProvider,
@@ -58,9 +68,16 @@ function deriveJwksUri(issuer: string): string {
     SignInEventsService,
     SignInAuditor,
     SignInEventsRetentionWorker,
+    DeviceFingerprintsService,
     SessionGuard,
     BadRequestAuditFilter,
   ],
-  exports: [SessionsService, UsersService, SignInEventsService, SessionGuard],
+  exports: [
+    SessionsService,
+    UsersService,
+    SignInEventsService,
+    DeviceFingerprintsService,
+    SessionGuard,
+  ],
 })
 export class AuthModule {}

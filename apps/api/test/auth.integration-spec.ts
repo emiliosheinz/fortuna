@@ -9,10 +9,12 @@ import { exportJWK, generateKeyPair, type JWK, SignJWT } from "jose";
 import request from "supertest";
 import { DataSource } from "typeorm";
 import { AppModule } from "@/app.module";
+import { DeviceFingerprint } from "@/auth/entities/device-fingerprint.entity";
 import { Identity } from "@/auth/entities/identity.entity";
 import { Session } from "@/auth/entities/session.entity";
 import { SignInEvent } from "@/auth/entities/sign-in-event.entity";
 import { User } from "@/auth/entities/user.entity";
+import { computeDeviceFingerprintHash } from "@/auth/fingerprint/device-fingerprint-hash";
 import {
   GOOGLE_ID_TOKEN_VERIFIER_OPTIONS,
   type GoogleIdTokenVerifierOptions,
@@ -84,7 +86,7 @@ describe("Auth integration", () => {
   beforeEach(async () => {
     if (!dataSource) return;
     await dataSource.query(
-      'TRUNCATE TABLE "sign_in_events", "sessions", "identities", "users" RESTART IDENTITY CASCADE',
+      'TRUNCATE TABLE "sign_in_events", "sessions", "device_fingerprints", "identities", "users" RESTART IDENTITY CASCADE',
     );
   });
 
@@ -728,6 +730,192 @@ describe("Auth integration", () => {
       expect(rows).toHaveLength(1);
       expect(rows[0]?.ip).toBeNull();
       expect(rows[0]?.uaHash).toBeNull();
+    });
+  });
+
+  describe("device fingerprinting", () => {
+    const CHROME_MAC_UA =
+      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+    const FIREFOX_MAC_UA =
+      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:120.0) Gecko/20100101 Firefox/120.0";
+
+    it("inserts a fingerprint with first_seen_at and links it to the session on first sign-in", async () => {
+      const idToken = await signIdToken({ sub: "fp-first" });
+      const res = await request(app.getHttpServer())
+        .post("/auth/google")
+        .send({ idToken, nonce: NONCE, deviceId: "device-abc" })
+        .set("User-Agent", CHROME_MAC_UA)
+        .expect(201);
+
+      const fingerprints = await dataSource
+        .getRepository(DeviceFingerprint)
+        .find();
+      expect(fingerprints).toHaveLength(1);
+      const fingerprint = fingerprints[0];
+      if (!fingerprint) throw new Error("expected one fingerprint");
+
+      expect(fingerprint.fingerprintHash).toBe(
+        computeDeviceFingerprintHash("device-abc", CHROME_MAC_UA),
+      );
+      expect(fingerprint.firstSeenAt).toBeInstanceOf(Date);
+      expect(fingerprint.lastSeenAt).toBeInstanceOf(Date);
+      // Raw device id is never persisted.
+      const fingerprintRow = await dataSource.query(
+        "SELECT id::text, fingerprint_hash FROM device_fingerprints LIMIT 1",
+      );
+      expect(JSON.stringify(fingerprintRow)).not.toContain("device-abc");
+
+      const session = await dataSource.getRepository(Session).findOne({
+        where: { tokenHash: sha256Hex(res.body.sessionToken) },
+      });
+      expect(session?.deviceFingerprintId).toBe(fingerprint.id);
+    });
+
+    it("updates last_seen_at and reuses the fingerprint row on a repeat sign-in from the same device", async () => {
+      const sub = "fp-repeat";
+
+      const first = await request(app.getHttpServer())
+        .post("/auth/google")
+        .send({
+          idToken: await signIdToken({ sub }),
+          nonce: NONCE,
+          deviceId: "device-abc",
+        })
+        .set("User-Agent", CHROME_MAC_UA)
+        .expect(201);
+
+      const before = await dataSource
+        .getRepository(DeviceFingerprint)
+        .findOne({ where: {} });
+      expect(before).not.toBeNull();
+      const firstSeenAt = before?.firstSeenAt;
+      const lastSeenAfterFirst = before?.lastSeenAt;
+
+      // Sleep just enough for the timestamp to move forward measurably.
+      await new Promise((r) => setTimeout(r, 25));
+
+      const second = await request(app.getHttpServer())
+        .post("/auth/google")
+        .send({
+          idToken: await signIdToken({ sub }),
+          nonce: NONCE,
+          deviceId: "device-abc",
+        })
+        .set("User-Agent", CHROME_MAC_UA)
+        .expect(201);
+
+      const fingerprints = await dataSource
+        .getRepository(DeviceFingerprint)
+        .find();
+      expect(fingerprints).toHaveLength(1);
+      const fingerprint = fingerprints[0];
+      if (!fingerprint) throw new Error("expected one fingerprint");
+      expect(fingerprint.firstSeenAt.getTime()).toBe(firstSeenAt?.getTime());
+      expect(fingerprint.lastSeenAt.getTime()).toBeGreaterThan(
+        lastSeenAfterFirst?.getTime() ?? 0,
+      );
+
+      const sessions = await dataSource.getRepository(Session).find();
+      expect(sessions).toHaveLength(2);
+      for (const session of sessions) {
+        expect(session.deviceFingerprintId).toBe(fingerprint.id);
+      }
+      // Both raw tokens reachable in the responses.
+      expect(first.body.sessionToken).not.toBe(second.body.sessionToken);
+    });
+
+    it("treats a cleared device_id cookie as a new device (new fingerprint row)", async () => {
+      const sub = "fp-cleared";
+
+      await request(app.getHttpServer())
+        .post("/auth/google")
+        .send({
+          idToken: await signIdToken({ sub }),
+          nonce: NONCE,
+          deviceId: "device-old",
+        })
+        .set("User-Agent", CHROME_MAC_UA)
+        .expect(201);
+
+      await request(app.getHttpServer())
+        .post("/auth/google")
+        .send({
+          idToken: await signIdToken({ sub }),
+          nonce: NONCE,
+          deviceId: "device-new",
+        })
+        .set("User-Agent", CHROME_MAC_UA)
+        .expect(201);
+
+      const fingerprints = await dataSource
+        .getRepository(DeviceFingerprint)
+        .find({ order: { firstSeenAt: "ASC" } });
+      expect(fingerprints).toHaveLength(2);
+      expect(fingerprints[0]?.fingerprintHash).not.toBe(
+        fingerprints[1]?.fingerprintHash,
+      );
+    });
+
+    it("treats a different UA family as a new device even when the device_id is the same", async () => {
+      const sub = "fp-ua-family";
+
+      await request(app.getHttpServer())
+        .post("/auth/google")
+        .send({
+          idToken: await signIdToken({ sub }),
+          nonce: NONCE,
+          deviceId: "device-shared",
+        })
+        .set("User-Agent", CHROME_MAC_UA)
+        .expect(201);
+
+      await request(app.getHttpServer())
+        .post("/auth/google")
+        .send({
+          idToken: await signIdToken({ sub }),
+          nonce: NONCE,
+          deviceId: "device-shared",
+        })
+        .set("User-Agent", FIREFOX_MAC_UA)
+        .expect(201);
+
+      const fingerprints = await dataSource
+        .getRepository(DeviceFingerprint)
+        .find();
+      expect(fingerprints).toHaveLength(2);
+    });
+
+    it("leaves device_fingerprint_id null on the session when no device_id is forwarded", async () => {
+      const res = await request(app.getHttpServer())
+        .post("/auth/google")
+        .send({ idToken: await signIdToken({ sub: "fp-none" }), nonce: NONCE })
+        .set("User-Agent", CHROME_MAC_UA)
+        .expect(201);
+
+      expect(await dataSource.getRepository(DeviceFingerprint).count()).toBe(0);
+
+      const session = await dataSource.getRepository(Session).findOne({
+        where: { tokenHash: sha256Hex(res.body.sessionToken) },
+      });
+      expect(session?.deviceFingerprintId).toBeNull();
+    });
+
+    it("cascades device_fingerprints on user delete (cascade contract regression)", async () => {
+      const idToken = await signIdToken({ sub: "fp-cascade" });
+      const res = await request(app.getHttpServer())
+        .post("/auth/google")
+        .send({ idToken, nonce: NONCE, deviceId: "device-cascade" })
+        .set("User-Agent", CHROME_MAC_UA)
+        .expect(201);
+
+      await request(app.getHttpServer())
+        .delete("/users/me")
+        .set("Cookie", `fortuna_session=${res.body.sessionToken}`)
+        .send({ confirm: true })
+        .expect(204);
+
+      expect(await dataSource.getRepository(User).count()).toBe(0);
+      expect(await dataSource.getRepository(DeviceFingerprint).count()).toBe(0);
     });
   });
 });

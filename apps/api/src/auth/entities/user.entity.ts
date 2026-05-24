@@ -6,6 +6,7 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from "typeorm";
+import { DeviceFingerprint } from "./device-fingerprint.entity";
 import { Identity } from "./identity.entity";
 import { Session } from "./session.entity";
 import { SignInEvent } from "./sign-in-event.entity";
@@ -55,4 +56,10 @@ export class User {
     (event) => event.user,
   )
   declare signInEvents: SignInEvent[];
+
+  @OneToMany(
+    () => DeviceFingerprint,
+    (fingerprint) => fingerprint.user,
+  )
+  declare deviceFingerprints: DeviceFingerprint[];
 }

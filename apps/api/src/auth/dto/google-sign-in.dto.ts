@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsString } from "class-validator";
+import { IsNotEmpty, IsOptional, IsString } from "class-validator";
 
 /**
  * Request body for `POST /auth/google`.
@@ -18,4 +18,14 @@ export class GoogleSignInDto {
   @IsString()
   @IsNotEmpty()
   declare nonce: string;
+
+  /**
+   * Optional raw value of the long-lived `device_id` cookie, forwarded by
+   * apps/web. Used to compute the per-user device fingerprint. Absence is
+   * treated as a brand-new device.
+   */
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  declare deviceId?: string;
 }

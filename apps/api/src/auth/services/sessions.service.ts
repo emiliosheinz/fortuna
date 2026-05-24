@@ -17,6 +17,8 @@ export interface MintInput {
   userId: string;
   userAgent: string | null;
   ip: string | null;
+  /** Optional device fingerprint to link to this session. */
+  deviceFingerprintId?: string | null;
 }
 
 export interface MintResult {
@@ -48,6 +50,7 @@ export class SessionsService {
     const session = await this.sessions.save({
       userId: input.userId,
       tokenHash,
+      deviceFingerprintId: input.deviceFingerprintId ?? null,
       userAgent: input.userAgent,
       ipAtCreation: input.ip,
       lastActiveAt: now,

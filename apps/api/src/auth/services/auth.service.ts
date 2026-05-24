@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { Injectable, Logger, UnauthorizedException } from "@nestjs/common";
 import type { GoogleSignInDto } from "../dto/google-sign-in.dto";
+import { DeviceFingerprintsService } from "./device-fingerprints.service";
 import {
   GoogleIdTokenVerifier,
   IdTokenVerificationError,
@@ -39,6 +40,7 @@ export class AuthService {
     private readonly verifier: GoogleIdTokenVerifier,
     private readonly users: UsersService,
     private readonly sessions: SessionsService,
+    private readonly fingerprints: DeviceFingerprintsService,
     private readonly auditor: SignInAuditor,
   ) {}
 
@@ -50,10 +52,16 @@ export class AuthService {
 
     const claims = await this.verifyOrAudit(dto, meta, correlationId);
     const user = await this.users.upsertFromGoogleIdentity(claims);
+    const { fingerprintId } = await this.fingerprints.recordSignIn({
+      userId: user.id,
+      deviceId: dto.deviceId ?? null,
+      userAgent: meta.userAgent,
+    });
     const { rawToken, session } = await this.sessions.mint({
       userId: user.id,
       userAgent: meta.userAgent,
       ip: meta.ip,
+      deviceFingerprintId: fingerprintId,
     });
 
     await this.auditor.recordSuccess({

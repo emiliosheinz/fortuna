@@ -4,6 +4,7 @@ import type { GoogleSignInDto } from "../dto/google-sign-in.dto";
 import type { Session } from "../entities/session.entity";
 import type { User } from "../entities/user.entity";
 import { AuthService } from "./auth.service";
+import { DeviceFingerprintsService } from "./device-fingerprints.service";
 import {
   GoogleIdTokenVerifier,
   IdTokenVerificationError,
@@ -17,6 +18,7 @@ interface AuthServiceStubs {
   verify: jest.Mock;
   upsertFromGoogleIdentity: jest.Mock;
   mint: jest.Mock;
+  recordSignIn: jest.Mock;
   recordSuccess: jest.Mock;
   recordVerificationFailure: jest.Mock;
   recordInternalFailure: jest.Mock;
@@ -29,6 +31,9 @@ async function buildAuthService(
     verify: jest.fn(),
     upsertFromGoogleIdentity: jest.fn(),
     mint: jest.fn(),
+    recordSignIn: jest
+      .fn()
+      .mockResolvedValue({ fingerprintId: null, isNew: false }),
     recordSuccess: jest.fn().mockResolvedValue(undefined),
     recordVerificationFailure: jest.fn().mockResolvedValue(undefined),
     recordInternalFailure: jest.fn().mockResolvedValue(undefined),
@@ -42,6 +47,9 @@ async function buildAuthService(
     upsertFromGoogleIdentity: stubs.upsertFromGoogleIdentity,
   };
   const sessionsStub: Pick<SessionsService, "mint"> = { mint: stubs.mint };
+  const fingerprintsStub: Pick<DeviceFingerprintsService, "recordSignIn"> = {
+    recordSignIn: stubs.recordSignIn,
+  };
   const auditorStub: Pick<
     SignInAuditor,
     "recordSuccess" | "recordVerificationFailure" | "recordInternalFailure"
@@ -57,6 +65,7 @@ async function buildAuthService(
       { provide: GoogleIdTokenVerifier, useValue: verifierStub },
       { provide: UsersService, useValue: usersStub },
       { provide: SessionsService, useValue: sessionsStub },
+      { provide: DeviceFingerprintsService, useValue: fingerprintsStub },
       { provide: SignInAuditor, useValue: auditorStub },
     ],
   }).compile();
@@ -105,6 +114,7 @@ describe("AuthService.signInWithGoogle", () => {
       userId: "user-1",
       userAgent: "Mozilla/5.0",
       ip: "203.0.113.5",
+      deviceFingerprintId: null,
     });
     expect(result).toEqual({
       sessionToken: "raw-token-xyz",
@@ -118,6 +128,43 @@ describe("AuthService.signInWithGoogle", () => {
         correlationId: expect.any(String),
       }),
     );
+  });
+
+  it("records the device fingerprint and links it to the new session", async () => {
+    const user = { id: "user-fp" } as User;
+    const session = {
+      id: "session-fp",
+      userId: "user-fp",
+      expiresAt: new Date(Date.now() + 1000),
+    } as Session;
+
+    const { service, recordSignIn, mint } = await buildAuthService({
+      verify: jest
+        .fn()
+        .mockResolvedValue({ sub: "g-sub", email: "u@e.com", name: "U" }),
+      upsertFromGoogleIdentity: jest.fn().mockResolvedValue(user),
+      mint: jest.fn().mockResolvedValue({ rawToken: "raw", session }),
+      recordSignIn: jest
+        .fn()
+        .mockResolvedValue({ fingerprintId: "fp-1", isNew: true }),
+    });
+
+    await service.signInWithGoogle(
+      { ...validDto, deviceId: "device-cookie-xyz" },
+      meta,
+    );
+
+    expect(recordSignIn).toHaveBeenCalledWith({
+      userId: "user-fp",
+      deviceId: "device-cookie-xyz",
+      userAgent: "Mozilla/5.0",
+    });
+    expect(mint).toHaveBeenCalledWith({
+      userId: "user-fp",
+      userAgent: "Mozilla/5.0",
+      ip: "203.0.113.5",
+      deviceFingerprintId: "fp-1",
+    });
   });
 
   it("throws UnauthorizedException with correlationId in body on verification failure", async () => {

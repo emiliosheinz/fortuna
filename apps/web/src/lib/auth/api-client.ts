@@ -177,19 +177,30 @@ export async function deleteMe(sessionCookie: string): Promise<void> {
  * persists it on the session row and derives the device label from it. If
  * omitted, the session inherits Node's default fetch UA and renders as
  * "Unknown device".
+ *
+ * `deviceId` carries the raw long-lived device cookie value forward to the
+ * API so it can compute the per-user device fingerprint. Omit when no
+ * cookie was present on the inbound request; the API will treat it as a
+ * brand-new device.
  */
 export async function createGoogleSession(
   idToken: string,
   nonce: string,
-  opts: { userAgent?: string } = {},
+  opts: { userAgent?: string; deviceId?: string } = {},
 ): Promise<GoogleSignInResponse> {
   const headers: Record<string, string> = {};
   if (opts.userAgent) headers["User-Agent"] = opts.userAgent;
 
+  const body: { idToken: string; nonce: string; deviceId?: string } = {
+    idToken,
+    nonce,
+  };
+  if (opts.deviceId) body.deviceId = opts.deviceId;
+
   const { response } = await apiFetch("/auth/google", {
     method: "POST",
     headers,
-    body: { idToken, nonce },
+    body,
   });
   return (await response.json()) as GoogleSignInResponse;
 }

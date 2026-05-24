@@ -190,6 +190,41 @@ describe("createGoogleSession", () => {
     expect(init.headers["User-Agent"]).toBeUndefined();
   });
 
+  it("forwards the device_id cookie value so the API can compute the fingerprint", async () => {
+    const fetchSpy = mockFetch({
+      ok: true,
+      status: 201,
+      body: { sessionToken: "tok", expiresAt: "2026-01-01T00:00:00.000Z" },
+    });
+
+    await createGoogleSession("id.token", "nonce-123", {
+      deviceId: "device-cookie-value",
+    });
+
+    const [, init] = fetchSpy.mock.calls[0] as [string, { body: string }];
+    expect(JSON.parse(init.body)).toEqual({
+      idToken: "id.token",
+      nonce: "nonce-123",
+      deviceId: "device-cookie-value",
+    });
+  });
+
+  it("omits deviceId from the body when none is provided", async () => {
+    const fetchSpy = mockFetch({
+      ok: true,
+      status: 201,
+      body: { sessionToken: "tok", expiresAt: "2026-01-01T00:00:00.000Z" },
+    });
+
+    await createGoogleSession("id.token", "nonce-123");
+
+    const [, init] = fetchSpy.mock.calls[0] as [string, { body: string }];
+    expect(JSON.parse(init.body)).toEqual({
+      idToken: "id.token",
+      nonce: "nonce-123",
+    });
+  });
+
   it("throws on non-2xx statuses", async () => {
     mockFetch({ ok: false, status: 401 });
     await expect(createGoogleSession("t", "n")).rejects.toThrow(
