@@ -4,7 +4,10 @@ import {
   Injectable,
   UnauthorizedException,
 } from "@nestjs/common";
-import { readSessionCookie } from "../cookies/session-cookie";
+import {
+  readSessionCookie,
+  SESSION_EXPIRES_AT_HEADER,
+} from "../cookies/session-cookie";
 import { SessionsService } from "../services/sessions.service";
 
 /** Authenticated principal attached to the request by {@link SessionGuard}. */
@@ -23,6 +26,11 @@ export interface RequestWithPrincipal {
   headers: Record<string, string | string[] | undefined>;
 }
 
+/** Minimal structural shape of the response object the guard needs. */
+interface ResponseWithSetHeader {
+  setHeader(name: string, value: string): unknown;
+}
+
 /**
  * Guard for every user-scoped endpoint.
  *
@@ -30,13 +38,18 @@ export interface RequestWithPrincipal {
  * with a bare 401 (no internal detail) on missing/revoked/expired, slides the
  * session's idle window when stale, then attaches the principal to the
  * request.
+ *
+ * Sets `X-Session-Expires-At` on the response so apps/web can re-issue the
+ * browser cookie with the slid expiry — without it, the cookie would expire
+ * 30 days after the initial sign-in regardless of activity.
  */
 @Injectable()
 export class SessionGuard implements CanActivate {
   constructor(private readonly sessions: SessionsService) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const request = context.switchToHttp().getRequest<RequestWithPrincipal>();
+    const http = context.switchToHttp();
+    const request = http.getRequest<RequestWithPrincipal>();
 
     const cookieHeader = normalizeCookieHeader(request.headers.cookie);
     const rawToken = readSessionCookie(cookieHeader);
@@ -46,6 +59,12 @@ export class SessionGuard implements CanActivate {
     if (!session) throw new UnauthorizedException();
 
     await this.sessions.maybeSlide(session);
+
+    const response = http.getResponse<ResponseWithSetHeader>();
+    response.setHeader(
+      SESSION_EXPIRES_AT_HEADER,
+      session.expiresAt.toISOString(),
+    );
 
     request.principal = {
       userId: session.userId,

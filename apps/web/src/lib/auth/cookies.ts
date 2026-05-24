@@ -1,10 +1,7 @@
 import { randomBytes } from "node:crypto";
-import type { ResponseCookies } from "next/dist/compiled/@edge-runtime/cookies";
 
 /** Name of the session cookie set after successful sign-in. */
 export const SESSION_COOKIE_NAME = "fortuna_session";
-/** Rolling lifetime of the session cookie, in seconds. */
-export const SESSION_COOKIE_MAX_AGE_S = 30 * 24 * 60 * 60;
 
 /** Short-lived cookies carrying OAuth state, PKCE verifier, and nonce. */
 export const OAUTH_STATE_COOKIE = "fortuna_oauth_state";
@@ -27,14 +24,38 @@ export const OAUTH_TEMP_COOKIE_MAX_AGE_S = 5 * 60;
 const OAUTH_CALLBACK_PATH = "/api/auth/callback/google";
 
 /**
+ * Minimal structural type for a writeable cookie jar. Satisfied by both
+ * `NextResponse.cookies` (used by route handlers) and the store returned by
+ * `cookies()` from `next/headers` (used by server actions). Keeps the
+ * callsites loose and lets unit tests inject a typed stub without `as
+ * unknown as` casts.
+ */
+export interface CookieJar {
+  set(
+    name: string,
+    value: string,
+    options?: {
+      httpOnly?: boolean;
+      secure?: boolean;
+      sameSite?: "lax" | "strict" | "none" | boolean;
+      path?: string;
+      expires?: Date;
+      maxAge?: number;
+      domain?: string;
+    },
+  ): unknown;
+}
+
+/**
  * Set the session cookie with the design-mandated attributes
  * (HttpOnly, Secure when in production, SameSite=Lax, host-only, Path=/).
  *
- * apps/api returns the opaque token via JSON; apps/web is responsible for
- * placing it into the cookie jar with the correct security posture.
+ * `expires` is authoritative: it mirrors the server-side `expires_at` and is
+ * re-issued on every authenticated response (see `apiFetch` in
+ * `./api-client.ts`) so the browser's expiry tracks the rolling DB window.
  */
 export function setSessionCookie(
-  cookies: ResponseCookies,
+  cookies: CookieJar,
   sessionToken: string,
   expiresAt: Date,
 ): void {
@@ -44,7 +65,6 @@ export function setSessionCookie(
     sameSite: "lax",
     path: "/",
     expires: expiresAt,
-    maxAge: SESSION_COOKIE_MAX_AGE_S,
   });
 }
 
@@ -62,10 +82,7 @@ export function mintDeviceId(): string {
  * security posture (HttpOnly, Secure in prod, SameSite=Lax, host-only,
  * Path=/) with a two-year expiry per the design.
  */
-export function setDeviceIdCookie(
-  cookies: ResponseCookies,
-  deviceId: string,
-): void {
+export function setDeviceIdCookie(cookies: CookieJar, deviceId: string): void {
   cookies.set(DEVICE_ID_COOKIE_NAME, deviceId, {
     httpOnly: true,
     secure: isProduction(),
@@ -76,7 +93,7 @@ export function setDeviceIdCookie(
 }
 
 /** Expire the session cookie on the response (used on sign-out / deletion). */
-export function clearSessionCookie(cookies: ResponseCookies): void {
+export function clearSessionCookie(cookies: CookieJar): void {
   cookies.set(SESSION_COOKIE_NAME, "", {
     path: "/",
     maxAge: 0,
@@ -94,7 +111,7 @@ export interface TempCookieValues {
  * to the OAuth callback path. Read once by the callback handler and cleared.
  */
 export function setOauthTempCookies(
-  cookies: ResponseCookies,
+  cookies: CookieJar,
   values: TempCookieValues,
 ): void {
   const base = {
@@ -110,7 +127,7 @@ export function setOauthTempCookies(
 }
 
 /** Expire all three OAuth temp cookies. */
-export function clearOauthTempCookies(cookies: ResponseCookies): void {
+export function clearOauthTempCookies(cookies: CookieJar): void {
   const base = {
     path: OAUTH_CALLBACK_PATH,
     maxAge: 0,

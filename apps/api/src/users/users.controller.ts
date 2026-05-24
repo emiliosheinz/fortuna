@@ -11,6 +11,7 @@ import {
   Res,
   UseGuards,
 } from "@nestjs/common";
+import { Equals, IsBoolean } from "class-validator";
 import type { Request, Response } from "express";
 import { buildClearSessionCookieHeader } from "../auth/cookies/session-cookie";
 import { SessionGuard } from "../auth/guards/session.guard";
@@ -35,10 +36,17 @@ export interface SessionListItem {
   isCurrent: boolean;
 }
 
-/** Request body for `DELETE /users/me`. */
-export interface DeleteMeDto {
-  /** Must be the literal `true`. Anything else returns 400. */
-  confirm: boolean;
+/**
+ * Request body for `DELETE /users/me`.
+ *
+ * Validated by Nest's global `ValidationPipe`; `confirm` must be the literal
+ * `true`. Anything else (missing, non-boolean, `false`) is rejected with 400
+ * before the handler runs.
+ */
+export class DeleteMeDto {
+  @IsBoolean()
+  @Equals(true)
+  declare confirm: boolean;
 }
 
 interface AuthedRequest extends Request {
@@ -81,11 +89,11 @@ export class UsersController {
   /**
    * Hard-delete the signed-in user's account.
    *
-   * Requires `confirm: true` in the request body — anything else is a 400.
-   * The transaction removes the user (cascading to sessions + identities)
-   * and anonymizes the user's `sign_in_events` rows. The response clears
-   * the session cookie so the browser cannot keep using the now-invalid
-   * session id.
+   * `ValidationPipe` enforces `confirm: true` against {@link DeleteMeDto}
+   * before this handler runs. The transaction removes the user (cascading
+   * to sessions + identities) and anonymizes the user's `sign_in_events`
+   * rows. The response clears the session cookie so the browser cannot keep
+   * using the now-invalid session id.
    */
   @UseGuards(SessionGuard)
   @Delete("me")
@@ -93,16 +101,10 @@ export class UsersController {
   async deleteMe(
     @Req() req: AuthedRequest,
     @Res({ passthrough: true }) res: Response,
-    @Body() body: DeleteMeDto,
+    @Body() _body: DeleteMeDto,
   ): Promise<void> {
     const principal = req.principal;
     if (!principal) throw new NotFoundException();
-
-    if (!body || body.confirm !== true) {
-      throw new BadRequestException(
-        "confirm: true is required to delete the account.",
-      );
-    }
 
     await this.users.deleteAccount(principal.userId);
     this.metrics.recordAccountDeletion();

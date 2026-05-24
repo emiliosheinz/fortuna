@@ -32,17 +32,11 @@ export function DeleteAccountForm() {
         name="confirmation"
         type="text"
         autoComplete="off"
-        data-testid="delete-confirmation-input"
         value={phrase}
         onChange={(e) => setPhrase(e.target.value)}
         className="rounded-md border border-border bg-background px-3 py-2 text-sm font-mono outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring"
       />
-      <Button
-        type="submit"
-        variant="destructive"
-        disabled={!canSubmit}
-        data-testid="delete-account-submit"
-      >
+      <Button type="submit" variant="destructive" disabled={!canSubmit}>
         Delete my account
       </Button>
     </form>

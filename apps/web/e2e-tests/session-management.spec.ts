@@ -1,13 +1,5 @@
 import { expect, type Page, test } from "@playwright/test";
-
-async function signInWithGoogle(page: Page): Promise<void> {
-  await page.goto("/");
-  await page.getByRole("link", { name: "Sign in with Google" }).click();
-  await page.waitForURL(/mock-oauth2-server:8080\/default\/authorize/);
-  await page.getByPlaceholder("Enter any user/subject").fill("E2E User");
-  await page.getByRole("button", { name: "Sign-in" }).click();
-  await page.waitForURL(/\/home$/);
-}
+import { signInWithGoogle } from "./helpers/auth";
 
 /** Read the principal's own session id from the sessions page. */
 async function readCurrentSessionId(page: Page): Promise<string> {
@@ -25,7 +17,7 @@ test.describe("Session management", () => {
   test("sign-out clears the cookie and protects /home from the prior cookie", async ({
     page,
   }) => {
-    await signInWithGoogle(page);
+    await signInWithGoogle(page, "E2E User");
     await expect(page.getByText("Welcome, E2E User")).toBeVisible();
 
     await page.getByRole("button", { name: "Sign out" }).click();
@@ -44,8 +36,10 @@ test.describe("Session management", () => {
     const pageB = await contextB.newPage();
 
     try {
-      await signInWithGoogle(pageA);
-      await signInWithGoogle(pageB);
+      // Same subject from two contexts → one user, two sessions; the test
+      // revokes one from the other.
+      await signInWithGoogle(pageA, "E2E User");
+      await signInWithGoogle(pageB, "E2E User");
 
       const bSessionId = await readCurrentSessionId(pageB);
 

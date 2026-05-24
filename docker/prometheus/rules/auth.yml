@@ -15,7 +15,7 @@ groups:
           description: |
             Investigate Google outage, certificate or clock skew, recent deploy.
             Excludes failure_user_cancelled from both numerator and denominator.
-          runbook: docs/runbooks/operator.md#sign-in-failure-rate-high
+          runbook: docs/runbooks/auth-operator.md#sign-in-failure-rate-high
 
       - alert: AuthRateLimiterBlocksSpike
         expr: rate(auth_rate_limiter_blocks_total[1m]) * 60 > 100
@@ -25,7 +25,7 @@ groups:
         annotations:
           summary: Rate-limiter blocking more than 100 requests per minute
           description: Possible brute-force or scraping. Verify and consider an IP block at the proxy.
-          runbook: docs/runbooks/operator.md#abuse-spike
+          runbook: docs/runbooks/auth-operator.md#abuse-spike
 
       - alert: AuthAccountDeletionsSpike
         expr: increase(auth_account_deletions_total[1h]) > 10
@@ -35,7 +35,7 @@ groups:
         annotations:
           summary: More than 10 account deletions in the last hour
           description: Either abuse or a regression wiping accounts. Investigate fast.
-          runbook: docs/runbooks/operator.md#deletion-abuse
+          runbook: docs/runbooks/auth-operator.md#deletion-abuse
 
       - alert: AuthSignInLatencyP95High
         expr: |
@@ -48,7 +48,7 @@ groups:
         annotations:
           summary: Sign-in p95 above 2s for 10 minutes
           description: Investigate Google JWKs latency, DB, downstream calls.
-          runbook: docs/runbooks/operator.md#sign-in-latency
+          runbook: docs/runbooks/auth-operator.md#sign-in-latency
 
       - alert: AuthLimiterDegraded
         expr: increase(auth_limiter_degraded_total[5m]) > 0
@@ -58,4 +58,4 @@ groups:
         annotations:
           summary: Rate limiter is failing open (Redis unreachable)
           description: Sign-ins continue without rate limiting. Restore Redis.
-          runbook: docs/runbooks/operator.md#redis-down
+          runbook: docs/runbooks/auth-operator.md#redis-down

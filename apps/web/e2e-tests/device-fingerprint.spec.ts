@@ -1,13 +1,5 @@
-import { expect, type Page, test } from "@playwright/test";
-
-async function signInWithGoogle(page: Page, subject: string): Promise<void> {
-  await page.goto("/");
-  await page.getByRole("link", { name: "Sign in with Google" }).click();
-  await page.waitForURL(/mock-oauth2-server:8080\/default\/authorize/);
-  await page.getByPlaceholder("Enter any user/subject").fill(subject);
-  await page.getByRole("button", { name: "Sign-in" }).click();
-  await page.waitForURL(/\/home$/);
-}
+import { expect, test } from "@playwright/test";
+import { signInWithGoogle } from "./helpers/auth";
 
 test.describe("Device fingerprint cookie", () => {
   test("persists the device_id cookie across sign-out + re-sign-in within one browser context", async ({

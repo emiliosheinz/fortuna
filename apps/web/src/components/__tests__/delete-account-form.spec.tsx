@@ -10,19 +10,15 @@ describe("DeleteAccountForm", () => {
   it("disables the destructive submit until the confirmation phrase matches", () => {
     render(<DeleteAccountForm />);
 
-    const submit = screen.getByTestId(
-      "delete-account-submit",
-    ) as HTMLButtonElement;
-    const input = screen.getByTestId(
-      "delete-confirmation-input",
-    ) as HTMLInputElement;
+    const submit = screen.getByRole("button", { name: /delete my account/i });
+    const input = screen.getByLabelText(/type.+to confirm/i);
 
-    expect(submit.disabled).toBe(true);
+    expect(submit).toBeDisabled();
 
     fireEvent.change(input, { target: { value: "delete" } });
-    expect(submit.disabled).toBe(true);
+    expect(submit).toBeDisabled();
 
     fireEvent.change(input, { target: { value: "DELETE" } });
-    expect(submit.disabled).toBe(false);
+    expect(submit).toBeEnabled();
   });
 });

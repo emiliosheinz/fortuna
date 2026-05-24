@@ -1,3 +1,4 @@
+import { cookies } from "next/headers";
 import {
   createGoogleSession,
   deleteCurrentSession,
@@ -7,15 +8,36 @@ import {
   getSessions,
 } from "../api-client";
 
+jest.mock("next/headers", () => ({
+  cookies: jest.fn(),
+}));
+
+const cookiesMock = cookies as jest.MockedFunction<typeof cookies>;
+
+/**
+ * Build a stub for the `next/headers` cookies() store. Its return
+ * (`ReadonlyRequestCookies`) has too many methods to satisfy structurally —
+ * the single cast here is the only place tests fabricate that shape.
+ */
+function fakeCookieStore(
+  set: jest.Mock = jest.fn(),
+): Awaited<ReturnType<typeof cookies>> {
+  return { set } as unknown as Awaited<ReturnType<typeof cookies>>;
+}
+
 const ORIGINAL_FETCH = global.fetch;
 const ORIGINAL_API_BASE_URL = process.env.API_BASE_URL;
 
 beforeEach(() => {
   process.env.API_BASE_URL = "http://api.test";
+  // Default: a writeable cookie store that records nothing. Tests that care
+  // about cookie refresh override this with their own jar.
+  cookiesMock.mockResolvedValue(fakeCookieStore());
 });
 
 afterEach(() => {
   global.fetch = ORIGINAL_FETCH;
+  cookiesMock.mockReset();
   if (ORIGINAL_API_BASE_URL === undefined) {
     delete process.env.API_BASE_URL;
   } else {
@@ -23,11 +45,17 @@ afterEach(() => {
   }
 });
 
-function mockFetch(response: { ok: boolean; status: number; body?: unknown }) {
+function mockFetch(response: {
+  ok: boolean;
+  status: number;
+  body?: unknown;
+  headers?: Record<string, string>;
+}) {
   const fn = jest.fn().mockResolvedValue({
     ok: response.ok,
     status: response.status,
     json: async () => response.body,
+    headers: new Headers(response.headers ?? {}),
   });
   global.fetch = fn as unknown as typeof global.fetch;
   return fn;
@@ -257,6 +285,97 @@ describe("deleteMe", () => {
     await expect(deleteMe("c")).rejects.toThrow(
       "/users/me DELETE failed with status 400",
     );
+  });
+});
+
+describe("session cookie refresh on slide", () => {
+  function mockCookieStore(): { set: jest.Mock } {
+    const set = jest.fn();
+    cookiesMock.mockResolvedValue(fakeCookieStore(set));
+    return { set };
+  }
+
+  it("re-issues the session cookie when the API returns X-Session-Expires-At", async () => {
+    const store = mockCookieStore();
+    const newExpiry = "2026-12-31T00:00:00.000Z";
+    mockFetch({
+      ok: true,
+      status: 200,
+      body: { id: "u1", name: "U", email: "u@example.com", avatarUrl: null },
+      headers: { "X-Session-Expires-At": newExpiry },
+    });
+
+    await getMe("session-cookie");
+
+    expect(store.set).toHaveBeenCalledWith(
+      "fortuna_session",
+      "session-cookie",
+      expect.objectContaining({
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/",
+        expires: new Date(newExpiry),
+      }),
+    );
+  });
+
+  it("does not touch cookies when the API omits the header", async () => {
+    const store = mockCookieStore();
+    mockFetch({
+      ok: true,
+      status: 200,
+      body: { id: "u1", name: "U", email: "u@example.com", avatarUrl: null },
+    });
+
+    await getMe("session-cookie");
+
+    expect(store.set).not.toHaveBeenCalled();
+  });
+
+  it("swallows cookies().set throws (Server Component read-only context)", async () => {
+    cookiesMock.mockResolvedValue(
+      fakeCookieStore(
+        jest.fn(() => {
+          throw new Error("Cookies can only be modified in a Server Action");
+        }),
+      ),
+    );
+    mockFetch({
+      ok: true,
+      status: 200,
+      body: { id: "u1", name: "U", email: "u@example.com", avatarUrl: null },
+      headers: { "X-Session-Expires-At": "2026-12-31T00:00:00.000Z" },
+    });
+
+    await expect(getMe("session-cookie")).resolves.not.toBeNull();
+  });
+
+  it("does not refresh when no session cookie was forwarded", async () => {
+    const store = mockCookieStore();
+    mockFetch({
+      ok: true,
+      status: 200,
+      body: { sessionToken: "tok", expiresAt: "2026-01-01T00:00:00.000Z" },
+      headers: { "X-Session-Expires-At": "2026-12-31T00:00:00.000Z" },
+    });
+
+    await createGoogleSession("id.token", "nonce");
+
+    expect(store.set).not.toHaveBeenCalled();
+  });
+
+  it("ignores a malformed expiry header rather than corrupting the cookie", async () => {
+    const store = mockCookieStore();
+    mockFetch({
+      ok: true,
+      status: 200,
+      body: { id: "u1", name: "U", email: "u@example.com", avatarUrl: null },
+      headers: { "X-Session-Expires-At": "not-a-date" },
+    });
+
+    await getMe("session-cookie");
+
+    expect(store.set).not.toHaveBeenCalled();
   });
 });
 

@@ -9,8 +9,7 @@ describe("Home Page", () => {
 
   it("links the consent notice to the Privacy Policy and Terms of Service", () => {
     render(<Page />);
-    const notice = screen.getByTestId("sign-in-consent-notice");
-    expect(notice.textContent).toMatch(/sign(.|\s)*in/i);
+    const notice = screen.getByText(/by signing in you agree/i);
 
     const privacyLink = within(notice).getByRole("link", {
       name: /privacy policy/i,

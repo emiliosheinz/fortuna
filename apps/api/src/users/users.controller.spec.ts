@@ -157,25 +157,9 @@ describe("UsersController GET /users/me/sessions", () => {
 });
 
 describe("UsersController DELETE /users/me", () => {
-  it("rejects when confirm flag is missing or not true", async () => {
-    const deleteAccount = jest.fn();
-    const { controller } = buildController({
-      users: { deleteAccount: deleteAccount as never },
-    });
-    const req = { principal: { userId: "user-1", sessionId: "s" } } as never;
-    const res = { setHeader: jest.fn() } as never;
-
-    await expect(
-      controller.deleteMe(req, res, {} as never),
-    ).rejects.toBeInstanceOf(BadRequestException);
-    await expect(
-      controller.deleteMe(req, res, { confirm: false } as never),
-    ).rejects.toBeInstanceOf(BadRequestException);
-    await expect(
-      controller.deleteMe(req, res, { confirm: "true" as never } as never),
-    ).rejects.toBeInstanceOf(BadRequestException);
-    expect(deleteAccount).not.toHaveBeenCalled();
-  });
+  // Body validation (confirm must be `true`) is enforced by Nest's
+  // ValidationPipe against DeleteMeDto, covered end-to-end in the
+  // integration spec. The controller no longer hand-rolls that check.
 
   it("deletes the account and clears the session cookie on confirm:true", async () => {
     const deleteAccount = jest.fn().mockResolvedValue(undefined);

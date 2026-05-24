@@ -143,8 +143,9 @@ continue without rate limiting until Redis recovers.
 3. Restart Redis: `docker compose restart redis`. The limiter recovers
    automatically on the next op.
 4. If Redis is down for > 30 minutes, post a status notice. Sign-ins
-   succeed during the outage, but a determined attacker could brute-force
-   the limiter is the sole defense for.
+   succeed during the outage, but with the limiter unavailable, endpoints
+   it normally protects (per-IP sign-in throttling, identity-scoped
+   backoff) are exposed to brute-force attempts until Redis recovers.
 5. After Redis recovers, confirm `auth_limiter_degraded_total` stops
    incrementing.
 

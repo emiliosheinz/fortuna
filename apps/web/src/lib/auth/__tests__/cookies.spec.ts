@@ -1,24 +1,24 @@
-import type { ResponseCookies } from "next/dist/compiled/@edge-runtime/cookies";
 import {
+  type CookieJar,
   DEVICE_ID_COOKIE_MAX_AGE_S,
   DEVICE_ID_COOKIE_NAME,
   mintDeviceId,
   setDeviceIdCookie,
 } from "../cookies";
 
-type CookieSetCall = Parameters<ResponseCookies["set"]>;
+type CookieSetCall = Parameters<CookieJar["set"]>;
 
 function buildCookieJar(): {
-  cookies: ResponseCookies;
+  cookies: CookieJar;
   calls: CookieSetCall[];
 } {
   const calls: CookieSetCall[] = [];
-  const cookies = {
+  const cookies: CookieJar = {
     set: jest.fn((...args: CookieSetCall) => {
       calls.push(args);
       return cookies;
     }),
-  } as unknown as ResponseCookies;
+  };
   return { cookies, calls };
 }
 

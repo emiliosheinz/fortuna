@@ -1,5 +1,13 @@
-import { SESSION_COOKIE_NAME } from "./cookies";
+import { cookies } from "next/headers";
+import { SESSION_COOKIE_NAME, setSessionCookie } from "./cookies";
 import { requireEnv } from "./env";
+
+/**
+ * Response header from apps/api carrying the (possibly slid) session expiry.
+ * Header names are case-insensitive over the wire; the API sends
+ * `X-Session-Expires-At`.
+ */
+const SESSION_EXPIRES_AT_HEADER = "x-session-expires-at";
 
 /** Shape of the API's `GET /users/me` response. */
 export interface MeResponse {
@@ -77,6 +85,13 @@ async function apiFetch(
   const apiBaseUrl = requireEnv("API_BASE_URL");
   const response = await fetch(`${apiBaseUrl}${path}`, init);
 
+  if (options.sessionCookie) {
+    await refreshSessionCookieFromResponse(
+      response.headers,
+      options.sessionCookie,
+    );
+  }
+
   if (options.treatAsNull?.includes(response.status)) {
     return { response, isNullStatus: true };
   }
@@ -86,6 +101,33 @@ async function apiFetch(
     );
   }
   return { response, isNullStatus: false };
+}
+
+/**
+ * Re-issue the session cookie when the API returns an updated expiry. Called
+ * after every authenticated API response.
+ *
+ * `cookies().set` throws in read-only contexts (Server Components in Next
+ * App Router). We swallow that — the slide will land on the next request
+ * invoked from a writeable context (Server Action / Route Handler). This is
+ * the known coverage gap accepted when picking this approach over true
+ * per-request middleware-driven sliding.
+ */
+async function refreshSessionCookieFromResponse(
+  headers: Headers,
+  sessionToken: string,
+): Promise<void> {
+  const expiresAtRaw = headers.get(SESSION_EXPIRES_AT_HEADER);
+  if (!expiresAtRaw) return;
+  const expiresAt = new Date(expiresAtRaw);
+  if (Number.isNaN(expiresAt.getTime())) return;
+
+  try {
+    const store = await cookies();
+    setSessionCookie(store, sessionToken, expiresAt);
+  } catch {
+    // Read-only cookie store; see docstring above.
+  }
 }
 
 /**

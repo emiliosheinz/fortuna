@@ -10,6 +10,14 @@ export const SESSION_COOKIE_NAME = "fortuna_session";
 export const SESSION_DURATION_MS = 30 * 24 * 60 * 60 * 1000;
 
 /**
+ * Response header carrying the (possibly slid) session expiry as an ISO-8601
+ * timestamp. {@link import("../guards/session.guard").SessionGuard} sets it
+ * on every authenticated response; apps/web reads it and re-issues the
+ * session cookie so the browser's expiry tracks the rolling server window.
+ */
+export const SESSION_EXPIRES_AT_HEADER = "X-Session-Expires-At";
+
+/**
  * Serialize a `Set-Cookie` value that clears the session cookie.
  *
  * Mirrors the attributes apps/web sets when minting the cookie (host-only,

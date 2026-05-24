@@ -11,7 +11,6 @@ self-contained; never combine rotations unless you have to.
 | ------------------------------- | ------- | --------------------------- | ----------------- |
 | `GOOGLE_CLIENT_SECRET`          | api     | `api` + `web`               | Google Cloud Console |
 | `GOOGLE_CLIENT_ID`              | api+web | `api` + `web` (rare)        | Google Cloud Console |
-| `RESEND_API_KEY`                | api     | `api` (when Phase 6 ships)  | Resend dashboard |
 | `REDIS_PASSWORD`                | api+infra | `redis` + `api`           | Local |
 | `STATE_COOKIE_SIGNING_KEY` (apps/web) | web | `web`                    | Local |
 | `POSTGRES_PASSWORD`             | infra   | `postgres` + `api`          | Local (psql) |
@@ -78,34 +77,20 @@ the required `aud` claim during ID-token verification.
 
 ---
 
-## `RESEND_API_KEY`
-
-> Not in use until Phase 6 ships (new-device emails). Listed here so the
-> rotation flow is ready when it does.
-
-1. Generate a new API key in the Resend dashboard.
-2. Update `apps/api/.env`:
-   ```
-   RESEND_API_KEY=<new-key>
-   ```
-3. Restart `api`:
-   ```bash
-   docker compose -f docker-compose.prod.yaml up -d api
-   ```
-4. Trigger a new-device email manually (sign in from a fresh browser
-   profile) and verify delivery.
-5. Revoke the old API key in the Resend dashboard.
-
----
-
 ## `REDIS_PASSWORD`
 
 Used by **redis** as `--requirepass` and by **apps/api** when
-connecting. Sequence matters — the password must be in both places
-before either side picks it up.
+connecting. The two services read from **different** env files in compose
+(`./.env` for redis, `./apps/api/.env` for api), so the rotation must
+touch both — updating only `./.env` will leave the API on the old
+password and the limiter will fail open until the next deploy.
 
-1. Update `.env` (read by both `redis` and `api`):
+1. Update **both** env files with the same new value:
    ```
+   # ./.env             (read by redis)
+   REDIS_PASSWORD=<new-password>
+
+   # ./apps/api/.env    (read by api)
    REDIS_PASSWORD=<new-password>
    ```
 2. Restart `redis` first, then `api`:

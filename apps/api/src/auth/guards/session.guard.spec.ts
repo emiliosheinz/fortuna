@@ -10,6 +10,7 @@ function makeContext(cookieHeader: string | undefined): {
     string,
     unknown
   >;
+  response: { setHeader: jest.Mock };
 } {
   const request = {
     headers: { cookie: cookieHeader },
@@ -17,10 +18,14 @@ function makeContext(cookieHeader: string | undefined): {
     string,
     unknown
   >;
+  const response = { setHeader: jest.fn() };
   const ctx = {
-    switchToHttp: () => ({ getRequest: () => request }),
+    switchToHttp: () => ({
+      getRequest: () => request,
+      getResponse: () => response,
+    }),
   } as unknown as ExecutionContext;
-  return { ctx, request };
+  return { ctx, request, response };
 }
 
 function makeService(overrides: Partial<SessionsService>): SessionsService {
@@ -76,6 +81,28 @@ describe("SessionGuard", () => {
       userId: "user-1",
       sessionId: "session-1",
     });
+  });
+
+  it("sets X-Session-Expires-At so apps/web can re-issue the cookie with the slid expiry", async () => {
+    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+    const session = {
+      id: "session-1",
+      userId: "user-1",
+      lastActiveAt: new Date(),
+      expiresAt,
+    } as Session;
+    const service = makeService({
+      findActiveByRawToken: jest.fn().mockResolvedValue(session),
+    });
+    const guard = new SessionGuard(service);
+    const { ctx, response } = makeContext("fortuna_session=opaque-good");
+
+    await guard.canActivate(ctx);
+
+    expect(response.setHeader).toHaveBeenCalledWith(
+      "X-Session-Expires-At",
+      expiresAt.toISOString(),
+    );
   });
 
   it("does not leak internal failure detail", async () => {
