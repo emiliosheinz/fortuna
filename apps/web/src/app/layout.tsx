@@ -1,6 +1,7 @@
 import "./globals.css";
 import type { Metadata } from "next";
 import { Geist, Geist_Mono as GeistMono } from "next/font/google";
+import { QueryProvider } from "@/components/query-provider";
 import { ThemeProvider } from "@/components/theme-switcher";
 
 const geist = Geist({
@@ -57,7 +58,7 @@ export default function RootLayout({
           attribute={["class", "data-theme"]}
           defaultTheme="system"
         >
-          {children}
+          <QueryProvider>{children}</QueryProvider>
         </ThemeProvider>
       </body>
     </html>
