@@ -25,6 +25,7 @@ export type SignInOutcome =
   | "failure_token_malformed"
   | "failure_nonce_mismatch"
   | "failure_bad_request"
+  | "failure_rate_limited"
   | "failure_internal";
 
 /**

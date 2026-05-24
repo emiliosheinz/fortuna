@@ -75,6 +75,16 @@ export class SignInAuditor {
     });
   }
 
+  async recordRateLimited(input: SignInAuditContext): Promise<void> {
+    await this.record({
+      userId: null,
+      correlationId: input.correlationId,
+      ip: input.ip,
+      userAgent: input.userAgent,
+      outcome: "failure_rate_limited",
+    });
+  }
+
   private async record(input: {
     userId: string | null;
     correlationId: string;

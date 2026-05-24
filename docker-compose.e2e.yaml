@@ -15,6 +15,22 @@ services:
       start_period: 10s
     restart: unless-stopped
 
+  redis:
+    image: redis:7-alpine
+    env_file:
+      - ./.env
+    command:
+      - sh
+      - -c
+      - exec redis-server --requirepass "$$REDIS_PASSWORD" --appendonly no
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" ping | grep -q PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+    restart: unless-stopped
+
   setup:
     image: ghcr.io/emiliosheinz/fortuna-cli:latest
     volumes:
@@ -66,6 +82,8 @@ services:
         condition: service_completed_successfully
       mock-oauth2-server:
         condition: service_started
+      redis:
+        condition: service_healthy
     volumes:
       - .:/fortuna
 

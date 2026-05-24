@@ -8,6 +8,9 @@ import { SignInEvent } from "./entities/sign-in-event.entity";
 import { User } from "./entities/user.entity";
 import { BadRequestAuditFilter } from "./filters/bad-request-audit.filter";
 import { SessionGuard } from "./guards/session.guard";
+import { redisClientProvider } from "./rate-limit/ioredis.client";
+import { limiterConfigProvider } from "./rate-limit/limiter.config";
+import { SlidingWindowLimiter } from "./rate-limit/sliding-window-limiter";
 import { AuthService } from "./services/auth.service";
 import { DeviceFingerprintsService } from "./services/device-fingerprints.service";
 import {
@@ -61,6 +64,8 @@ function deriveJwksUri(issuer: string): string {
   controllers: [AuthController],
   providers: [
     googleVerifierOptionsProvider,
+    redisClientProvider,
+    limiterConfigProvider,
     GoogleIdTokenVerifier,
     AuthService,
     SessionsService,
@@ -69,6 +74,7 @@ function deriveJwksUri(issuer: string): string {
     SignInAuditor,
     SignInEventsRetentionWorker,
     DeviceFingerprintsService,
+    SlidingWindowLimiter,
     SessionGuard,
     BadRequestAuditFilter,
   ],

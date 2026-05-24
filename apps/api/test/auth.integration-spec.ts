@@ -5,6 +5,8 @@ import {
   PostgreSqlContainer,
   StartedPostgreSqlContainer,
 } from "@testcontainers/postgresql";
+import { RedisContainer, StartedRedisContainer } from "@testcontainers/redis";
+import IORedis, { type Redis } from "ioredis";
 import { exportJWK, generateKeyPair, type JWK, SignJWT } from "jose";
 import request from "supertest";
 import { DataSource } from "typeorm";
@@ -15,6 +17,11 @@ import { Session } from "@/auth/entities/session.entity";
 import { SignInEvent } from "@/auth/entities/sign-in-event.entity";
 import { User } from "@/auth/entities/user.entity";
 import { computeDeviceFingerprintHash } from "@/auth/fingerprint/device-fingerprint-hash";
+import {
+  LIMITER_CONFIG,
+  type LimiterConfig,
+} from "@/auth/rate-limit/limiter.config";
+import { SlidingWindowLimiter } from "@/auth/rate-limit/sliding-window-limiter";
 import {
   GOOGLE_ID_TOKEN_VERIFIER_OPTIONS,
   type GoogleIdTokenVerifierOptions,
@@ -31,8 +38,11 @@ function sha256Hex(input: string): string {
 
 describe("Auth integration", () => {
   let container: StartedPostgreSqlContainer;
+  let redisContainer: StartedRedisContainer | null;
+  let redisAdmin: Redis;
   let app: INestApplication;
   let dataSource: DataSource;
+  let limiterConfig: LimiterConfig;
   let signingPrivateKey: CryptoKey;
   let publicJwk: JWK;
 
@@ -50,6 +60,19 @@ describe("Auth integration", () => {
     process.env.DB_PASSWORD = container.getPassword();
     process.env.DB_SSL = "false";
 
+    redisContainer = await new RedisContainer("redis:7-alpine")
+      .withPassword("fortuna")
+      .start();
+    process.env.REDIS_HOST = redisContainer.getHost();
+    process.env.REDIS_PORT = String(redisContainer.getPort());
+    process.env.REDIS_PASSWORD = redisContainer.getPassword();
+    redisAdmin = new IORedis({
+      host: redisContainer.getHost(),
+      port: redisContainer.getPort(),
+      password: redisContainer.getPassword(),
+      maxRetriesPerRequest: 1,
+    });
+
     const keyPair = await generateKeyPair("RS256");
     signingPrivateKey = keyPair.privateKey;
     const jwk = await exportJWK(keyPair.publicKey);
@@ -64,11 +87,24 @@ describe("Auth integration", () => {
       jwks: { keys: [publicJwk] },
     };
 
+    // Mutable so individual tests can dial parameters in/out.
+    limiterConfig = {
+      ip: { windowMs: 60_000, limit: 30 },
+      identity: {
+        thresholdFailures: 2,
+        baseMs: 300,
+        capMs: 2_000,
+        counterTtlSec: 60,
+      },
+    };
+
     const moduleRef: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     })
       .overrideProvider(GOOGLE_ID_TOKEN_VERIFIER_OPTIONS)
       .useValue(verifierOptions)
+      .overrideProvider(LIMITER_CONFIG)
+      .useValue(limiterConfig)
       .compile();
 
     app = moduleRef.createNestApplication();
@@ -80,6 +116,8 @@ describe("Auth integration", () => {
 
   afterAll(async () => {
     await app?.close();
+    await redisAdmin?.quit().catch(() => undefined);
+    await redisContainer?.stop();
     await container?.stop();
   });
 
@@ -88,6 +126,19 @@ describe("Auth integration", () => {
     await dataSource.query(
       'TRUNCATE TABLE "sign_in_events", "sessions", "device_fingerprints", "identities", "users" RESTART IDENTITY CASCADE',
     );
+    if (redisAdmin?.status === "ready" || redisAdmin?.status === "connect") {
+      await redisAdmin.flushdb().catch(() => undefined);
+    }
+    // Reset limiter config to the per-suite default.
+    Object.assign(limiterConfig, {
+      ip: { windowMs: 60_000, limit: 30 },
+      identity: {
+        thresholdFailures: 2,
+        baseMs: 300,
+        capMs: 2_000,
+        counterTtlSec: 60,
+      },
+    } satisfies LimiterConfig);
   });
 
   async function signIdToken(
@@ -916,6 +967,162 @@ describe("Auth integration", () => {
 
       expect(await dataSource.getRepository(User).count()).toBe(0);
       expect(await dataSource.getRepository(DeviceFingerprint).count()).toBe(0);
+    });
+  });
+
+  describe("rate limiting", () => {
+    it("blocks at the per-IP threshold and audits failure_rate_limited", async () => {
+      limiterConfig.ip.limit = 3;
+
+      // First three attempts pass the limiter (they each fail verification —
+      // that's fine; the IP counter increments on every attempt).
+      for (let i = 0; i < 3; i++) {
+        const idToken = await signIdToken({
+          aud: "wrong-audience",
+          sub: `ip-rl-${i}`,
+        });
+        await request(app.getHttpServer())
+          .post("/auth/google")
+          .send({ idToken, nonce: NONCE })
+          .expect(401);
+      }
+
+      // Fourth attempt is blocked by the IP limiter.
+      const blockedIdToken = await signIdToken({
+        aud: "wrong-audience",
+        sub: "ip-rl-blocked",
+      });
+      const res = await request(app.getHttpServer())
+        .post("/auth/google")
+        .send({ idToken: blockedIdToken, nonce: NONCE })
+        .expect(401);
+
+      expect(res.body.correlationId).toEqual(expect.any(String));
+
+      const events = await dataSource
+        .getRepository(SignInEvent)
+        .find({ order: { createdAt: "ASC" } });
+      expect(events).toHaveLength(4);
+      const last = events[events.length - 1];
+      expect(last?.outcome).toBe("failure_rate_limited");
+      expect(last?.correlationId).toBe(res.body.correlationId);
+    });
+
+    it("applies identity-scoped backoff after repeated failures for the same identity", async () => {
+      // threshold=2, baseMs=300, capMs=2000
+
+      // Three failures for the same sub push the failure counter past the
+      // threshold, so the next attempt should be in cooldown.
+      for (let i = 0; i < 3; i++) {
+        const idToken = await signIdToken({
+          aud: "wrong-audience",
+          sub: "identity-backoff",
+        });
+        const res = await request(app.getHttpServer())
+          .post("/auth/google")
+          .send({ idToken, nonce: NONCE })
+          .expect(401);
+        expect(res.body.correlationId).toEqual(expect.any(String));
+      }
+
+      const blockedIdToken = await signIdToken({
+        aud: "wrong-audience",
+        sub: "identity-backoff",
+      });
+      const blocked = await request(app.getHttpServer())
+        .post("/auth/google")
+        .send({ idToken: blockedIdToken, nonce: NONCE })
+        .expect(401);
+
+      const events = await dataSource
+        .getRepository(SignInEvent)
+        .find({ order: { createdAt: "ASC" } });
+      const lastOutcome = events[events.length - 1]?.outcome;
+      expect(lastOutcome).toBe("failure_rate_limited");
+      expect(events[events.length - 1]?.correlationId).toBe(
+        blocked.body.correlationId,
+      );
+
+      // A *different* identity is not affected by sub="identity-backoff"'s
+      // cooldown — separate keyspace per (provider, subject).
+      const otherIdToken = await signIdToken({
+        aud: "wrong-audience",
+        sub: "different-identity",
+      });
+      const other = await request(app.getHttpServer())
+        .post("/auth/google")
+        .send({ idToken: otherIdToken, nonce: NONCE })
+        .expect(401);
+      const eventsAfter = await dataSource
+        .getRepository(SignInEvent)
+        .find({ order: { createdAt: "ASC" } });
+      const lastForOther = eventsAfter[eventsAfter.length - 1];
+      expect(lastForOther?.outcome).toBe("failure_token_audience");
+      expect(lastForOther?.correlationId).toBe(other.body.correlationId);
+    });
+
+    it("clears identity backoff state after a successful sign-in", async () => {
+      // Push the identity counter to threshold (but not over).
+      for (let i = 0; i < 2; i++) {
+        const idToken = await signIdToken({
+          aud: "wrong-audience",
+          sub: "clear-on-success",
+        });
+        await request(app.getHttpServer())
+          .post("/auth/google")
+          .send({ idToken, nonce: NONCE })
+          .expect(401);
+      }
+
+      // Successful sign-in clears the failure counter.
+      const goodIdToken = await signIdToken({ sub: "clear-on-success" });
+      await request(app.getHttpServer())
+        .post("/auth/google")
+        .send({ idToken: goodIdToken, nonce: NONCE })
+        .expect(201);
+
+      // Three more failures must be tolerated — backoff threshold (2) is
+      // counted from zero again because clearIdentityFailures wiped the key.
+      for (let i = 0; i < 2; i++) {
+        const idToken = await signIdToken({
+          aud: "wrong-audience",
+          sub: "clear-on-success",
+        });
+        await request(app.getHttpServer())
+          .post("/auth/google")
+          .send({ idToken, nonce: NONCE })
+          .expect(401);
+      }
+      const events = await dataSource.getRepository(SignInEvent).find();
+      // None of the post-success failures should be rate-limited.
+      const postSuccessFailures = events.filter(
+        (e) => e.outcome === "failure_token_audience",
+      );
+      expect(postSuccessFailures.length).toBeGreaterThanOrEqual(4);
+      expect(events.some((e) => e.outcome === "failure_rate_limited")).toBe(
+        false,
+      );
+    });
+
+    it("fails open when Redis is unreachable: sign-ins succeed and degradedCount increments", async () => {
+      const limiter = app.get(SlidingWindowLimiter);
+      const baselineDegraded = limiter.degradedCount();
+
+      // Stop Redis for the rest of the test file (this case must run last).
+      const stoppingRedis = redisContainer;
+      redisContainer = null;
+      await stoppingRedis?.stop();
+      await redisAdmin?.quit().catch(() => undefined);
+
+      const idToken = await signIdToken({ sub: "fail-open" });
+      const res = await request(app.getHttpServer())
+        .post("/auth/google")
+        .send({ idToken, nonce: NONCE })
+        .expect(201);
+
+      expect(res.body.sessionToken).toEqual(expect.any(String));
+      expect(limiter.degradedCount()).toBeGreaterThan(baselineDegraded);
+      expect(limiter.isDegraded()).toBe(true);
     });
   });
 });

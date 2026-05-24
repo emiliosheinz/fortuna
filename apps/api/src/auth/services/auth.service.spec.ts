@@ -1,8 +1,10 @@
 import { UnauthorizedException } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
+import { generateKeyPair, SignJWT } from "jose";
 import type { GoogleSignInDto } from "../dto/google-sign-in.dto";
 import type { Session } from "../entities/session.entity";
 import type { User } from "../entities/user.entity";
+import { SlidingWindowLimiter } from "../rate-limit/sliding-window-limiter";
 import { AuthService } from "./auth.service";
 import { DeviceFingerprintsService } from "./device-fingerprints.service";
 import {
@@ -22,6 +24,12 @@ interface AuthServiceStubs {
   recordSuccess: jest.Mock;
   recordVerificationFailure: jest.Mock;
   recordInternalFailure: jest.Mock;
+  recordRateLimited: jest.Mock;
+  checkIpRate: jest.Mock;
+  checkIdentityBackoff: jest.Mock;
+  recordIdentityFailure: jest.Mock;
+  clearIdentityFailures: jest.Mock;
+  isDegraded: jest.Mock;
 }
 
 async function buildAuthService(
@@ -37,6 +45,16 @@ async function buildAuthService(
     recordSuccess: jest.fn().mockResolvedValue(undefined),
     recordVerificationFailure: jest.fn().mockResolvedValue(undefined),
     recordInternalFailure: jest.fn().mockResolvedValue(undefined),
+    recordRateLimited: jest.fn().mockResolvedValue(undefined),
+    checkIpRate: jest
+      .fn()
+      .mockResolvedValue({ allowed: true, degraded: false }),
+    checkIdentityBackoff: jest
+      .fn()
+      .mockResolvedValue({ allowed: true, degraded: false }),
+    recordIdentityFailure: jest.fn().mockResolvedValue(undefined),
+    clearIdentityFailures: jest.fn().mockResolvedValue(undefined),
+    isDegraded: jest.fn().mockReturnValue(false),
     ...overrides,
   };
 
@@ -52,11 +70,29 @@ async function buildAuthService(
   };
   const auditorStub: Pick<
     SignInAuditor,
-    "recordSuccess" | "recordVerificationFailure" | "recordInternalFailure"
+    | "recordSuccess"
+    | "recordVerificationFailure"
+    | "recordInternalFailure"
+    | "recordRateLimited"
   > = {
     recordSuccess: stubs.recordSuccess,
     recordVerificationFailure: stubs.recordVerificationFailure,
     recordInternalFailure: stubs.recordInternalFailure,
+    recordRateLimited: stubs.recordRateLimited,
+  };
+  const limiterStub: Pick<
+    SlidingWindowLimiter,
+    | "checkIpRate"
+    | "checkIdentityBackoff"
+    | "recordIdentityFailure"
+    | "clearIdentityFailures"
+    | "isDegraded"
+  > = {
+    checkIpRate: stubs.checkIpRate,
+    checkIdentityBackoff: stubs.checkIdentityBackoff,
+    recordIdentityFailure: stubs.recordIdentityFailure,
+    clearIdentityFailures: stubs.clearIdentityFailures,
+    isDegraded: stubs.isDegraded,
   };
 
   const moduleRef = await Test.createTestingModule({
@@ -67,10 +103,26 @@ async function buildAuthService(
       { provide: SessionsService, useValue: sessionsStub },
       { provide: DeviceFingerprintsService, useValue: fingerprintsStub },
       { provide: SignInAuditor, useValue: auditorStub },
+      { provide: SlidingWindowLimiter, useValue: limiterStub },
     ],
   }).compile();
 
   return { service: moduleRef.get(AuthService), ...stubs };
+}
+
+let _signKey: CryptoKey | null = null;
+async function signableToken(sub: string): Promise<string> {
+  if (!_signKey) {
+    const pair = await generateKeyPair("RS256");
+    _signKey = pair.privateKey;
+  }
+  return new SignJWT({ nonce: "n" })
+    .setProtectedHeader({ alg: "RS256" })
+    .setIssuer("https://accounts.google.com")
+    .setAudience("aud")
+    .setSubject(sub)
+    .setExpirationTime("5m")
+    .sign(_signKey);
 }
 
 const validDto: GoogleSignInDto = {
@@ -227,5 +279,116 @@ describe("AuthService.signInWithGoogle", () => {
     expect(recordInternalFailure).toHaveBeenCalledWith(
       expect.objectContaining({ correlationId: expect.any(String) }),
     );
+  });
+});
+
+describe("AuthService rate limiting", () => {
+  it("rejects with 401 + audits failure_rate_limited when the per-IP limiter blocks", async () => {
+    const { service, verify, recordRateLimited, checkIpRate } =
+      await buildAuthService({
+        checkIpRate: jest
+          .fn()
+          .mockResolvedValue({ allowed: false, retryAfterMs: 12_000 }),
+      });
+
+    const err = await service
+      .signInWithGoogle(validDto, meta)
+      .catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(UnauthorizedException);
+    const body = (err as UnauthorizedException).getResponse() as {
+      correlationId?: string;
+    };
+    expect(body.correlationId).toEqual(expect.any(String));
+    expect(checkIpRate).toHaveBeenCalledWith("203.0.113.5");
+    expect(recordRateLimited).toHaveBeenCalledWith(
+      expect.objectContaining({
+        correlationId: body.correlationId,
+        ip: "203.0.113.5",
+      }),
+    );
+    expect(verify).not.toHaveBeenCalled();
+  });
+
+  it("rejects with 401 + audits failure_rate_limited when the per-identity limiter blocks", async () => {
+    const idToken = await signableToken("identity-blocked");
+    const { service, verify, recordRateLimited, checkIdentityBackoff } =
+      await buildAuthService({
+        checkIdentityBackoff: jest
+          .fn()
+          .mockResolvedValue({ allowed: false, retryAfterMs: 3_000 }),
+      });
+
+    const err = await service
+      .signInWithGoogle({ ...validDto, idToken }, meta)
+      .catch((e: unknown) => e);
+
+    expect(err).toBeInstanceOf(UnauthorizedException);
+    expect(checkIdentityBackoff).toHaveBeenCalledWith({
+      provider: "google",
+      subject: "identity-blocked",
+    });
+    expect(recordRateLimited).toHaveBeenCalled();
+    expect(verify).not.toHaveBeenCalled();
+  });
+
+  it("skips identity check when the id token cannot be decoded (lets verifier reject)", async () => {
+    const { service, verify, checkIdentityBackoff } = await buildAuthService({
+      verify: jest
+        .fn()
+        .mockRejectedValue(new IdTokenVerificationError("malformed")),
+    });
+
+    await service
+      .signInWithGoogle({ idToken: "not-a-jwt", nonce: "n" }, meta)
+      .catch(() => undefined);
+
+    expect(checkIdentityBackoff).not.toHaveBeenCalled();
+    expect(verify).toHaveBeenCalled();
+  });
+
+  it("records an identity failure when verification fails for a decodable token", async () => {
+    const idToken = await signableToken("identity-fails");
+    const { service, recordIdentityFailure } = await buildAuthService({
+      verify: jest
+        .fn()
+        .mockRejectedValue(new IdTokenVerificationError("signature")),
+    });
+
+    await service
+      .signInWithGoogle({ ...validDto, idToken }, meta)
+      .catch(() => undefined);
+
+    expect(recordIdentityFailure).toHaveBeenCalledWith({
+      provider: "google",
+      subject: "identity-fails",
+    });
+  });
+
+  it("clears identity failures on a successful sign-in", async () => {
+    const idToken = await signableToken("identity-success");
+    const user = { id: "user-success" } as User;
+    const session = {
+      id: "s",
+      userId: "user-success",
+      expiresAt: new Date(Date.now() + 1000),
+    } as Session;
+
+    const { service, clearIdentityFailures } = await buildAuthService({
+      verify: jest.fn().mockResolvedValue({
+        sub: "identity-success",
+        email: "u@e.com",
+        name: "U",
+      }),
+      upsertFromGoogleIdentity: jest.fn().mockResolvedValue(user),
+      mint: jest.fn().mockResolvedValue({ rawToken: "rt", session }),
+    });
+
+    await service.signInWithGoogle({ ...validDto, idToken }, meta);
+
+    expect(clearIdentityFailures).toHaveBeenCalledWith({
+      provider: "google",
+      subject: "identity-success",
+    });
   });
 });

@@ -1,6 +1,11 @@
 import { randomUUID } from "node:crypto";
 import { Injectable, Logger, UnauthorizedException } from "@nestjs/common";
+import { decodeJwt } from "jose";
 import type { GoogleSignInDto } from "../dto/google-sign-in.dto";
+import {
+  type IdentityKey,
+  SlidingWindowLimiter,
+} from "../rate-limit/sliding-window-limiter";
 import { DeviceFingerprintsService } from "./device-fingerprints.service";
 import {
   GoogleIdTokenVerifier,
@@ -9,6 +14,8 @@ import {
 import { SessionsService } from "./sessions.service";
 import { SignInAuditor } from "./sign-in-auditor";
 import { UsersService } from "./users.service";
+
+const PROVIDER = "google";
 
 /** Caller-supplied request metadata recorded on every audit row. */
 export interface SignInRequestMetadata {
@@ -23,14 +30,17 @@ export interface GoogleSignInResult {
 }
 
 /**
- * Orchestrates the Google sign-in pipeline: verify the ID token, upsert the
- * user + identity, mint a session, and audit the outcome.
+ * Orchestrates the Google sign-in pipeline: rate-limit, verify the ID
+ * token, upsert the user + identity, mint a session, and audit the
+ * outcome.
  *
- * The controller is intentionally a thin HTTP adapter — all sign-in policy
- * lives here. Audit writes are delegated to {@link SignInAuditor}; HTTP
- * status mapping (success vs `UnauthorizedException` for verification
- * failures, bubbling for everything else) is the controller's view of the
- * world but is shaped at this layer so the controller stays trivial.
+ * The controller is intentionally a thin HTTP adapter — all sign-in
+ * policy lives here. Rate-limit rejections, verification failures and
+ * successes are all audited via {@link SignInAuditor}; HTTP status
+ * mapping (success vs `UnauthorizedException` for rate-limited /
+ * verification failures, bubbling for everything else) is the
+ * controller's view of the world but is shaped at this layer so the
+ * controller stays trivial.
  */
 @Injectable()
 export class AuthService {
@@ -42,6 +52,7 @@ export class AuthService {
     private readonly sessions: SessionsService,
     private readonly fingerprints: DeviceFingerprintsService,
     private readonly auditor: SignInAuditor,
+    private readonly limiter: SlidingWindowLimiter,
   ) {}
 
   async signInWithGoogle(
@@ -50,7 +61,13 @@ export class AuthService {
   ): Promise<GoogleSignInResult> {
     const correlationId = randomUUID();
 
-    const claims = await this.verifyOrAudit(dto, meta, correlationId);
+    await this.enforceIpRate(correlationId, meta);
+    const identity = decodeIdentity(dto.idToken);
+    if (identity) {
+      await this.enforceIdentityBackoff(identity, correlationId, meta);
+    }
+
+    const claims = await this.verifyOrAudit(dto, meta, correlationId, identity);
     const user = await this.users.upsertFromGoogleIdentity(claims);
     const { fingerprintId } = await this.fingerprints.recordSignIn({
       userId: user.id,
@@ -70,6 +87,10 @@ export class AuthService {
       ip: meta.ip,
       userAgent: meta.userAgent,
     });
+    await this.limiter.clearIdentityFailures({
+      provider: PROVIDER,
+      subject: claims.sub,
+    });
 
     return {
       sessionToken: rawToken,
@@ -77,10 +98,46 @@ export class AuthService {
     };
   }
 
+  private async enforceIpRate(
+    correlationId: string,
+    meta: SignInRequestMetadata,
+  ): Promise<void> {
+    const decision = await this.limiter.checkIpRate(meta.ip);
+    if (decision.allowed) return;
+    this.logger.warn(
+      `Sign-in blocked by IP limiter (ip=${meta.ip}, retryAfterMs=${decision.retryAfterMs}) [cid=${correlationId}]`,
+    );
+    await this.auditor.recordRateLimited({
+      correlationId,
+      ip: meta.ip,
+      userAgent: meta.userAgent,
+    });
+    throw new UnauthorizedException({ correlationId });
+  }
+
+  private async enforceIdentityBackoff(
+    identity: IdentityKey,
+    correlationId: string,
+    meta: SignInRequestMetadata,
+  ): Promise<void> {
+    const decision = await this.limiter.checkIdentityBackoff(identity);
+    if (decision.allowed) return;
+    this.logger.warn(
+      `Sign-in blocked by identity backoff (sub=${identity.subject}, retryAfterMs=${decision.retryAfterMs}) [cid=${correlationId}]`,
+    );
+    await this.auditor.recordRateLimited({
+      correlationId,
+      ip: meta.ip,
+      userAgent: meta.userAgent,
+    });
+    throw new UnauthorizedException({ correlationId });
+  }
+
   private async verifyOrAudit(
     dto: GoogleSignInDto,
     meta: SignInRequestMetadata,
     correlationId: string,
+    identity: IdentityKey | null,
   ) {
     try {
       return await this.verifier.verify(dto.idToken, dto.nonce);
@@ -95,6 +152,9 @@ export class AuthService {
           ip: meta.ip,
           userAgent: meta.userAgent,
         });
+        if (identity) {
+          await this.limiter.recordIdentityFailure(identity);
+        }
         throw new UnauthorizedException({ correlationId });
       }
       await this.auditor.recordInternalFailure({
@@ -104,5 +164,21 @@ export class AuthService {
       });
       throw err;
     }
+  }
+}
+
+/**
+ * Peek at the unverified JWT payload to extract `(provider, sub)` for
+ * the identity-backoff lookup. A malformed token surfaces as `null` and
+ * the caller skips the identity check — the verifier will reject the
+ * token a moment later with `failure_token_malformed`.
+ */
+function decodeIdentity(idToken: string): IdentityKey | null {
+  try {
+    const claims = decodeJwt(idToken);
+    if (typeof claims.sub !== "string" || claims.sub.length === 0) return null;
+    return { provider: PROVIDER, subject: claims.sub };
+  } catch {
+    return null;
   }
 }

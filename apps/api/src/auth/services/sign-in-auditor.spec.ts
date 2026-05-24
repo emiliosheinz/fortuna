@@ -68,6 +68,17 @@ describe("SignInAuditor", () => {
     );
   });
 
+  it("recordRateLimited writes failure_rate_limited with userId=null", async () => {
+    const { auditor, record } = await buildAuditor();
+    await auditor.recordRateLimited(context);
+    expect(record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        outcome: "failure_rate_limited",
+        userId: null,
+      }),
+    );
+  });
+
   const reasonOutcomeCases: Array<{
     reason: IdTokenVerificationReason;
     outcome: SignInOutcome;
