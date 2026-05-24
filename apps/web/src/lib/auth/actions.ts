@@ -2,8 +2,15 @@
 
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { deleteCurrentSession, deleteSession } from "./api-client";
+import {
+  deleteAccount,
+  deleteCurrentSession,
+  deleteSession,
+} from "./api-client";
 import { SESSION_COOKIE_NAME } from "./cookies";
+
+/** Phrase the user must type to confirm an irreversible account deletion. */
+export const DELETE_ACCOUNT_CONFIRMATION_PHRASE = "DELETE";
 
 /**
  * Sign out the current device.
@@ -50,4 +57,35 @@ export async function revokeSessionAction(formData: FormData): Promise<void> {
 
   const { revalidatePath } = await import("next/cache");
   revalidatePath("/settings/sessions");
+}
+
+/**
+ * Hard-delete the signed-in user's account.
+ *
+ * Reads the confirmation phrase from the form (must match
+ * {@link DELETE_ACCOUNT_CONFIRMATION_PHRASE}), calls the API, and clears the
+ * session cookie before redirecting to the public landing page. Any thrown
+ * error here surfaces via the route's error boundary — the API enforces
+ * `confirm: true` as the final guard, so a phrase-bypass attempt still 400s.
+ */
+export async function deleteAccountAction(formData: FormData): Promise<void> {
+  const confirmation = formData.get("confirmation");
+  if (
+    typeof confirmation !== "string" ||
+    confirmation !== DELETE_ACCOUNT_CONFIRMATION_PHRASE
+  ) {
+    throw new Error(
+      `Type ${DELETE_ACCOUNT_CONFIRMATION_PHRASE} to confirm account deletion.`,
+    );
+  }
+
+  const cookieStore = await cookies();
+  const sessionValue = cookieStore.get(SESSION_COOKIE_NAME)?.value;
+  if (!sessionValue) {
+    redirect("/");
+  }
+
+  await deleteAccount(sessionValue);
+  cookieStore.set(SESSION_COOKIE_NAME, "", { path: "/", maxAge: 0 });
+  redirect("/");
 }

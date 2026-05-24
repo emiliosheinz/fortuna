@@ -3,6 +3,7 @@ import { InjectDataSource } from "@nestjs/typeorm";
 import { DataSource, type EntityManager } from "typeorm";
 import { Identity } from "../entities/identity.entity";
 import { User } from "../entities/user.entity";
+import { SignInEventsService } from "./sign-in-events.service";
 
 const GOOGLE_PROVIDER = "google";
 
@@ -27,6 +28,7 @@ export class UsersService {
   constructor(
     @InjectDataSource()
     private readonly dataSource: DataSource,
+    private readonly signInEvents: SignInEventsService,
   ) {}
 
   /**
@@ -43,6 +45,21 @@ export class UsersService {
   /** Fetch a user by primary key. */
   async findById(id: string): Promise<User | null> {
     return this.dataSource.getRepository(User).findOne({ where: { id } });
+  }
+
+  /**
+   * LGPD-compliant hard delete.
+   *
+   * In a single transaction: anonymize the user's `sign_in_events` rows
+   * (user_id, ip, ua_hash → null) and delete the `users` row, which cascades
+   * to `sessions` and `identities` via the FK contract. Outcome + timestamp
+   * on `sign_in_events` are retained for security forensics.
+   */
+  async deleteAccount(userId: string): Promise<void> {
+    await this.dataSource.transaction(async (manager) => {
+      await this.signInEvents.anonymizeForUser(userId, manager);
+      await manager.getRepository(User).delete({ id: userId });
+    });
   }
 }
 

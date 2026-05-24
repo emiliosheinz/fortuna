@@ -1,12 +1,18 @@
-import { BadRequestException, UnauthorizedException } from "@nestjs/common";
+import {
+  BadRequestException,
+  type HttpException,
+  UnauthorizedException,
+} from "@nestjs/common";
 import { AuthController, type GoogleSignInDto } from "./auth.controller";
 import { Session } from "./entities/session.entity";
 import { User } from "./entities/user.entity";
 import {
   GoogleIdTokenVerifier,
   IdTokenVerificationError,
+  type IdTokenVerificationReason,
 } from "./services/google-id-token-verifier";
 import { SessionsService } from "./services/sessions.service";
+import { SignInEventsService } from "./services/sign-in-events.service";
 import { UsersService } from "./services/users.service";
 
 class FakeRequest {
@@ -23,8 +29,15 @@ function buildController(
     verifier?: Partial<GoogleIdTokenVerifier>;
     users?: Partial<UsersService>;
     sessions?: Partial<SessionsService>;
+    signInEvents?: Partial<SignInEventsService>;
   } = {},
-): AuthController {
+): {
+  controller: AuthController;
+  verifier: GoogleIdTokenVerifier;
+  users: UsersService;
+  sessions: SessionsService;
+  signInEvents: SignInEventsService;
+} {
   const verifier = {
     verify: jest.fn(),
     ...overrides.verifier,
@@ -35,15 +48,26 @@ function buildController(
   } as unknown as UsersService;
   const sessions = {
     mint: jest.fn(),
+    revoke: jest.fn(),
     ...overrides.sessions,
   } as unknown as SessionsService;
-  return new AuthController(verifier, users, sessions);
+  const signInEvents = {
+    record: jest.fn().mockResolvedValue(undefined),
+    ...overrides.signInEvents,
+  } as unknown as SignInEventsService;
+  return {
+    controller: new AuthController(verifier, users, sessions, signInEvents),
+    verifier,
+    users,
+    sessions,
+    signInEvents,
+  };
 }
 
 describe("AuthController DELETE /auth/session", () => {
   it("revokes the principal's session and sets a clear-session-cookie header", async () => {
     const revoke = jest.fn().mockResolvedValue(undefined);
-    const controller = buildController({ sessions: { revoke } });
+    const { controller } = buildController({ sessions: { revoke } });
 
     const setHeader = jest.fn();
     const req = { principal: { userId: "user-1", sessionId: "session-1" } };
@@ -70,8 +94,8 @@ describe("AuthController POST /auth/google", () => {
     nonce: "the-nonce",
   };
 
-  it("rejects when body is missing fields", async () => {
-    const controller = buildController();
+  it("rejects when body is missing fields and records failure_bad_request", async () => {
+    const { controller, signInEvents } = buildController();
     const req = new FakeRequest();
 
     await expect(
@@ -80,10 +104,20 @@ describe("AuthController POST /auth/google", () => {
         req as never,
       ),
     ).rejects.toBeInstanceOf(BadRequestException);
+
+    expect(signInEvents.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: null,
+        outcome: "failure_bad_request",
+        ip: "203.0.113.5",
+        userAgent: "Mozilla/5.0",
+        correlationId: expect.any(String),
+      }),
+    );
   });
 
-  it("returns 401 on token verification failure", async () => {
-    const controller = buildController({
+  it("returns 401 with correlationId in body on token verification failure", async () => {
+    const { controller, signInEvents } = buildController({
       verifier: {
         verify: jest
           .fn()
@@ -92,12 +126,72 @@ describe("AuthController POST /auth/google", () => {
     });
     const req = new FakeRequest();
 
-    await expect(
-      controller.googleSignIn(validBody, req as never),
-    ).rejects.toBeInstanceOf(UnauthorizedException);
+    const err = await controller
+      .googleSignIn(validBody, req as never)
+      .catch((e: HttpException) => e);
+
+    expect(err).toBeInstanceOf(UnauthorizedException);
+    const body = (err as HttpException).getResponse() as {
+      correlationId?: string;
+    };
+    expect(body.correlationId).toEqual(expect.any(String));
+    expect(signInEvents.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        outcome: "failure_token_signature",
+        userId: null,
+        correlationId: body.correlationId,
+      }),
+    );
   });
 
-  it("verifies token, upserts user, mints session, returns sessionToken + expiresAt", async () => {
+  const verificationReasonCases: Array<{
+    reason: IdTokenVerificationReason;
+    outcome: string;
+  }> = [
+    { reason: "signature", outcome: "failure_token_signature" },
+    { reason: "expired", outcome: "failure_token_expired" },
+    { reason: "issuer", outcome: "failure_token_issuer" },
+    { reason: "audience", outcome: "failure_token_audience" },
+    { reason: "nonce_mismatch", outcome: "failure_nonce_mismatch" },
+    { reason: "malformed", outcome: "failure_token_malformed" },
+  ];
+
+  for (const { reason, outcome } of verificationReasonCases) {
+    it(`maps verification reason "${reason}" to outcome "${outcome}"`, async () => {
+      const { controller, signInEvents } = buildController({
+        verifier: {
+          verify: jest
+            .fn()
+            .mockRejectedValue(new IdTokenVerificationError(reason)),
+        },
+      });
+      const req = new FakeRequest();
+
+      await controller
+        .googleSignIn(validBody, req as never)
+        .catch(() => undefined);
+
+      expect(signInEvents.record).toHaveBeenCalledWith(
+        expect.objectContaining({ outcome }),
+      );
+    });
+  }
+
+  it("records failure_internal when verifier throws an unknown error", async () => {
+    const { controller, signInEvents } = buildController({
+      verifier: { verify: jest.fn().mockRejectedValue(new Error("boom")) },
+    });
+    const req = new FakeRequest();
+
+    await expect(
+      controller.googleSignIn(validBody, req as never),
+    ).rejects.toBeInstanceOf(Error);
+    expect(signInEvents.record).toHaveBeenCalledWith(
+      expect.objectContaining({ outcome: "failure_internal" }),
+    );
+  });
+
+  it("verifies token, upserts user, mints session, records success event", async () => {
     const user = { id: "user-1" } as User;
     const expiresAt = new Date(Date.now() + 1000);
     const session = {
@@ -118,7 +212,11 @@ describe("AuthController POST /auth/google", () => {
     const sessions = {
       mint: jest.fn().mockResolvedValue({ rawToken: "raw-token-xyz", session }),
     };
-    const controller = buildController({ verifier, users, sessions });
+    const { controller, signInEvents } = buildController({
+      verifier,
+      users,
+      sessions,
+    });
     const req = new FakeRequest();
 
     const result = await controller.googleSignIn(validBody, req as never);
@@ -138,5 +236,14 @@ describe("AuthController POST /auth/google", () => {
       sessionToken: "raw-token-xyz",
       expiresAt: expiresAt.toISOString(),
     });
+    expect(signInEvents.record).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userId: "user-1",
+        outcome: "success",
+        ip: "203.0.113.5",
+        userAgent: "Mozilla/5.0",
+        correlationId: expect.any(String),
+      }),
+    );
   });
 });

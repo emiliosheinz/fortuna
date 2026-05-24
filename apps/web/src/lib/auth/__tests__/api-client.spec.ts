@@ -1,4 +1,5 @@
 import {
+  deleteAccount,
   deleteCurrentSession,
   deleteSession,
   listSessions,
@@ -150,6 +151,33 @@ describe("postGoogleIdToken", () => {
       { headers: Record<string, string> },
     ];
     expect(init.headers["User-Agent"]).toBeUndefined();
+  });
+});
+
+describe("deleteAccount", () => {
+  it("DELETEs /users/me with confirm:true in the body and the session cookie", async () => {
+    const fetchSpy = mockFetch({ ok: true, status: 204 });
+
+    await deleteAccount("session-cookie");
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "http://api.test/users/me",
+      expect.objectContaining({
+        method: "DELETE",
+        headers: expect.objectContaining({
+          Cookie: "fortuna_session=session-cookie",
+          "Content-Type": "application/json",
+        }),
+        body: JSON.stringify({ confirm: true }),
+      }),
+    );
+  });
+
+  it("throws on non-2xx status codes", async () => {
+    mockFetch({ ok: false, status: 400 });
+    await expect(deleteAccount("c")).rejects.toThrow(
+      "/users/me DELETE failed with status 400",
+    );
   });
 });
 

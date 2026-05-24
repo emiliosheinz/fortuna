@@ -3,6 +3,7 @@ import { TypeOrmModule } from "@nestjs/typeorm";
 import { AuthController } from "./auth.controller";
 import { Identity } from "./entities/identity.entity";
 import { Session } from "./entities/session.entity";
+import { SignInEvent } from "./entities/sign-in-event.entity";
 import { User } from "./entities/user.entity";
 import { SessionGuard } from "./guards/session.guard";
 import {
@@ -11,6 +12,8 @@ import {
   type GoogleIdTokenVerifierOptions,
 } from "./services/google-id-token-verifier";
 import { SessionsService } from "./services/sessions.service";
+import { SignInEventsService } from "./services/sign-in-events.service";
+import { SignInEventsRetentionWorker } from "./services/sign-in-events-retention.worker";
 import { UsersService } from "./services/users.service";
 
 const googleVerifierOptionsProvider = {
@@ -41,15 +44,17 @@ function deriveJwksUri(issuer: string): string {
 }
 
 @Module({
-  imports: [TypeOrmModule.forFeature([User, Identity, Session])],
+  imports: [TypeOrmModule.forFeature([User, Identity, Session, SignInEvent])],
   controllers: [AuthController],
   providers: [
     googleVerifierOptionsProvider,
     GoogleIdTokenVerifier,
     SessionsService,
     UsersService,
+    SignInEventsService,
+    SignInEventsRetentionWorker,
     SessionGuard,
   ],
-  exports: [SessionsService, UsersService, SessionGuard],
+  exports: [SessionsService, UsersService, SignInEventsService, SessionGuard],
 })
 export class AuthModule {}

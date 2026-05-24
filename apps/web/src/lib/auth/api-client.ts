@@ -108,6 +108,31 @@ export async function deleteSession(
   }
 }
 
+/**
+ * Hard-delete the signed-in user's account.
+ *
+ * Forwards `{ confirm: true }` server-to-server; the API anonymizes
+ * sign-in events and cascades sessions + identities. Caller is responsible
+ * for clearing the session cookie after a successful 204 — the API also
+ * sends a clear-cookie header, but the server-action layer overwrites the
+ * cookie jar separately to keep behavior deterministic.
+ */
+export async function deleteAccount(sessionCookieValue: string): Promise<void> {
+  const apiBaseUrl = requireEnv("API_BASE_URL");
+  const res = await fetch(`${apiBaseUrl}/users/me`, {
+    method: "DELETE",
+    headers: {
+      Cookie: `${SESSION_COOKIE_NAME}=${sessionCookieValue}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ confirm: true }),
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    throw new Error(`/users/me DELETE failed with status ${res.status}`);
+  }
+}
+
 /** Shape of the API's `POST /auth/google` response. */
 export interface GoogleSignInResponse {
   sessionToken: string;

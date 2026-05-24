@@ -23,9 +23,12 @@ export default async function HomePage() {
       <p className="text-sm" data-testid="user-email">
         {me.email}
       </p>
-      <div className="flex gap-2">
+      <div className="flex flex-wrap justify-center gap-2">
         <Button asChild variant="outline">
           <Link href="/settings/sessions">Manage sessions</Link>
+        </Button>
+        <Button asChild variant="outline">
+          <Link href="/settings/account">Account</Link>
         </Button>
         <SignOutButton />
       </div>

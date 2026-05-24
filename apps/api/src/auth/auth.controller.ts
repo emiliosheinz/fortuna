@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import {
   BadRequestException,
   Body,
@@ -13,12 +14,15 @@ import {
 } from "@nestjs/common";
 import type { Request, Response } from "express";
 import { buildClearSessionCookieHeader } from "./cookies/session-cookie";
+import type { SignInOutcome } from "./entities/sign-in-event.entity";
 import { SessionGuard } from "./guards/session.guard";
 import {
   GoogleIdTokenVerifier,
   IdTokenVerificationError,
+  type IdTokenVerificationReason,
 } from "./services/google-id-token-verifier";
 import { SessionsService } from "./services/sessions.service";
+import { SignInEventsService } from "./services/sign-in-events.service";
 import { UsersService } from "./services/users.service";
 
 interface AuthedRequest extends Request {
@@ -53,20 +57,27 @@ export class AuthController {
     private readonly verifier: GoogleIdTokenVerifier,
     private readonly users: UsersService,
     private readonly sessions: SessionsService,
+    private readonly signInEvents: SignInEventsService,
   ) {}
 
   /**
    * Verify a Google ID token forwarded by apps/web, upsert the user +
    * identity, mint a session, and return the opaque token.
    *
-   * Responds 401 (no internal detail) for any token-verification failure;
-   * the specific reason is logged via {@link Logger} for forensics.
+   * Every attempt — success or failure — appends a row to `sign_in_events`
+   * with a fresh `correlation_id`. Failures surface that id in the response
+   * body so support can map a user-reported error to the audit row without
+   * leaking the internal failure reason.
    */
   @Post("google")
   async googleSignIn(
     @Body() body: GoogleSignInDto,
     @Req() req: Request,
   ): Promise<GoogleSignInResponse> {
+    const correlationId = randomUUID();
+    const userAgent = headerString(req.headers["user-agent"]) ?? null;
+    const ip = req.ip ?? null;
+
     if (
       !body ||
       typeof body.idToken !== "string" ||
@@ -74,7 +85,14 @@ export class AuthController {
       typeof body.nonce !== "string" ||
       !body.nonce
     ) {
-      throw new BadRequestException();
+      await this.recordSafely({
+        userId: null,
+        correlationId,
+        outcome: "failure_bad_request",
+        ip,
+        userAgent,
+      });
+      throw new BadRequestException({ correlationId });
     }
 
     let claims: Awaited<ReturnType<GoogleIdTokenVerifier["verify"]>>;
@@ -82,21 +100,43 @@ export class AuthController {
       claims = await this.verifier.verify(body.idToken, body.nonce);
     } catch (err) {
       if (err instanceof IdTokenVerificationError) {
-        this.logger.warn(`Sign-in verification failed (${err.reason})`);
-        throw new UnauthorizedException();
+        const outcome = outcomeFromVerificationReason(err.reason);
+        this.logger.warn(
+          `Sign-in verification failed (${err.reason}) [cid=${correlationId}]`,
+        );
+        await this.recordSafely({
+          userId: null,
+          correlationId,
+          outcome,
+          ip,
+          userAgent,
+        });
+        throw new UnauthorizedException({ correlationId });
       }
+      await this.recordSafely({
+        userId: null,
+        correlationId,
+        outcome: "failure_internal",
+        ip,
+        userAgent,
+      });
       throw err;
     }
 
     const user = await this.users.upsertFromGoogleIdentity(claims);
 
-    const userAgent = headerString(req.headers["user-agent"]) ?? null;
-    const ip = req.ip ?? null;
-
     const { rawToken, session } = await this.sessions.mint({
       userId: user.id,
       userAgent,
       ip,
+    });
+
+    await this.recordSafely({
+      userId: user.id,
+      correlationId,
+      outcome: "success",
+      ip,
+      userAgent,
     });
 
     return {
@@ -124,6 +164,42 @@ export class AuthController {
 
     await this.sessions.revoke(principal.sessionId);
     res.setHeader("Set-Cookie", buildClearSessionCookieHeader());
+  }
+
+  private async recordSafely(input: {
+    userId: string | null;
+    correlationId: string;
+    outcome: SignInOutcome;
+    ip: string | null;
+    userAgent: string | null;
+  }): Promise<void> {
+    try {
+      await this.signInEvents.record(input);
+    } catch (err) {
+      this.logger.error(
+        `Failed to persist sign_in_events row [cid=${input.correlationId}]`,
+        err instanceof Error ? err.stack : String(err),
+      );
+    }
+  }
+}
+
+function outcomeFromVerificationReason(
+  reason: IdTokenVerificationReason,
+): SignInOutcome {
+  switch (reason) {
+    case "signature":
+      return "failure_token_signature";
+    case "expired":
+      return "failure_token_expired";
+    case "issuer":
+      return "failure_token_issuer";
+    case "audience":
+      return "failure_token_audience";
+    case "nonce_mismatch":
+      return "failure_nonce_mismatch";
+    case "malformed":
+      return "failure_token_malformed";
   }
 }
 

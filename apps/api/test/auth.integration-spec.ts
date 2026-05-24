@@ -11,11 +11,13 @@ import { DataSource } from "typeorm";
 import { AppModule } from "@/app.module";
 import { Identity } from "@/auth/entities/identity.entity";
 import { Session } from "@/auth/entities/session.entity";
+import { SignInEvent } from "@/auth/entities/sign-in-event.entity";
 import { User } from "@/auth/entities/user.entity";
 import {
   GOOGLE_ID_TOKEN_VERIFIER_OPTIONS,
   type GoogleIdTokenVerifierOptions,
 } from "@/auth/services/google-id-token-verifier";
+import { SignInEventsRetentionWorker } from "@/auth/services/sign-in-events-retention.worker";
 
 const ISSUER = "https://test-issuer.example.com";
 const AUDIENCE = "test-client-id";
@@ -82,7 +84,7 @@ describe("Auth integration", () => {
   beforeEach(async () => {
     if (!dataSource) return;
     await dataSource.query(
-      'TRUNCATE TABLE "sessions", "identities", "users" RESTART IDENTITY CASCADE',
+      'TRUNCATE TABLE "sign_in_events", "sessions", "identities", "users" RESTART IDENTITY CASCADE',
     );
   });
 
@@ -430,6 +432,233 @@ describe("Auth integration", () => {
         .delete(`/users/me/sessions/${fakeUuid}`)
         .set("Cookie", `fortuna_session=${current.sessionToken}`)
         .expect(404);
+    });
+  });
+
+  describe("sign-in event auditing", () => {
+    it("records a success event for the user on a verified sign-in", async () => {
+      const idToken = await signIdToken({ sub: "audit-success" });
+      const res = await request(app.getHttpServer())
+        .post("/auth/google")
+        .send({ idToken, nonce: NONCE })
+        .set("User-Agent", "Mozilla/5.0 (Macintosh; Audit/1.0)")
+        .expect(201);
+      expect(res.body.sessionToken).toEqual(expect.any(String));
+
+      const events = await dataSource.getRepository(SignInEvent).find();
+      expect(events).toHaveLength(1);
+      const event = events[0];
+      if (!event) throw new Error("expected one sign_in_event");
+
+      expect(event.outcome).toBe("success");
+      expect(event.userId).not.toBeNull();
+      expect(event.correlationId).toEqual(expect.any(String));
+      expect(event.ip).toBeTruthy();
+      expect(event.uaHash).toMatch(/^[a-f0-9]{64}$/);
+      expect(event.uaHash).toBe(
+        createHash("sha256")
+          .update("Mozilla/5.0 (Macintosh; Audit/1.0)")
+          .digest("hex"),
+      );
+    });
+
+    it("records a failure event with userId=null and exposes correlationId on the 401 body", async () => {
+      const idToken = await signIdToken({ aud: "wrong-audience" });
+      const res = await request(app.getHttpServer())
+        .post("/auth/google")
+        .send({ idToken, nonce: NONCE })
+        .expect(401);
+
+      expect(res.body.correlationId).toEqual(expect.any(String));
+
+      const events = await dataSource.getRepository(SignInEvent).find();
+      expect(events).toHaveLength(1);
+      const event = events[0];
+      if (!event) throw new Error("expected one sign_in_event");
+      expect(event.outcome).toBe("failure_token_audience");
+      expect(event.userId).toBeNull();
+      expect(event.correlationId).toBe(res.body.correlationId);
+    });
+
+    it("records a failure_bad_request event when the body is empty", async () => {
+      const res = await request(app.getHttpServer())
+        .post("/auth/google")
+        .send({})
+        .expect(400);
+      expect(res.body.correlationId).toEqual(expect.any(String));
+
+      const events = await dataSource.getRepository(SignInEvent).find();
+      expect(events).toHaveLength(1);
+      expect(events[0]?.outcome).toBe("failure_bad_request");
+      expect(events[0]?.userId).toBeNull();
+    });
+  });
+
+  describe("DELETE /users/me (account deletion)", () => {
+    async function signInAs(opts: {
+      sub?: string;
+      email?: string;
+    }): Promise<{ sessionToken: string; userId: string }> {
+      const idToken = await signIdToken({ sub: opts.sub, email: opts.email });
+      const res = await request(app.getHttpServer())
+        .post("/auth/google")
+        .send({ idToken, nonce: NONCE })
+        .set("User-Agent", "Mozilla/5.0 (Macintosh; DeleteFlow/1.0)")
+        .expect(201);
+      const session = await dataSource.getRepository(Session).findOne({
+        where: { tokenHash: sha256Hex(res.body.sessionToken) },
+      });
+      if (!session) throw new Error("expected session");
+      return { sessionToken: res.body.sessionToken, userId: session.userId };
+    }
+
+    it("returns 400 when confirm is not true", async () => {
+      const { sessionToken } = await signInAs({ sub: "delete-no-confirm" });
+
+      const noBody = await request(app.getHttpServer())
+        .delete("/users/me")
+        .set("Cookie", `fortuna_session=${sessionToken}`)
+        .send({})
+        .expect(400);
+      expect(noBody.body).toBeDefined();
+
+      await request(app.getHttpServer())
+        .delete("/users/me")
+        .set("Cookie", `fortuna_session=${sessionToken}`)
+        .send({ confirm: false })
+        .expect(400);
+
+      // Nothing was deleted.
+      expect(await dataSource.getRepository(User).count()).toBe(1);
+    });
+
+    it("returns 401 when called without a session cookie", async () => {
+      await request(app.getHttpServer())
+        .delete("/users/me")
+        .send({ confirm: true })
+        .expect(401);
+    });
+
+    it("deletes the user (cascades sessions+identities), anonymizes sign_in_events, clears cookie, and 401s subsequent requests", async () => {
+      const { sessionToken, userId } = await signInAs({ sub: "delete-me" });
+
+      // Pre-state: 1 user, 1 identity, 1 session, 1 sign_in_event referencing the user.
+      expect(await dataSource.getRepository(User).count()).toBe(1);
+      expect(await dataSource.getRepository(Identity).count()).toBe(1);
+      expect(await dataSource.getRepository(Session).count()).toBe(1);
+      const eventsBefore = await dataSource
+        .getRepository(SignInEvent)
+        .findBy({ userId });
+      expect(eventsBefore.length).toBeGreaterThan(0);
+      expect(eventsBefore[0]?.ip).toBeTruthy();
+      expect(eventsBefore[0]?.uaHash).toBeTruthy();
+
+      const deleteRes = await request(app.getHttpServer())
+        .delete("/users/me")
+        .set("Cookie", `fortuna_session=${sessionToken}`)
+        .send({ confirm: true })
+        .expect(204);
+
+      const setCookieHeader = deleteRes.headers["set-cookie"] as
+        | string[]
+        | string
+        | undefined;
+      const setCookies = Array.isArray(setCookieHeader)
+        ? setCookieHeader
+        : setCookieHeader
+          ? [setCookieHeader]
+          : [];
+      const clearHeader = setCookies.find((c) =>
+        c.startsWith("fortuna_session="),
+      );
+      expect(clearHeader).toBeDefined();
+      expect(clearHeader).toContain("Max-Age=0");
+
+      // Cascade: user + identities + sessions are gone.
+      expect(await dataSource.getRepository(User).count()).toBe(0);
+      expect(await dataSource.getRepository(Identity).count()).toBe(0);
+      expect(await dataSource.getRepository(Session).count()).toBe(0);
+
+      // Anonymization: every sign_in_event row for the user has user_id, ip,
+      // ua_hash nulled — but outcome + timestamp survive for forensics.
+      const eventsAfter = await dataSource.getRepository(SignInEvent).find();
+      expect(eventsAfter.length).toBeGreaterThan(0);
+      for (const event of eventsAfter) {
+        expect(event.userId).toBeNull();
+        expect(event.ip).toBeNull();
+        expect(event.uaHash).toBeNull();
+        expect(event.outcome).toBeDefined();
+        expect(event.createdAt).toBeInstanceOf(Date);
+      }
+
+      // The prior session cookie no longer authenticates.
+      await request(app.getHttpServer())
+        .get("/users/me")
+        .set("Cookie", `fortuna_session=${sessionToken}`)
+        .expect(401);
+    });
+
+    it("only deletes the principal's data, not other users", async () => {
+      const victim = await signInAs({
+        sub: "victim",
+        email: "victim@example.com",
+      });
+      const survivor = await signInAs({
+        sub: "survivor",
+        email: "survivor@example.com",
+      });
+      expect(victim.userId).not.toBe(survivor.userId);
+
+      await request(app.getHttpServer())
+        .delete("/users/me")
+        .set("Cookie", `fortuna_session=${victim.sessionToken}`)
+        .send({ confirm: true })
+        .expect(204);
+
+      // Survivor's user, identity, session all intact.
+      expect(await dataSource.getRepository(User).count()).toBe(1);
+      expect(await dataSource.getRepository(Identity).count()).toBe(1);
+      const survivingSessions = await dataSource.getRepository(Session).find();
+      expect(survivingSessions).toHaveLength(1);
+      expect(survivingSessions[0]?.userId).toBe(survivor.userId);
+
+      // The survivor's sign_in_events still carry their user_id.
+      const survivorEvents = await dataSource
+        .getRepository(SignInEvent)
+        .findBy({ userId: survivor.userId });
+      expect(survivorEvents.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe("sign_in_events retention sweep", () => {
+    it("clears ip + ua_hash on rows older than the retention window and leaves recent rows untouched", async () => {
+      const repo = dataSource.getRepository(SignInEvent);
+      const now = Date.now();
+      const oldDate = new Date(now - 91 * 24 * 60 * 60 * 1000);
+      const recentDate = new Date(now - 89 * 24 * 60 * 60 * 1000);
+
+      // Use raw INSERT so we can set created_at explicitly (entity uses
+      // @CreateDateColumn defaults).
+      await repo.query(
+        `INSERT INTO sign_in_events (id, user_id, correlation_id, outcome, ip, ua_hash, created_at)
+         VALUES
+           (uuid_generate_v4(), NULL, uuid_generate_v4(), 'success', '203.0.113.1', 'aaaa', $1),
+           (uuid_generate_v4(), NULL, uuid_generate_v4(), 'success', '203.0.113.2', 'bbbb', $2)`,
+        [oldDate.toISOString(), recentDate.toISOString()],
+      );
+
+      const worker = app.get(SignInEventsRetentionWorker);
+      await worker.runRetentionSweep();
+
+      const rows = await repo.find({ order: { createdAt: "ASC" } });
+      expect(rows).toHaveLength(2);
+
+      // Oldest row was anonymized.
+      expect(rows[0]?.ip).toBeNull();
+      expect(rows[0]?.uaHash).toBeNull();
+      // Recent row untouched.
+      expect(rows[1]?.ip).toBe("203.0.113.2");
+      expect(rows[1]?.uaHash).toBe("bbbb");
     });
   });
 });

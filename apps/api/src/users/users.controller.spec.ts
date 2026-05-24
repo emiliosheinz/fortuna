@@ -17,6 +17,7 @@ function buildController(
 } {
   const users = {
     findById: jest.fn(),
+    deleteAccount: jest.fn().mockResolvedValue(undefined),
     ...overrides.users,
   } as unknown as UsersService;
   const sessions = {
@@ -143,6 +144,51 @@ describe("UsersController GET /users/me/sessions", () => {
 
     expect(result[0]?.deviceLabel).toBe("Unknown device");
     expect(result[0]?.isCurrent).toBe(true);
+  });
+});
+
+describe("UsersController DELETE /users/me", () => {
+  it("rejects when confirm flag is missing or not true", async () => {
+    const deleteAccount = jest.fn();
+    const { controller } = buildController({
+      users: { deleteAccount: deleteAccount as never },
+    });
+    const req = { principal: { userId: "user-1", sessionId: "s" } } as never;
+    const res = { setHeader: jest.fn() } as never;
+
+    await expect(
+      controller.deleteMe(req, res, {} as never),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    await expect(
+      controller.deleteMe(req, res, { confirm: false } as never),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    await expect(
+      controller.deleteMe(req, res, { confirm: "true" as never } as never),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(deleteAccount).not.toHaveBeenCalled();
+  });
+
+  it("deletes the account and clears the session cookie on confirm:true", async () => {
+    const deleteAccount = jest.fn().mockResolvedValue(undefined);
+    const { controller } = buildController({
+      users: { deleteAccount: deleteAccount as never },
+    });
+    const setHeader = jest.fn();
+    const req = {
+      principal: { userId: "user-1", sessionId: "s" },
+    } as never;
+    const res = { setHeader } as never;
+
+    await controller.deleteMe(req, res, { confirm: true });
+
+    expect(deleteAccount).toHaveBeenCalledWith("user-1");
+    const setCookieCalls = setHeader.mock.calls.filter(
+      ([name]) => name === "Set-Cookie",
+    );
+    expect(setCookieCalls).toHaveLength(1);
+    const cookieValue = setCookieCalls[0][1] as string;
+    expect(cookieValue).toMatch(/^fortuna_session=/);
+    expect(cookieValue).toContain("Max-Age=0");
   });
 });
 

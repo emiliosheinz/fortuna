@@ -8,6 +8,7 @@ import {
 } from "typeorm";
 import { Identity } from "./identity.entity";
 import { Session } from "./session.entity";
+import { SignInEvent } from "./sign-in-event.entity";
 
 /**
  * Canonical Fortuna user.
@@ -48,4 +49,10 @@ export class User {
     (session) => session.user,
   )
   declare sessions: Session[];
+
+  @OneToMany(
+    () => SignInEvent,
+    (event) => event.user,
+  )
+  declare signInEvents: SignInEvent[];
 }

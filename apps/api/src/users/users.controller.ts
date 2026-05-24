@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  Body,
   Controller,
   Delete,
   Get,
@@ -7,9 +8,11 @@ import {
   NotFoundException,
   Param,
   Req,
+  Res,
   UseGuards,
 } from "@nestjs/common";
-import type { Request } from "express";
+import type { Request, Response } from "express";
+import { buildClearSessionCookieHeader } from "../auth/cookies/session-cookie";
 import { SessionGuard } from "../auth/guards/session.guard";
 import { SessionsService } from "../auth/services/sessions.service";
 import { UsersService } from "../auth/services/users.service";
@@ -29,6 +32,12 @@ export interface SessionListItem {
   deviceLabel: string;
   lastActiveAt: string;
   isCurrent: boolean;
+}
+
+/** Request body for `DELETE /users/me`. */
+export interface DeleteMeDto {
+  /** Must be the literal `true`. Anything else returns 400. */
+  confirm: boolean;
 }
 
 interface AuthedRequest extends Request {
@@ -65,6 +74,36 @@ export class UsersController {
       email: user.email,
       avatarUrl: user.avatarUrl,
     };
+  }
+
+  /**
+   * Hard-delete the signed-in user's account.
+   *
+   * Requires `confirm: true` in the request body — anything else is a 400.
+   * The transaction removes the user (cascading to sessions + identities)
+   * and anonymizes the user's `sign_in_events` rows. The response clears
+   * the session cookie so the browser cannot keep using the now-invalid
+   * session id.
+   */
+  @UseGuards(SessionGuard)
+  @Delete("me")
+  @HttpCode(204)
+  async deleteMe(
+    @Req() req: AuthedRequest,
+    @Res({ passthrough: true }) res: Response,
+    @Body() body: DeleteMeDto,
+  ): Promise<void> {
+    const principal = req.principal;
+    if (!principal) throw new NotFoundException();
+
+    if (!body || body.confirm !== true) {
+      throw new BadRequestException(
+        "confirm: true is required to delete the account.",
+      );
+    }
+
+    await this.users.deleteAccount(principal.userId);
+    res.setHeader("Set-Cookie", buildClearSessionCookieHeader());
   }
 
   /**
