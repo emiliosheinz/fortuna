@@ -82,9 +82,13 @@ export class IoredisClient implements RedisClient, OnModuleDestroy {
     if (this.client.status === "end") return;
     try {
       await this.client.quit();
-    } catch {
-      // Ignore: quit may reject when the connection was already broken
-      // (e.g. Redis container stopped); disconnect below cleans up anyway.
+    } catch (err) {
+      // quit() rejects when the connection is already broken (e.g. the
+      // Redis container was stopped). The disconnect below still cleans
+      // up the socket + scheduled timers — log so the cause is observable
+      // without disrupting shutdown.
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.warn(`Redis quit() failed during shutdown: ${message}`);
     }
     this.client.disconnect(false);
   }
