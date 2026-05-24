@@ -1,6 +1,7 @@
 import { UnauthorizedException } from "@nestjs/common";
 import { Test } from "@nestjs/testing";
 import { generateKeyPair, SignJWT } from "jose";
+import { MetricsService } from "../../metrics/metrics.service";
 import type { GoogleSignInDto } from "../dto/google-sign-in.dto";
 import type { Session } from "../entities/session.entity";
 import type { User } from "../entities/user.entity";
@@ -30,6 +31,8 @@ interface AuthServiceStubs {
   recordIdentityFailure: jest.Mock;
   clearIdentityFailures: jest.Mock;
   isDegraded: jest.Mock;
+  recordSessionCreation: jest.Mock;
+  observeSignInDuration: jest.Mock;
 }
 
 async function buildAuthService(
@@ -55,6 +58,8 @@ async function buildAuthService(
     recordIdentityFailure: jest.fn().mockResolvedValue(undefined),
     clearIdentityFailures: jest.fn().mockResolvedValue(undefined),
     isDegraded: jest.fn().mockReturnValue(false),
+    recordSessionCreation: jest.fn(),
+    observeSignInDuration: jest.fn(),
     ...overrides,
   };
 
@@ -94,6 +99,13 @@ async function buildAuthService(
     clearIdentityFailures: stubs.clearIdentityFailures,
     isDegraded: stubs.isDegraded,
   };
+  const metricsStub: Pick<
+    MetricsService,
+    "recordSessionCreation" | "observeSignInDuration"
+  > = {
+    recordSessionCreation: stubs.recordSessionCreation,
+    observeSignInDuration: stubs.observeSignInDuration,
+  };
 
   const moduleRef = await Test.createTestingModule({
     providers: [
@@ -104,6 +116,7 @@ async function buildAuthService(
       { provide: DeviceFingerprintsService, useValue: fingerprintsStub },
       { provide: SignInAuditor, useValue: auditorStub },
       { provide: SlidingWindowLimiter, useValue: limiterStub },
+      { provide: MetricsService, useValue: metricsStub },
     ],
   }).compile();
 
@@ -363,6 +376,51 @@ describe("AuthService rate limiting", () => {
       provider: "google",
       subject: "identity-fails",
     });
+  });
+
+  it("records a session-creation metric on successful sign-in", async () => {
+    const user = { id: "user-mc" } as User;
+    const session = {
+      id: "s-mc",
+      userId: "user-mc",
+      expiresAt: new Date(Date.now() + 1000),
+    } as Session;
+
+    const { service, recordSessionCreation } = await buildAuthService({
+      verify: jest
+        .fn()
+        .mockResolvedValue({ sub: "g", email: "u@e.com", name: "U" }),
+      upsertFromGoogleIdentity: jest.fn().mockResolvedValue(user),
+      mint: jest.fn().mockResolvedValue({ rawToken: "rt", session }),
+    });
+
+    await service.signInWithGoogle(validDto, meta);
+    expect(recordSessionCreation).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not record a session-creation metric on rate-limit rejection", async () => {
+    const { service, recordSessionCreation } = await buildAuthService({
+      checkIpRate: jest
+        .fn()
+        .mockResolvedValue({ allowed: false, retryAfterMs: 1_000 }),
+    });
+
+    await service.signInWithGoogle(validDto, meta).catch(() => undefined);
+    expect(recordSessionCreation).not.toHaveBeenCalled();
+  });
+
+  it("observes the sign-in duration histogram on every attempt", async () => {
+    const { service, observeSignInDuration } = await buildAuthService({
+      checkIpRate: jest
+        .fn()
+        .mockResolvedValue({ allowed: false, retryAfterMs: 1_000 }),
+    });
+
+    await service.signInWithGoogle(validDto, meta).catch(() => undefined);
+    expect(observeSignInDuration).toHaveBeenCalledTimes(1);
+    const seconds = observeSignInDuration.mock.calls[0][0];
+    expect(typeof seconds).toBe("number");
+    expect(seconds).toBeGreaterThanOrEqual(0);
   });
 
   it("clears identity failures on a successful sign-in", async () => {

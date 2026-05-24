@@ -1,4 +1,5 @@
 import { Test } from "@nestjs/testing";
+import { MetricsService } from "../../metrics/metrics.service";
 import type { SignInOutcome } from "../entities/sign-in-event.entity";
 import type { IdTokenVerificationReason } from "./google-id-token-verifier";
 import { SignInAuditor } from "./sign-in-auditor";
@@ -6,6 +7,8 @@ import { SignInEventsService } from "./sign-in-events.service";
 
 interface AuditorStubs {
   record: jest.Mock;
+  recordSignInOutcome: jest.Mock;
+  recordRateLimiterBlock: jest.Mock;
 }
 
 async function buildAuditor(
@@ -13,15 +16,25 @@ async function buildAuditor(
 ): Promise<{ auditor: SignInAuditor } & AuditorStubs> {
   const stubs: AuditorStubs = {
     record: jest.fn().mockResolvedValue(undefined),
+    recordSignInOutcome: jest.fn(),
+    recordRateLimiterBlock: jest.fn(),
     ...overrides,
   };
   const eventsStub: Pick<SignInEventsService, "record"> = {
     record: stubs.record,
   };
+  const metricsStub: Pick<
+    MetricsService,
+    "recordSignInOutcome" | "recordRateLimiterBlock"
+  > = {
+    recordSignInOutcome: stubs.recordSignInOutcome,
+    recordRateLimiterBlock: stubs.recordRateLimiterBlock,
+  };
   const moduleRef = await Test.createTestingModule({
     providers: [
       SignInAuditor,
       { provide: SignInEventsService, useValue: eventsStub },
+      { provide: MetricsService, useValue: metricsStub },
     ],
   }).compile();
   return { auditor: moduleRef.get(SignInAuditor), ...stubs };
@@ -109,5 +122,52 @@ describe("SignInAuditor", () => {
     await expect(
       auditor.recordSuccess({ ...context, userId: "user-1" }),
     ).resolves.toBeUndefined();
+  });
+
+  describe("metrics emission", () => {
+    it("recordSuccess increments the success counter", async () => {
+      const { auditor, recordSignInOutcome } = await buildAuditor();
+      await auditor.recordSuccess({ ...context, userId: "user-1" });
+      expect(recordSignInOutcome).toHaveBeenCalledWith("success");
+    });
+
+    it("recordVerificationFailure increments the per-outcome counter", async () => {
+      const { auditor, recordSignInOutcome } = await buildAuditor();
+      await auditor.recordVerificationFailure({
+        ...context,
+        reason: "signature",
+      });
+      expect(recordSignInOutcome).toHaveBeenCalledWith(
+        "failure_token_signature",
+      );
+    });
+
+    it("recordRateLimited increments both the outcome counter and rate_limiter_blocks_total", async () => {
+      const { auditor, recordSignInOutcome, recordRateLimiterBlock } =
+        await buildAuditor();
+      await auditor.recordRateLimited(context);
+      expect(recordSignInOutcome).toHaveBeenCalledWith("failure_rate_limited");
+      expect(recordRateLimiterBlock).toHaveBeenCalledTimes(1);
+    });
+
+    it("recordBadRequest increments failure_bad_request", async () => {
+      const { auditor, recordSignInOutcome } = await buildAuditor();
+      await auditor.recordBadRequest(context);
+      expect(recordSignInOutcome).toHaveBeenCalledWith("failure_bad_request");
+    });
+
+    it("recordInternalFailure increments failure_internal", async () => {
+      const { auditor, recordSignInOutcome } = await buildAuditor();
+      await auditor.recordInternalFailure(context);
+      expect(recordSignInOutcome).toHaveBeenCalledWith("failure_internal");
+    });
+
+    it("still emits the metric when the audit write fails", async () => {
+      const { auditor, recordSignInOutcome } = await buildAuditor({
+        record: jest.fn().mockRejectedValue(new Error("db is down")),
+      });
+      await auditor.recordSuccess({ ...context, userId: "user-1" });
+      expect(recordSignInOutcome).toHaveBeenCalledWith("success");
+    });
   });
 });

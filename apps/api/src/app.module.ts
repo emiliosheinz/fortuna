@@ -11,6 +11,7 @@ import { Identity } from "./auth/entities/identity.entity";
 import { Session } from "./auth/entities/session.entity";
 import { SignInEvent } from "./auth/entities/sign-in-event.entity";
 import { User } from "./auth/entities/user.entity";
+import { MetricsModule } from "./metrics/metrics.module";
 import { UsersModule } from "./users/users.module";
 
 @Module({
@@ -33,6 +34,7 @@ import { UsersModule } from "./users/users.module";
       }),
     }),
     ScheduleModule.forRoot(),
+    MetricsModule,
     AuthModule,
     UsersModule,
   ],

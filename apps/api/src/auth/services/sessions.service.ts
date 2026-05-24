@@ -68,6 +68,17 @@ export class SessionsService {
     return this.sessions.findOne({ where: { id: sessionId } });
   }
 
+  /** Count every non-revoked, non-expired session across all users. Used
+   * by the periodic sampler that backs the `auth_sessions_active` gauge. */
+  async countActive(): Promise<number> {
+    return this.sessions.count({
+      where: {
+        revokedAt: IsNull(),
+        expiresAt: MoreThan(new Date()),
+      },
+    });
+  }
+
   /** List every non-revoked, non-expired session for a user, newest active
    * first. Used to render the "active sessions" UI. */
   async listActiveForUser(userId: string): Promise<Session[]> {

@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { Injectable, Logger, UnauthorizedException } from "@nestjs/common";
 import { decodeJwt } from "jose";
+import { MetricsService } from "../../metrics/metrics.service";
 import type { GoogleSignInDto } from "../dto/google-sign-in.dto";
 import {
   type IdentityKey,
@@ -53,9 +54,23 @@ export class AuthService {
     private readonly fingerprints: DeviceFingerprintsService,
     private readonly auditor: SignInAuditor,
     private readonly limiter: SlidingWindowLimiter,
+    private readonly metrics: MetricsService,
   ) {}
 
   async signInWithGoogle(
+    dto: GoogleSignInDto,
+    meta: SignInRequestMetadata,
+  ): Promise<GoogleSignInResult> {
+    const startedAt = process.hrtime.bigint();
+    try {
+      return await this.signInWithGoogleInner(dto, meta);
+    } finally {
+      const elapsedNs = Number(process.hrtime.bigint() - startedAt);
+      this.metrics.observeSignInDuration(elapsedNs / 1e9);
+    }
+  }
+
+  private async signInWithGoogleInner(
     dto: GoogleSignInDto,
     meta: SignInRequestMetadata,
   ): Promise<GoogleSignInResult> {
@@ -80,6 +95,7 @@ export class AuthService {
       ip: meta.ip,
       deviceFingerprintId: fingerprintId,
     });
+    this.metrics.recordSessionCreation();
 
     await this.auditor.recordSuccess({
       userId: user.id,

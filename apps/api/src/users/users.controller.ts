@@ -17,6 +17,7 @@ import { SessionGuard } from "../auth/guards/session.guard";
 import { SessionsService } from "../auth/services/sessions.service";
 import { UsersService } from "../auth/services/users.service";
 import { deriveDeviceLabel } from "../auth/sessions/device-label";
+import { MetricsService } from "../metrics/metrics.service";
 
 /** Response body for `GET /users/me`. Mirrors the user's Google profile. */
 export interface MeResponse {
@@ -49,6 +50,7 @@ export class UsersController {
   constructor(
     private readonly users: UsersService,
     private readonly sessions: SessionsService,
+    private readonly metrics: MetricsService,
   ) {}
 
   /**
@@ -103,6 +105,8 @@ export class UsersController {
     }
 
     await this.users.deleteAccount(principal.userId);
+    this.metrics.recordAccountDeletion();
+    this.metrics.recordSessionRevocation("account_deletion");
     res.setHeader("Set-Cookie", buildClearSessionCookieHeader());
   }
 
@@ -155,5 +159,6 @@ export class UsersController {
     }
 
     await this.sessions.revoke(session.id);
+    this.metrics.recordSessionRevocation("user_revoke_other");
   }
 }

@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import { Inject, Injectable, Logger } from "@nestjs/common";
+import { MetricsService } from "../../metrics/metrics.service";
 import { LIMITER_CONFIG, type LimiterConfig } from "./limiter.config";
 import { REDIS_CLIENT, type RedisClient } from "./redis.client";
 
@@ -40,6 +41,7 @@ export class SlidingWindowLimiter {
   constructor(
     @Inject(REDIS_CLIENT) private readonly redis: RedisClient,
     @Inject(LIMITER_CONFIG) private readonly config: LimiterConfig,
+    private readonly metrics: MetricsService,
   ) {}
 
   /** Most recent op flipped the limiter into a degraded (Redis-unreachable) state. */
@@ -127,6 +129,7 @@ export class SlidingWindowLimiter {
   private markDegraded(err: unknown, op: string): void {
     this.degraded = true;
     this.degradedTotal += 1;
+    this.metrics.recordLimiterDegraded();
     const message = err instanceof Error ? err.message : String(err);
     this.logger.warn(`Limiter degraded (${op}): ${message}`);
   }

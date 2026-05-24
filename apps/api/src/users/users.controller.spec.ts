@@ -3,17 +3,20 @@ import type { Session } from "../auth/entities/session.entity";
 import { User } from "../auth/entities/user.entity";
 import { SessionsService } from "../auth/services/sessions.service";
 import { UsersService } from "../auth/services/users.service";
+import { MetricsService } from "../metrics/metrics.service";
 import { UsersController } from "./users.controller";
 
 function buildController(
   overrides: {
     users?: Partial<UsersService>;
     sessions?: Partial<SessionsService>;
+    metrics?: Partial<MetricsService>;
   } = {},
 ): {
   controller: UsersController;
   users: UsersService;
   sessions: SessionsService;
+  metrics: MetricsService;
 } {
   const users = {
     findById: jest.fn(),
@@ -26,10 +29,16 @@ function buildController(
     findById: jest.fn(),
     ...overrides.sessions,
   } as unknown as SessionsService;
+  const metrics = {
+    recordSessionRevocation: jest.fn(),
+    recordAccountDeletion: jest.fn(),
+    ...overrides.metrics,
+  } as unknown as MetricsService;
   return {
-    controller: new UsersController(users, sessions),
+    controller: new UsersController(users, sessions, metrics),
     users,
     sessions,
+    metrics,
   };
 }
 
@@ -190,6 +199,26 @@ describe("UsersController DELETE /users/me", () => {
     expect(cookieValue).toMatch(/^fortuna_session=/);
     expect(cookieValue).toContain("Max-Age=0");
   });
+
+  it("increments auth_account_deletions_total and session_revocations(account_deletion) on confirm:true", async () => {
+    const recordSessionRevocation = jest.fn();
+    const recordAccountDeletion = jest.fn();
+    const { controller } = buildController({
+      metrics: {
+        recordSessionRevocation,
+        recordAccountDeletion,
+      } as never,
+    });
+    const req = {
+      principal: { userId: "user-1", sessionId: "s" },
+    } as never;
+    const res = { setHeader: jest.fn() } as never;
+
+    await controller.deleteMe(req, res, { confirm: true });
+
+    expect(recordAccountDeletion).toHaveBeenCalledTimes(1);
+    expect(recordSessionRevocation).toHaveBeenCalledWith("account_deletion");
+  });
 });
 
 describe("UsersController DELETE /users/me/sessions/:id", () => {
@@ -264,5 +293,27 @@ describe("UsersController DELETE /users/me/sessions/:id", () => {
       controller.revokeSession(req, "session-other"),
     ).resolves.toBeUndefined();
     expect(revoke).toHaveBeenCalledWith("session-other");
+  });
+
+  it("increments auth_session_revocations_total with reason=user_revoke_other", async () => {
+    const ownedSession = {
+      id: "session-other",
+      userId: "user-1",
+    } as Session;
+    const recordSessionRevocation = jest.fn();
+    const { controller } = buildController({
+      sessions: {
+        findById: jest.fn().mockResolvedValue(ownedSession),
+        revoke: jest.fn().mockResolvedValue(undefined),
+      },
+      metrics: { recordSessionRevocation } as never,
+    });
+    const req = {
+      principal: { userId: "user-1", sessionId: "session-current" },
+    } as never;
+
+    await controller.revokeSession(req, "session-other");
+
+    expect(recordSessionRevocation).toHaveBeenCalledWith("user_revoke_other");
   });
 });

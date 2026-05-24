@@ -1,4 +1,5 @@
 import { Test } from "@nestjs/testing";
+import { MetricsService } from "../../metrics/metrics.service";
 import { LIMITER_CONFIG, type LimiterConfig } from "./limiter.config";
 import { REDIS_CLIENT, type RedisClient } from "./redis.client";
 import { SlidingWindowLimiter } from "./sliding-window-limiter";
@@ -7,6 +8,7 @@ interface LimiterStubs {
   ping: jest.Mock;
   eval: jest.Mock;
   del: jest.Mock;
+  recordLimiterDegraded: jest.Mock;
 }
 
 async function buildLimiter(
@@ -17,6 +19,7 @@ async function buildLimiter(
     ping: jest.fn().mockResolvedValue("PONG"),
     eval: jest.fn(),
     del: jest.fn().mockResolvedValue(1),
+    recordLimiterDegraded: jest.fn(),
     ...overrides,
   };
 
@@ -24,6 +27,9 @@ async function buildLimiter(
     ping: stubs.ping,
     eval: stubs.eval,
     del: stubs.del,
+  };
+  const metricsStub: Pick<MetricsService, "recordLimiterDegraded"> = {
+    recordLimiterDegraded: stubs.recordLimiterDegraded,
   };
 
   const config: LimiterConfig = {
@@ -42,6 +48,7 @@ async function buildLimiter(
       SlidingWindowLimiter,
       { provide: REDIS_CLIENT, useValue: redisStub },
       { provide: LIMITER_CONFIG, useValue: config },
+      { provide: MetricsService, useValue: metricsStub },
     ],
   }).compile();
 
@@ -237,5 +244,17 @@ describe("SlidingWindowLimiter.degradedCount", () => {
 
     await limiter.checkIpRate("203.0.113.5");
     expect(limiter.degradedCount()).toBe(0);
+  });
+
+  it("emits the auth_limiter_degraded_total metric every time it fails open", async () => {
+    const { limiter, recordLimiterDegraded } = await buildLimiter({
+      eval: jest.fn().mockRejectedValue(new Error("down")),
+    });
+
+    await limiter.checkIpRate("203.0.113.5");
+    await limiter.checkIdentityBackoff({ provider: "google", subject: "s" });
+    await limiter.recordIdentityFailure({ provider: "google", subject: "s" });
+
+    expect(recordLimiterDegraded).toHaveBeenCalledTimes(3);
   });
 });

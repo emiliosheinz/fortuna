@@ -11,6 +11,7 @@ import {
   UseGuards,
 } from "@nestjs/common";
 import type { Request, Response } from "express";
+import { MetricsService } from "../metrics/metrics.service";
 import { buildClearSessionCookieHeader } from "./cookies/session-cookie";
 import { GoogleSignInDto } from "./dto/google-sign-in.dto";
 import { BadRequestAuditFilter } from "./filters/bad-request-audit.filter";
@@ -39,6 +40,7 @@ export class AuthController {
   constructor(
     private readonly authService: AuthService,
     private readonly sessions: SessionsService,
+    private readonly metrics: MetricsService,
   ) {}
 
   /**
@@ -79,6 +81,7 @@ export class AuthController {
     if (!principal) throw new UnauthorizedException();
 
     await this.sessions.revoke(principal.sessionId);
+    this.metrics.recordSessionRevocation("user_signout");
     res.setHeader("Set-Cookie", buildClearSessionCookieHeader());
   }
 }

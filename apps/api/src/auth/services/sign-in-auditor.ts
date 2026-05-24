@@ -1,4 +1,5 @@
 import { Injectable, Logger } from "@nestjs/common";
+import { MetricsService } from "../../metrics/metrics.service";
 import type { SignInOutcome } from "../entities/sign-in-event.entity";
 import type { IdTokenVerificationReason } from "./google-id-token-verifier";
 import { SignInEventsService } from "./sign-in-events.service";
@@ -19,19 +20,25 @@ export interface SignInAuditVerificationFailureInput
 }
 
 /**
- * Sole writer of `sign_in_events` rows for the `/auth/google` pipeline.
+ * Sole writer of `sign_in_events` rows for the `/auth/google` pipeline,
+ * and the canonical chokepoint for `auth_signin_attempts_total` Prometheus
+ * emissions.
  *
  * Encapsulates the verification-reason → outcome mapping and the
  * "log + swallow" semantics: a failed audit write must never mask the
  * user-visible response (a 500 from auditing would be worse than a missing
- * forensic row). Logs the failure at error level with the correlation id so
- * the gap can be reconstructed from app logs.
+ * forensic row). The Prometheus counter is incremented regardless of
+ * persistence success so the rate-of-attempts dashboard does not flatline
+ * when Postgres has a hiccup.
  */
 @Injectable()
 export class SignInAuditor {
   private readonly logger = new Logger(SignInAuditor.name);
 
-  constructor(private readonly events: SignInEventsService) {}
+  constructor(
+    private readonly events: SignInEventsService,
+    private readonly metrics: MetricsService,
+  ) {}
 
   async recordSuccess(input: SignInAuditSuccessInput): Promise<void> {
     await this.record({
@@ -76,6 +83,7 @@ export class SignInAuditor {
   }
 
   async recordRateLimited(input: SignInAuditContext): Promise<void> {
+    this.metrics.recordRateLimiterBlock();
     await this.record({
       userId: null,
       correlationId: input.correlationId,
@@ -92,6 +100,7 @@ export class SignInAuditor {
     ip: string | null;
     userAgent: string | null;
   }): Promise<void> {
+    this.metrics.recordSignInOutcome(input.outcome);
     try {
       await this.events.record(input);
     } catch (err) {

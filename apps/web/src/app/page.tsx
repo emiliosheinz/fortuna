@@ -13,6 +13,20 @@ export default function Home() {
       <Button asChild>
         <a href="/api/auth/sign-in">Sign in with Google</a>
       </Button>
+      <p
+        data-testid="sign-in-consent-notice"
+        className="max-w-xs text-center text-xs text-muted-foreground"
+      >
+        By signing in you agree to our{" "}
+        <a href="/terms" className="underline underline-offset-2">
+          Terms of Service
+        </a>{" "}
+        and acknowledge our{" "}
+        <a href="/privacy" className="underline underline-offset-2">
+          Privacy Policy
+        </a>
+        .
+      </p>
       <Suspense fallback={null}>
         <SignInErrorBanner />
       </Suspense>

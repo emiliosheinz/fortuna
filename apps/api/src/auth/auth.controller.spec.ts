@@ -1,5 +1,6 @@
 import { Test } from "@nestjs/testing";
 import type { Request, Response } from "express";
+import { MetricsService } from "../metrics/metrics.service";
 import { AuthController } from "./auth.controller";
 import type { GoogleSignInDto } from "./dto/google-sign-in.dto";
 import { BadRequestAuditFilter } from "./filters/bad-request-audit.filter";
@@ -39,6 +40,9 @@ function fakeRequest(
 interface ControllerStubs {
   signInWithGoogle: jest.Mock;
   revoke: jest.Mock;
+  recordSessionRevocation: jest.Mock;
+  recordSignInOutcome: jest.Mock;
+  recordRateLimiterBlock: jest.Mock;
 }
 
 async function buildController(
@@ -47,6 +51,9 @@ async function buildController(
   const stubs: ControllerStubs = {
     signInWithGoogle: jest.fn(),
     revoke: jest.fn().mockResolvedValue(undefined),
+    recordSessionRevocation: jest.fn(),
+    recordSignInOutcome: jest.fn(),
+    recordRateLimiterBlock: jest.fn(),
     ...overrides,
   };
 
@@ -59,6 +66,14 @@ async function buildController(
   const eventsStub: Pick<SignInEventsService, "record"> = {
     record: jest.fn().mockResolvedValue(undefined),
   };
+  const metricsStub: Pick<
+    MetricsService,
+    "recordSessionRevocation" | "recordSignInOutcome" | "recordRateLimiterBlock"
+  > = {
+    recordSessionRevocation: stubs.recordSessionRevocation,
+    recordSignInOutcome: stubs.recordSignInOutcome,
+    recordRateLimiterBlock: stubs.recordRateLimiterBlock,
+  };
 
   const moduleRef = await Test.createTestingModule({
     controllers: [AuthController],
@@ -66,6 +81,7 @@ async function buildController(
       { provide: AuthService, useValue: authServiceStub },
       { provide: SessionsService, useValue: sessionsStub },
       { provide: SignInEventsService, useValue: eventsStub },
+      { provide: MetricsService, useValue: metricsStub },
       SignInAuditor,
       BadRequestAuditFilter,
     ],
@@ -142,5 +158,17 @@ describe("AuthController DELETE /auth/session", () => {
     expect(cookieValue).toContain("Path=/");
     expect(cookieValue.toLowerCase()).toContain("httponly");
     expect(cookieValue.toLowerCase()).toContain("samesite=lax");
+  });
+
+  it("increments auth_session_revocations_total with reason=user_signout", async () => {
+    const { controller, recordSessionRevocation } = await buildController();
+    const { res } = fakeResponse();
+    const req = fakeRequest({
+      principal: { userId: "user-1", sessionId: "session-1" },
+    });
+
+    await controller.signOut(req, res);
+
+    expect(recordSessionRevocation).toHaveBeenCalledWith("user_signout");
   });
 });

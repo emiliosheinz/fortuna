@@ -11,6 +11,7 @@ import { SessionGuard } from "./guards/session.guard";
 import { redisClientProvider } from "./rate-limit/ioredis.client";
 import { limiterConfigProvider } from "./rate-limit/limiter.config";
 import { SlidingWindowLimiter } from "./rate-limit/sliding-window-limiter";
+import { ActiveSessionsSampler } from "./services/active-sessions.sampler";
 import { AuthService } from "./services/auth.service";
 import { DeviceFingerprintsService } from "./services/device-fingerprints.service";
 import {
@@ -77,6 +78,7 @@ function deriveJwksUri(issuer: string): string {
     SlidingWindowLimiter,
     SessionGuard,
     BadRequestAuditFilter,
+    ActiveSessionsSampler,
   ],
   exports: [
     SessionsService,
