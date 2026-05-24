@@ -72,6 +72,9 @@ describe("Auth integration", () => {
       password: redisContainer.getPassword(),
       maxRetriesPerRequest: 1,
     });
+    // Don't let the admin client's socket block worker exit (mirrors the
+    // production IoredisClient pattern). Re-applied on every reconnect.
+    redisAdmin.on("connect", () => redisAdmin.stream?.unref());
 
     const keyPair = await generateKeyPair("RS256");
     signingPrivateKey = keyPair.privateKey;
@@ -117,6 +120,7 @@ describe("Auth integration", () => {
   afterAll(async () => {
     await app?.close();
     await redisAdmin?.quit().catch(() => undefined);
+    redisAdmin?.disconnect(false);
     await redisContainer?.stop();
     await container?.stop();
   });

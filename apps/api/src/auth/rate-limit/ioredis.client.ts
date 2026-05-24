@@ -33,6 +33,17 @@ export class IoredisClient implements RedisClient, OnModuleDestroy {
       retryStrategy: (attempts) => Math.min(attempts * 200, 2000),
     });
 
+    // Detach the underlying socket from libuv's "keep loop alive" ref
+    // count. In normal operation the HTTP server keeps the process
+    // running; on shutdown (or in tests after app.close()) we want the
+    // process to exit even if ioredis still has a reconnect or command-
+    // retry timer scheduled. Without this, Jest hangs after teardown
+    // and prod processes won't honor SIGTERM cleanly. The stream is
+    // recreated on every reconnect, so we unref on each connect event.
+    this.client.on("connect", () => {
+      this.client.stream?.unref();
+    });
+
     this.client.on("error", (err) => {
       this.logger.warn(`Redis connection error: ${err.message}`);
     });
@@ -61,13 +72,21 @@ export class IoredisClient implements RedisClient, OnModuleDestroy {
 
   /**
    * Nest lifecycle hook — closes the underlying ioredis socket and stops
-   * the reconnect timer on `app.close()`. Without this, integration tests
-   * see an open handle and Jest hangs after the run completes; in prod the
-   * process would never shut down cleanly on SIGTERM.
+   * the reconnect timer on `app.close()`. Calling `disconnect(false)` after
+   * `quit()` is critical: a `quit()` that fails (or even one that succeeds
+   * while a reconnect timer is already scheduled) can leave a pending
+   * `setTimeout` on the event loop, which makes Jest hang after the run
+   * completes and would prevent prod from shutting down cleanly on SIGTERM.
    */
   async onModuleDestroy(): Promise<void> {
     if (this.client.status === "end") return;
-    await this.client.quit().catch(() => this.client.disconnect());
+    try {
+      await this.client.quit();
+    } catch {
+      // Ignore: quit may reject when the connection was already broken
+      // (e.g. Redis container stopped); disconnect below cleans up anyway.
+    }
+    this.client.disconnect(false);
   }
 }
 
