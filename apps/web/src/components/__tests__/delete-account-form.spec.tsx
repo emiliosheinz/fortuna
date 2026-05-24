@@ -3,7 +3,6 @@ import { DeleteAccountForm } from "../delete-account-form";
 
 jest.mock("@/lib/auth/actions", () => ({
   __esModule: true,
-  DELETE_ACCOUNT_CONFIRMATION_PHRASE: "DELETE",
   deleteAccountAction: jest.fn(),
 }));
 

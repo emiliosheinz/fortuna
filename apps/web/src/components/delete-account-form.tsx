@@ -2,10 +2,8 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import {
-  DELETE_ACCOUNT_CONFIRMATION_PHRASE,
-  deleteAccountAction,
-} from "@/lib/auth/actions";
+import { deleteAccountAction } from "@/lib/auth/actions";
+import { DELETE_ACCOUNT_CONFIRMATION_PHRASE } from "@/lib/auth/constants";
 
 /**
  * Client form that gates the destructive delete-account submit on the user

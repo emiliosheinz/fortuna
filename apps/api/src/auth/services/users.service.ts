@@ -1,11 +1,14 @@
 import { Injectable } from "@nestjs/common";
 import { InjectDataSource } from "@nestjs/typeorm";
-import { DataSource, type EntityManager } from "typeorm";
+import { DataSource, type EntityManager, QueryFailedError } from "typeorm";
 import { Identity } from "../entities/identity.entity";
 import { User } from "../entities/user.entity";
 import { SignInEventsService } from "./sign-in-events.service";
 
 const GOOGLE_PROVIDER = "google";
+
+/** Postgres SQLSTATE for unique-violation; surfaced via the pg driver. */
+const PG_UNIQUE_VIOLATION = "23505";
 
 /** Mirrored Google ID token claims used to create/update a Fortuna user. */
 export interface GoogleIdentityClaims {
@@ -32,14 +35,31 @@ export class UsersService {
   ) {}
 
   /**
-   * Look up by `(google, sub)` or create the user + identity in a single
-   * transaction. For returning users the mirrored profile fields (name,
-   * email, avatarUrl) are refreshed from Google's claims on every sign-in.
+   * Look up by `(google, sub)` or create the user + identity. For returning
+   * users the mirrored profile fields (name, email, avatarUrl) are refreshed
+   * from Google's claims on every sign-in.
+   *
+   * Two concurrent first-time sign-ins for the same Google identity will
+   * race on the `users.email` and `identities (provider, provider_subject)`
+   * unique constraints. The lost transaction rolls back; we re-resolve via
+   * the canonical lookup and return the row the winning transaction
+   * committed. The retry runs **outside** the failed transaction because
+   * Postgres rejects every statement issued on an aborted transaction.
    */
   async upsertFromGoogleIdentity(claims: GoogleIdentityClaims): Promise<User> {
-    return this.dataSource.transaction(async (manager) =>
-      upsertFromGoogleIdentityWithManager(manager, claims),
-    );
+    try {
+      return await this.dataSource.transaction(async (manager) =>
+        upsertFromGoogleIdentityWithManager(manager, claims),
+      );
+    } catch (err) {
+      if (!isUniqueViolation(err)) throw err;
+      const winner = await this.dataSource.getRepository(Identity).findOne({
+        where: { provider: GOOGLE_PROVIDER, providerSubject: claims.sub },
+        relations: { user: true },
+      });
+      if (!winner) throw err;
+      return winner.user;
+    }
   }
 
   /** Fetch a user by primary key. */
@@ -95,4 +115,13 @@ async function upsertFromGoogleIdentityWithManager(
     providerSubject: claims.sub,
   });
   return user;
+}
+
+function isUniqueViolation(err: unknown): boolean {
+  if (!(err instanceof QueryFailedError)) return false;
+  const driverError = (err as QueryFailedError & { code?: string }).code;
+  if (driverError === PG_UNIQUE_VIOLATION) return true;
+  const nested = (err as QueryFailedError & { driverError?: { code?: string } })
+    .driverError;
+  return nested?.code === PG_UNIQUE_VIOLATION;
 }

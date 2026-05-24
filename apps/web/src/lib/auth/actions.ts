@@ -7,10 +7,8 @@ import {
   deleteCurrentSession,
   deleteSession,
 } from "./api-client";
+import { DELETE_ACCOUNT_CONFIRMATION_PHRASE } from "./constants";
 import { SESSION_COOKIE_NAME } from "./cookies";
-
-/** Phrase the user must type to confirm an irreversible account deletion. */
-export const DELETE_ACCOUNT_CONFIRMATION_PHRASE = "DELETE";
 
 /**
  * Sign out the current device.

@@ -147,6 +147,32 @@ describe("Auth integration", () => {
     expect(session.tokenHash).not.toBe(res.body.sessionToken);
   });
 
+  it("converges to a single user when concurrent sign-ins race for the same Google identity", async () => {
+    const idTokens = await Promise.all([
+      signIdToken({ sub: "race-sub" }),
+      signIdToken({ sub: "race-sub" }),
+      signIdToken({ sub: "race-sub" }),
+    ]);
+
+    const responses = await Promise.all(
+      idTokens.map((idToken) =>
+        request(app.getHttpServer())
+          .post("/auth/google")
+          .send({ idToken, nonce: NONCE }),
+      ),
+    );
+
+    for (const res of responses) {
+      expect(res.status).toBeGreaterThanOrEqual(200);
+      expect(res.status).toBeLessThan(300);
+      expect(res.body.sessionToken).toEqual(expect.any(String));
+    }
+
+    expect(await dataSource.getRepository(User).count()).toBe(1);
+    expect(await dataSource.getRepository(Identity).count()).toBe(1);
+    expect(await dataSource.getRepository(Session).count()).toBe(3);
+  });
+
   it("reuses existing user + identity on returning sign-in and mints a new session", async () => {
     const idToken1 = await signIdToken();
     const res1 = await request(app.getHttpServer())
@@ -659,6 +685,49 @@ describe("Auth integration", () => {
       // Recent row untouched.
       expect(rows[1]?.ip).toBe("203.0.113.2");
       expect(rows[1]?.uaHash).toBe("bbbb");
+    });
+
+    it("clears the remaining column on a half-anonymized old row", async () => {
+      const repo = dataSource.getRepository(SignInEvent);
+      const oldDate = new Date(Date.now() - 100 * 24 * 60 * 60 * 1000);
+
+      await repo.query(
+        `INSERT INTO sign_in_events (id, user_id, correlation_id, outcome, ip, ua_hash, created_at)
+         VALUES
+           (uuid_generate_v4(), NULL, uuid_generate_v4(), 'success', '203.0.113.3', NULL, $1),
+           (uuid_generate_v4(), NULL, uuid_generate_v4(), 'success', NULL, 'cccc', $1)`,
+        [oldDate.toISOString()],
+      );
+
+      const worker = app.get(SignInEventsRetentionWorker);
+      await worker.runRetentionSweep();
+
+      const rows = await repo.find({ order: { createdAt: "ASC" } });
+      expect(rows).toHaveLength(2);
+      for (const row of rows) {
+        expect(row.ip).toBeNull();
+        expect(row.uaHash).toBeNull();
+      }
+    });
+
+    it("is idempotent — re-running the sweep on already-anonymized rows does not error", async () => {
+      const repo = dataSource.getRepository(SignInEvent);
+      const oldDate = new Date(Date.now() - 100 * 24 * 60 * 60 * 1000);
+
+      await repo.query(
+        `INSERT INTO sign_in_events (id, user_id, correlation_id, outcome, ip, ua_hash, created_at)
+         VALUES (uuid_generate_v4(), NULL, uuid_generate_v4(), 'success', NULL, NULL, $1)`,
+        [oldDate.toISOString()],
+      );
+
+      const worker = app.get(SignInEventsRetentionWorker);
+      await worker.runRetentionSweep();
+      await worker.runRetentionSweep();
+
+      const rows = await repo.find();
+      expect(rows).toHaveLength(1);
+      expect(rows[0]?.ip).toBeNull();
+      expect(rows[0]?.uaHash).toBeNull();
     });
   });
 });
