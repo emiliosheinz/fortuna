@@ -1,5 +1,6 @@
 import path from "node:path";
-import { Module } from "@nestjs/common";
+import { Module, ValidationPipe } from "@nestjs/common";
+import { APP_PIPE } from "@nestjs/core";
 import { ScheduleModule } from "@nestjs/schedule";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { AppController } from "./app.controller";
@@ -35,6 +36,16 @@ import { UsersModule } from "./users/users.module";
     UsersModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    {
+      provide: APP_PIPE,
+      useValue: new ValidationPipe({
+        whitelist: true,
+        forbidNonWhitelisted: true,
+        transform: true,
+      }),
+    },
+  ],
 })
 export class AppModule {}

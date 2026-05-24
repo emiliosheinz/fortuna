@@ -102,7 +102,9 @@ describe("GoogleIdTokenVerifier", () => {
 
   it("rejects an expired token", async () => {
     const keyset = await newKeyset();
-    const token = await keyset.sign({ exp: Math.floor(Date.now() / 1000) - 120 });
+    const token = await keyset.sign({
+      exp: Math.floor(Date.now() / 1000) - 120,
+    });
 
     const verifier = makeVerifier({ keys: [keyset.publicJwk] });
 
@@ -155,7 +157,9 @@ describe("GoogleIdTokenVerifier", () => {
 
   it("error reason is exposed as a typed property", async () => {
     const keyset = await newKeyset();
-    const token = await keyset.sign({ exp: Math.floor(Date.now() / 1000) - 120 });
+    const token = await keyset.sign({
+      exp: Math.floor(Date.now() / 1000) - 120,
+    });
     const verifier = makeVerifier({ keys: [keyset.publicJwk] });
 
     let caught: unknown;
@@ -169,7 +173,9 @@ describe("GoogleIdTokenVerifier", () => {
 
   it("accepts tokens within the configured clock tolerance", async () => {
     const keyset = await newKeyset();
-    const token = await keyset.sign({ exp: Math.floor(Date.now() / 1000) - 10 });
+    const token = await keyset.sign({
+      exp: Math.floor(Date.now() / 1000) - 10,
+    });
 
     const verifier = makeVerifier({ keys: [keyset.publicJwk] });
 

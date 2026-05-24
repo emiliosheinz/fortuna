@@ -1,40 +1,25 @@
-import { randomUUID } from "node:crypto";
 import {
-  BadRequestException,
   Body,
   Controller,
   Delete,
   HttpCode,
-  Logger,
   Post,
   Req,
   Res,
   UnauthorizedException,
+  UseFilters,
   UseGuards,
 } from "@nestjs/common";
 import type { Request, Response } from "express";
 import { buildClearSessionCookieHeader } from "./cookies/session-cookie";
-import type { SignInOutcome } from "./entities/sign-in-event.entity";
+import { GoogleSignInDto } from "./dto/google-sign-in.dto";
+import { BadRequestAuditFilter } from "./filters/bad-request-audit.filter";
 import { SessionGuard } from "./guards/session.guard";
-import {
-  GoogleIdTokenVerifier,
-  IdTokenVerificationError,
-  type IdTokenVerificationReason,
-} from "./services/google-id-token-verifier";
+import { AuthService } from "./services/auth.service";
 import { SessionsService } from "./services/sessions.service";
-import { SignInEventsService } from "./services/sign-in-events.service";
-import { UsersService } from "./services/users.service";
 
 interface AuthedRequest extends Request {
   principal?: { userId: string; sessionId: string };
-}
-
-/** Request body for `POST /auth/google`. */
-export interface GoogleSignInDto {
-  /** Google ID token (JWT) obtained by apps/web during the OAuth exchange. */
-  idToken: string;
-  /** Nonce that apps/web included in the OAuth `authorize` request. */
-  nonce: string;
 }
 
 /** Response body for `POST /auth/google`. */
@@ -51,98 +36,29 @@ export interface GoogleSignInResponse {
 
 @Controller("auth")
 export class AuthController {
-  private readonly logger = new Logger(AuthController.name);
-
   constructor(
-    private readonly verifier: GoogleIdTokenVerifier,
-    private readonly users: UsersService,
+    private readonly authService: AuthService,
     private readonly sessions: SessionsService,
-    private readonly signInEvents: SignInEventsService,
   ) {}
 
   /**
-   * Verify a Google ID token forwarded by apps/web, upsert the user +
-   * identity, mint a session, and return the opaque token.
+   * Verify a Google ID token forwarded by apps/web and mint a session.
    *
-   * Every attempt — success or failure — appends a row to `sign_in_events`
-   * with a fresh `correlation_id`. Failures surface that id in the response
-   * body so support can map a user-reported error to the audit row without
-   * leaking the internal failure reason.
+   * Validation is enforced by the global `ValidationPipe` against
+   * {@link GoogleSignInDto}; bad-request failures are caught by
+   * {@link BadRequestAuditFilter} so they still produce an audit row.
+   * Orchestration of verify + upsert + mint lives in {@link AuthService}.
    */
   @Post("google")
+  @UseFilters(BadRequestAuditFilter)
   async googleSignIn(
-    @Body() body: GoogleSignInDto,
+    @Body() dto: GoogleSignInDto,
     @Req() req: Request,
   ): Promise<GoogleSignInResponse> {
-    const correlationId = randomUUID();
-    const userAgent = headerString(req.headers["user-agent"]) ?? null;
-    const ip = req.ip ?? null;
-
-    if (
-      !body ||
-      typeof body.idToken !== "string" ||
-      !body.idToken ||
-      typeof body.nonce !== "string" ||
-      !body.nonce
-    ) {
-      await this.recordSafely({
-        userId: null,
-        correlationId,
-        outcome: "failure_bad_request",
-        ip,
-        userAgent,
-      });
-      throw new BadRequestException({ correlationId });
-    }
-
-    let claims: Awaited<ReturnType<GoogleIdTokenVerifier["verify"]>>;
-    try {
-      claims = await this.verifier.verify(body.idToken, body.nonce);
-    } catch (err) {
-      if (err instanceof IdTokenVerificationError) {
-        const outcome = outcomeFromVerificationReason(err.reason);
-        this.logger.warn(
-          `Sign-in verification failed (${err.reason}) [cid=${correlationId}]`,
-        );
-        await this.recordSafely({
-          userId: null,
-          correlationId,
-          outcome,
-          ip,
-          userAgent,
-        });
-        throw new UnauthorizedException({ correlationId });
-      }
-      await this.recordSafely({
-        userId: null,
-        correlationId,
-        outcome: "failure_internal",
-        ip,
-        userAgent,
-      });
-      throw err;
-    }
-
-    const user = await this.users.upsertFromGoogleIdentity(claims);
-
-    const { rawToken, session } = await this.sessions.mint({
-      userId: user.id,
-      userAgent,
-      ip,
+    return this.authService.signInWithGoogle(dto, {
+      ip: req.ip ?? null,
+      userAgent: readUserAgent(req),
     });
-
-    await this.recordSafely({
-      userId: user.id,
-      correlationId,
-      outcome: "success",
-      ip,
-      userAgent,
-    });
-
-    return {
-      sessionToken: rawToken,
-      expiresAt: session.expiresAt.toISOString(),
-    };
   }
 
   /**
@@ -165,47 +81,10 @@ export class AuthController {
     await this.sessions.revoke(principal.sessionId);
     res.setHeader("Set-Cookie", buildClearSessionCookieHeader());
   }
-
-  private async recordSafely(input: {
-    userId: string | null;
-    correlationId: string;
-    outcome: SignInOutcome;
-    ip: string | null;
-    userAgent: string | null;
-  }): Promise<void> {
-    try {
-      await this.signInEvents.record(input);
-    } catch (err) {
-      this.logger.error(
-        `Failed to persist sign_in_events row [cid=${input.correlationId}]`,
-        err instanceof Error ? err.stack : String(err),
-      );
-    }
-  }
 }
 
-function outcomeFromVerificationReason(
-  reason: IdTokenVerificationReason,
-): SignInOutcome {
-  switch (reason) {
-    case "signature":
-      return "failure_token_signature";
-    case "expired":
-      return "failure_token_expired";
-    case "issuer":
-      return "failure_token_issuer";
-    case "audience":
-      return "failure_token_audience";
-    case "nonce_mismatch":
-      return "failure_nonce_mismatch";
-    case "malformed":
-      return "failure_token_malformed";
-  }
-}
-
-function headerString(
-  header: string | string[] | undefined,
-): string | undefined {
-  if (header === undefined) return undefined;
+function readUserAgent(req: Request): string | null {
+  const header = req.headers["user-agent"];
+  if (header === undefined) return null;
   return Array.isArray(header) ? header.join(", ") : header;
 }
