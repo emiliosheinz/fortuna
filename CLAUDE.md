@@ -1,7 +1,35 @@
 # Fortuna — Agent Notes
 
-Quick orientation for Claude Code agents. The README is the source of truth for
-setup; this file captures conventions that are easy to miss.
+Setup, install, migrations, and the daily dev workflow live in
+[`README.md`](./README.md) and [`CONTRIBUTING.md`](./CONTRIBUTING.md).
+Don't duplicate them here. This file is only for judgment rules the
+agent needs that aren't already in those docs or the code.
+
+## Run everything through `bin/fortuna`
+
+All compute commands (install, test, lint, build, migrations) execute
+inside the `workspace` container. From the host, prefix with
+`bin/fortuna`:
+
+```bash
+bin/fortuna pnpm install
+bin/fortuna pnpm --filter api test
+bin/fortuna pnpm --filter api test:integration
+bin/fortuna pnpm --filter web test:e2e
+bin/fortuna pnpm turbo check
+bin/fortuna db migration:generate <Name>
+```
+
+The host `pnpm`, `jest`, `npx biome`, etc. are off-limits — host
+`node_modules` drifts from the workspace's (CI-mode installs skip
+optional native binaries, e.g. `@biomejs/cli-darwin-arm64`), and
+integration tests need the docker socket mounted by `workspace`.
+
+When the lockfile changes, `bin/fortuna pnpm install` is the only step
+required — restart the affected service afterward with
+`docker compose restart api` (or `web`). Symptoms of a skipped
+re-install: Turbopack "couldn't find next package", missing native
+binary errors, or stale type imports.
 
 ## Cascade contract (user-scoped schemas)
 
@@ -32,15 +60,17 @@ Full rationale + the audit-anonymization rule live in
 Three layers, three names, no overlap:
 
 - **Unit** — `*.spec.ts` colocated with source. Pure functions or a single
-  class with collaborators stubbed. No I/O, no Nest container. Run on save.
+  class with collaborators stubbed. No I/O, no Nest container. Run via
+  `bin/fortuna pnpm --filter api test`.
 - **Integration** — `apps/api/test/*.integration-spec.ts`. NestJS module
-  wired against a real testcontainer Postgres and exercised via Supertest.
-  No browser. This is where API endpoints are verified end-to-end on the
-  server side. Run via `pnpm --filter api test:integration`.
+  wired against a real testcontainer Postgres (and Redis, for rate-
+  limiting) and exercised via Supertest. No browser. This is where API
+  endpoints are verified end-to-end on the server side. Run via
+  `bin/fortuna pnpm --filter api test:integration`.
 - **E2E** — `apps/web` Playwright suite only. Browser → web → API → DB.
-  Run via `pnpm --filter web test:e2e`. The API package has no `test:e2e`
-  script on purpose — anything that isn't a browser-driven flow belongs in
-  unit or integration.
+  Run via `bin/fortuna pnpm --filter web test:e2e`. The API package
+  has no `test:e2e` script on purpose — anything that isn't a browser-
+  driven flow belongs in unit or integration.
 
 ### Spec stubs
 
@@ -92,29 +122,3 @@ Client-side fetches use TanStack Query. `QueryClientProvider` is already
 wired at `apps/web/src/app/layout.tsx` via `QueryProvider`, with the
 devtools mounted only when `NODE_ENV !== "production"`. Reach for
 `useQuery` / `useMutation` rather than ad-hoc `useEffect` + `fetch`.
-
-## Dev container: re-run `setup` after dep changes
-
-The `web` and `api` services in `docker-compose.yaml` have no
-`pnpm install` step in their entrypoints. The `setup` service does, with
-`CI=true` so pnpm doesn't prompt for TTY confirmation. Whenever the
-workspace lockfile changes (new dep, version bump), run:
-
-```bash
-docker compose run --rm setup
-docker compose up -d web   # or api, or both
-```
-
-Skipping this manifests as either a Turbopack "couldn't find next
-package" error (when the new dep isn't resolvable yet) or
-`ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY` on restart.
-
-## Database migrations
-
-Migrations are generated from TypeORM entities, never hand-written. Workflow:
-
-1. Edit the entity (`apps/api/src/auth/entities/*.entity.ts` etc.).
-2. Run `bin/fortuna db migration:generate <Name>`.
-3. Review the generated SQL — both `up` and `down`.
-
-See `README.md` for the full migration commands.

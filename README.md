@@ -26,15 +26,19 @@ docker compose exec workspace <command>
 
 ### E2E Tests
 
-E2E tests validate the system as a whole, ensuring all applications work correctly together inside Docker. They are not started automatically with the development environment.
-
-To run E2E tests, you must explicitly start the E2E services defined in `docker-compose.yaml`.
-
-Each application has its own E2E service (e.g., `web-e2e`), which spins up the required dependencies and runs tests against downstream services.
+E2E tests validate the system as a whole, exercising the browser against
+a full web → API → DB stack inside Docker. They live in a separate
+Compose project (`docker-compose.e2e.yaml`, project name `fortuna-e2e`)
+so they can run safely alongside the dev stack — networks, volumes,
+and the `apps/web/.next` build cache are isolated.
 
 ```bash
-# Run the E2E service for the web app
-docker compose --profile e2e up --exit-code-from web-e2e web-e2e
+# Run the full e2e suite (starts dependencies, then web-e2e, then tears down)
+bin/fortuna e2e
+
+# Or interact with the e2e project directly via docker compose
+bin/fortuna e2e logs web
+bin/fortuna e2e down
 ```
 
 ### Using the fortuna helper
