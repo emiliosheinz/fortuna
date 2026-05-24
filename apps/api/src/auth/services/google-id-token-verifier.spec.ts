@@ -69,15 +69,15 @@ function makeVerifier(jwks: { keys: JWK[] }): GoogleIdTokenVerifier {
 
 describe("GoogleIdTokenVerifier", () => {
   it("returns claims for a valid token", async () => {
-    const ks = await newKeyset();
-    const token = await ks.sign({
+    const keyset = await newKeyset();
+    const token = await keyset.sign({
       sub: "abc-123",
       email: "alice@example.com",
       name: "Alice",
       picture: "https://example.com/a.png",
     });
 
-    const verifier = makeVerifier({ keys: [ks.publicJwk] });
+    const verifier = makeVerifier({ keys: [keyset.publicJwk] });
     const claims = await verifier.verify(token, NONCE);
 
     expect(claims).toEqual({
@@ -89,11 +89,11 @@ describe("GoogleIdTokenVerifier", () => {
   });
 
   it("rejects a token signed by an unknown key", async () => {
-    const issuingKs = await newKeyset("issuing");
-    const trustedKs = await newKeyset("trusted");
-    const token = await issuingKs.sign();
+    const issuingKeyset = await newKeyset("issuing");
+    const trustedKeyset = await newKeyset("trusted");
+    const token = await issuingKeyset.sign();
 
-    const verifier = makeVerifier({ keys: [trustedKs.publicJwk] });
+    const verifier = makeVerifier({ keys: [trustedKeyset.publicJwk] });
 
     await expect(verifier.verify(token, NONCE)).rejects.toMatchObject({
       reason: "signature",
@@ -101,10 +101,10 @@ describe("GoogleIdTokenVerifier", () => {
   });
 
   it("rejects an expired token", async () => {
-    const ks = await newKeyset();
-    const token = await ks.sign({ exp: Math.floor(Date.now() / 1000) - 120 });
+    const keyset = await newKeyset();
+    const token = await keyset.sign({ exp: Math.floor(Date.now() / 1000) - 120 });
 
-    const verifier = makeVerifier({ keys: [ks.publicJwk] });
+    const verifier = makeVerifier({ keys: [keyset.publicJwk] });
 
     await expect(verifier.verify(token, NONCE)).rejects.toMatchObject({
       reason: "expired",
@@ -112,10 +112,10 @@ describe("GoogleIdTokenVerifier", () => {
   });
 
   it("rejects a token from the wrong issuer", async () => {
-    const ks = await newKeyset();
-    const token = await ks.sign({ iss: "https://evil.example.com" });
+    const keyset = await newKeyset();
+    const token = await keyset.sign({ iss: "https://evil.example.com" });
 
-    const verifier = makeVerifier({ keys: [ks.publicJwk] });
+    const verifier = makeVerifier({ keys: [keyset.publicJwk] });
 
     await expect(verifier.verify(token, NONCE)).rejects.toMatchObject({
       reason: "issuer",
@@ -123,10 +123,10 @@ describe("GoogleIdTokenVerifier", () => {
   });
 
   it("rejects a token for the wrong audience", async () => {
-    const ks = await newKeyset();
-    const token = await ks.sign({ aud: "some-other-client-id" });
+    const keyset = await newKeyset();
+    const token = await keyset.sign({ aud: "some-other-client-id" });
 
-    const verifier = makeVerifier({ keys: [ks.publicJwk] });
+    const verifier = makeVerifier({ keys: [keyset.publicJwk] });
 
     await expect(verifier.verify(token, NONCE)).rejects.toMatchObject({
       reason: "audience",
@@ -134,10 +134,10 @@ describe("GoogleIdTokenVerifier", () => {
   });
 
   it("rejects a token with a mismatched nonce", async () => {
-    const ks = await newKeyset();
-    const token = await ks.sign({ nonce: "different-nonce" });
+    const keyset = await newKeyset();
+    const token = await keyset.sign({ nonce: "different-nonce" });
 
-    const verifier = makeVerifier({ keys: [ks.publicJwk] });
+    const verifier = makeVerifier({ keys: [keyset.publicJwk] });
 
     await expect(verifier.verify(token, NONCE)).rejects.toMatchObject({
       reason: "nonce_mismatch",
@@ -145,8 +145,8 @@ describe("GoogleIdTokenVerifier", () => {
   });
 
   it("rejects a malformed token", async () => {
-    const ks = await newKeyset();
-    const verifier = makeVerifier({ keys: [ks.publicJwk] });
+    const keyset = await newKeyset();
+    const verifier = makeVerifier({ keys: [keyset.publicJwk] });
 
     await expect(verifier.verify("not-a-jwt", NONCE)).rejects.toMatchObject({
       reason: "malformed",
@@ -154,9 +154,9 @@ describe("GoogleIdTokenVerifier", () => {
   });
 
   it("error reason is exposed as a typed property", async () => {
-    const ks = await newKeyset();
-    const token = await ks.sign({ exp: Math.floor(Date.now() / 1000) - 120 });
-    const verifier = makeVerifier({ keys: [ks.publicJwk] });
+    const keyset = await newKeyset();
+    const token = await keyset.sign({ exp: Math.floor(Date.now() / 1000) - 120 });
+    const verifier = makeVerifier({ keys: [keyset.publicJwk] });
 
     let caught: unknown;
     try {
@@ -168,10 +168,10 @@ describe("GoogleIdTokenVerifier", () => {
   });
 
   it("accepts tokens within the configured clock tolerance", async () => {
-    const ks = await newKeyset();
-    const token = await ks.sign({ exp: Math.floor(Date.now() / 1000) - 10 });
+    const keyset = await newKeyset();
+    const token = await keyset.sign({ exp: Math.floor(Date.now() / 1000) - 10 });
 
-    const verifier = makeVerifier({ keys: [ks.publicJwk] });
+    const verifier = makeVerifier({ keys: [keyset.publicJwk] });
 
     await expect(verifier.verify(token, NONCE)).resolves.toMatchObject({
       sub: "google-sub-12345",
