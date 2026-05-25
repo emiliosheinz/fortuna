@@ -111,6 +111,10 @@ jobs:
       - name: Run E2E Tests for ${{ matrix.app }}
         run: docker compose -f docker-compose.e2e.yaml up --exit-code-from ${{ matrix.app }}-e2e ${{ matrix.app }}-e2e
 
+      - name: Dump compose logs
+        if: failure()
+        run: docker compose -f docker-compose.e2e.yaml logs --no-color --timestamps
+
       - name: Upload Playwright results
         if: always()
         uses: actions/upload-artifact@v4
