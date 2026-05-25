@@ -53,12 +53,12 @@ describe("Auth integration", () => {
       .withPassword("fortuna")
       .start();
 
-    process.env.DB_HOST = container.getHost();
-    process.env.DB_PORT = String(container.getMappedPort(5432));
-    process.env.DB_NAME = container.getDatabase();
-    process.env.DB_USER = container.getUsername();
-    process.env.DB_PASSWORD = container.getPassword();
-    process.env.DB_SSL = "false";
+    process.env.POSTGRES_HOST = container.getHost();
+    process.env.POSTGRES_PORT = String(container.getMappedPort(5432));
+    process.env.POSTGRES_DB = container.getDatabase();
+    process.env.POSTGRES_USER = container.getUsername();
+    process.env.POSTGRES_PASSWORD = container.getPassword();
+    process.env.POSTGRES_SSL = "false";
 
     redisContainer = await new RedisContainer("redis:7-alpine")
       .withPassword("fortuna")

@@ -5,7 +5,7 @@ Fortuna's entire development environment runs in Docker. The only host requireme
 ## First-time setup
 
 ```bash
-# Copy every .env.example to a matching .env (root + each app).
+# Single env file at the repo root — every compose service reads from it.
 ./scripts/setup-env.sh
 
 # Bring up Postgres, the workspace shell, the API, the web app, and run migrations.

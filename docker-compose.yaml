@@ -4,10 +4,12 @@ services:
   postgres:
     container_name: postgres
     image: postgres:17-alpine
-    env_file:
-      - ./.env
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?required}
+      POSTGRES_USER: ${POSTGRES_USER:?required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?required}
     ports:
-      - "5432:5432"
+      - "${POSTGRES_PORT:?required}:5432"
     volumes:
       - db-data:/var/lib/postgresql/data
     healthcheck:
@@ -21,8 +23,8 @@ services:
   redis:
     container_name: redis
     image: redis:7-alpine
-    env_file:
-      - ./.env
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?required}
     command:
       - sh
       - -c
@@ -64,8 +66,13 @@ services:
       target: dev
       dockerfile: apps/api/Dockerfile
     command: ["pnpm", "--filter", "api", "run", "migration:run"]
-    env_file:
-      - ./apps/api/.env
+    environment:
+      POSTGRES_HOST: ${POSTGRES_HOST:?required}
+      POSTGRES_PORT: ${POSTGRES_PORT:?required}
+      POSTGRES_SSL: ${POSTGRES_SSL:?required}
+      POSTGRES_DB: ${POSTGRES_DB:?required}
+      POSTGRES_USER: ${POSTGRES_USER:?required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?required}
     depends_on:
       postgres:
         condition: service_healthy
@@ -81,8 +88,20 @@ services:
       context: .
       target: dev
       dockerfile: apps/api/Dockerfile
-    env_file:
-      - ./apps/api/.env
+    environment:
+      PORT: ${API_PORT:?required}
+      HOST: ${API_HOST:?required}
+      POSTGRES_HOST: ${POSTGRES_HOST:?required}
+      POSTGRES_PORT: ${POSTGRES_PORT:?required}
+      POSTGRES_SSL: ${POSTGRES_SSL:?required}
+      POSTGRES_DB: ${POSTGRES_DB:?required}
+      POSTGRES_USER: ${POSTGRES_USER:?required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?required}
+      REDIS_HOST: ${REDIS_HOST:?required}
+      REDIS_PORT: ${REDIS_PORT:?required}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?required}
+      OIDC_ISSUER_URL: ${OIDC_ISSUER_URL:?required}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:?required}
     depends_on:
       setup:
         condition: service_completed_successfully
@@ -93,7 +112,7 @@ services:
     volumes:
       - .:/fortuna
     ports:
-      - "3000:3000"
+      - "${API_PORT:?required}:${API_PORT:?required}"
 
   web:
     container_name: web
@@ -101,8 +120,14 @@ services:
       context: .
       target: dev
       dockerfile: apps/web/Dockerfile
-    env_file:
-      - ./apps/web/.env
+    environment:
+      PORT: ${WEB_PORT:?required}
+      HOST: ${WEB_HOST:?required}
+      API_BASE_URL: ${API_BASE_URL:?required}
+      OIDC_ISSUER_URL: ${OIDC_ISSUER_URL:?required}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:?required}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:?required}
+      GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:?required}
     depends_on:
       setup:
         condition: service_completed_successfully
@@ -115,7 +140,7 @@ services:
     volumes:
       - .:/fortuna
     ports:
-      - "3001:3001"
+      - "${WEB_PORT:?required}:${WEB_PORT:?required}"
 
   prometheus:
     container_name: prometheus
@@ -138,11 +163,9 @@ services:
   grafana:
     container_name: grafana
     image: grafana/grafana:11.3.1
-    env_file:
-      - ./.env
     environment:
-      GF_SECURITY_ADMIN_USER: ${GF_SECURITY_ADMIN_USER:-admin}
-      GF_SECURITY_ADMIN_PASSWORD: ${GF_SECURITY_ADMIN_PASSWORD:-admin}
+      GF_SECURITY_ADMIN_USER: ${GF_SECURITY_ADMIN_USER:?required}
+      GF_SECURITY_ADMIN_PASSWORD: ${GF_SECURITY_ADMIN_PASSWORD:?required}
       GF_USERS_ALLOW_SIGN_UP: "false"
       GF_AUTH_ANONYMOUS_ENABLED: "false"
     volumes:

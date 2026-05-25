@@ -58,20 +58,24 @@ Scopes (e.g., `feat(api): …`) are encouraged for clarity but don't change beha
 
 ## CI environment variables
 
-Per-app `.env` files are required by every compose service. In CI the values come from GitHub Actions vars/secrets, assembled by a composite action:
+Every compose service reads from a single `.env` at the repo root. Each `environment:` block in `docker-compose*.yaml` interpolates the keys it needs via `${VAR:?required}`, so missing keys fail loudly when compose validates the file.
 
-- `.github/actions/assemble-env/` reads `apps/<app>/.env.example` (or `.env.example` at repo root for `root`) and writes the corresponding `.env`.
-- Required env vars use a prefix scheme: for each `KEY` in `.env.example`, the action reads `${PREFIX}_${KEY}` from the workflow environment.
-  - `apps/web/.env.example` → prefix `WEB_` (e.g. `WEB_PORT`, `WEB_HOST`).
-  - `apps/api/.env.example` → prefix `API_` (e.g. `API_DB_HOST`, `API_DB_PASSWORD`).
-  - Root `.env.example` → prefix `ROOT_` (e.g. `ROOT_POSTGRES_USER`).
-- If any required prefixed var is missing, the action lists every missing variable before exiting non-zero. CI fails loudly rather than silently shipping with blanks.
-- The `migration-check` job uses `ROOT_POSTGRES_*` as the source of truth for database credentials and derives `API_DB_*` from them — there's one credential, not two.
+`.env.example` carries dev-safe defaults for every key, so CI jobs that don't need real secrets can boot the stack with:
+
+```yaml
+- name: Write root .env
+  run: cp .env.example .env
+```
+
+That works for `e2e-tests` (mock-oauth2-server replaces real Google OAuth, ephemeral postgres/redis are happy with the dev creds) and `migration-check` (ephemeral postgres, no real secrets needed). The current PR-check workflow therefore requires zero GitHub-side configuration.
+
+A future real-deployment job would write `.env` from GitHub secrets the same way, just overriding the keys that matter (`POSTGRES_PASSWORD`, `GOOGLE_CLIENT_SECRET`, `GF_SECURITY_ADMIN_PASSWORD`, etc.) — the variable name in GitHub equals the name in `.env` equals the name compose interpolates equals the name the source code reads.
 
 When adding a new env var:
 
-1. Add it to the relevant `.env.example` so it's picked up locally by `scripts/setup-env.sh`.
-2. Add `${PREFIX}_${KEY}` as a GitHub Actions variable or secret, then reference it in the workflow `env:` block.
+1. Add it to `.env.example` with a sensible dev default.
+2. Reference it from the relevant service's `environment:` block in each `docker-compose*.yaml` that needs it via `${VAR:?required}`.
+3. For real secrets in real deployments, override in the deployment's `.env`.
 
 ## Auxiliary Docker base images
 

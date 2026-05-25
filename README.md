@@ -9,7 +9,7 @@ A personal finance app for tracking spending, net worth, investments, and financ
 Docker is the only host requirement.
 
 ```bash
-./scripts/setup-env.sh        # copy every .env.example to .env
+./scripts/setup-env.sh        # copies .env.example to .env (use -f to overwrite)
 docker compose up -d          # postgres, migrations, api, web
 ```
 
