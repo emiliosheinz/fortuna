@@ -56,26 +56,27 @@ Scopes (e.g., `feat(api): …`) are encouraged for clarity but don't change beha
 - Tags: `{projectName}@{version}` (for example `api@1.4.0`, `web@0.3.0`, `@fortuna/config@0.2.1`).
 - GitHub releases are created per project with rendered changelogs that include authors and commit references.
 
-## CI environment variables
+## Environment variables
 
-Every compose service reads from a single `.env` at the repo root. Each `environment:` block in `docker-compose*.yaml` interpolates the keys it needs via `${VAR:?required}`, so missing keys fail loudly when compose validates the file.
+Three contexts, three sources of truth — kept deliberately separate so changes to one don't silently leak into the others.
 
-`.env.example` carries dev-safe defaults for every key, so CI jobs that don't need real secrets can boot the stack with:
+| Context | Source of truth | How values are supplied |
+|---------|-----------------|--------------------------|
+| Dev (local) | `.env` (gitignored) | `scripts/setup-env.sh` copies `.env.example` once; you edit the secrets you need (Google OAuth client, etc.). Every dev compose service reads it via `${VAR:?required}`. |
+| CI (`e2e-tests`) | `docker-compose.e2e.yaml` itself | All values pinned inline as fixtures (`fortuna_e2e`, `e2e-fixed-postgres-password`, `e2e-client-id`, mock-oauth2-server URLs). `.env` is never consulted. `bin/fortuna e2e` runs against any clone with zero setup. |
+| CI (`migration-check`) | The workflow step's `env:` block | Distinctive fixtures (`fortuna_ci`, `ci-fixed-postgres-password`) live on the `Run migrations` step. Docker Compose interpolates them from the process environment, no `.env` file written. |
 
-```yaml
-- name: Write root .env
-  run: cp .env.example .env
-```
+The rule of thumb: **CI never borrows from `.env.example`.** Dev defaults are dev's concern; if they change, CI must not silently pick them up. Each CI job declares exactly the fixture values it depends on, distinctively named so logs make the context obvious.
 
-That works for `e2e-tests` (mock-oauth2-server replaces real Google OAuth, ephemeral postgres/redis are happy with the dev creds) and `migration-check` (ephemeral postgres, no real secrets needed). The current PR-check workflow therefore requires zero GitHub-side configuration.
-
-A future real-deployment job would write `.env` from GitHub secrets the same way, just overriding the keys that matter (`POSTGRES_PASSWORD`, `GOOGLE_CLIENT_SECRET`, `GF_SECURITY_ADMIN_PASSWORD`, etc.) — the variable name in GitHub equals the name in `.env` equals the name compose interpolates equals the name the source code reads.
+A future real-deployment job would write `.env` from GitHub secrets — the variable name in GitHub equals the name in `.env` equals the name compose interpolates equals the name the source code reads.
 
 When adding a new env var:
 
 1. Add it to `.env.example` with a sensible dev default.
-2. Reference it from the relevant service's `environment:` block in each `docker-compose*.yaml` that needs it via `${VAR:?required}`.
-3. For real secrets in real deployments, override in the deployment's `.env`.
+2. Reference it from the relevant service's `environment:` block in `docker-compose.yaml` / `docker-compose.prod.yaml` via `${VAR:?required}`.
+3. If e2e exercises that code path, pin a fixture value inline in `docker-compose.e2e.yaml`.
+4. If `migration-check` (or any other CI job) exercises it, add a fixture value to that job's `env:` block in the workflow.
+5. For real secrets in real deployments, override in the deployment's `.env`.
 
 ## Auxiliary Docker base images
 

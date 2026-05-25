@@ -139,12 +139,18 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # .env.example defaults are CI-safe: the ephemeral postgres container
-      # only needs the dev defaults to validate migrations against.
-      - name: Write root .env
-        run: ./scripts/setup-env.sh
-
+      # Explicit CI fixtures, not borrowed from .env.example. Docker Compose
+      # reads ${VAR} interpolation from the process environment, so no .env
+      # file is needed. Distinctive values (fortuna_ci, ci-fixed-*) make CI
+      # state obvious in logs and prevent dev/CI drift.
       - name: Run migrations
+        env:
+          POSTGRES_HOST: postgres
+          POSTGRES_PORT: "5432"
+          POSTGRES_SSL: "false"
+          POSTGRES_DB: fortuna_ci
+          POSTGRES_USER: fortuna_ci
+          POSTGRES_PASSWORD: ci-fixed-postgres-password
         run: docker compose -f docker-compose.prod.yaml run --rm migration
 
       - name: Teardown
