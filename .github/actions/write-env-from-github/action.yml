@@ -3,10 +3,10 @@ description: "Materializes every var and secret in the caller's scope into a roo
 
 inputs:
   vars:
-    description: "JSON-encoded vars object — pass `${{ toJSON(vars) }}`"
+    description: "JSON-encoded vars object. The caller must pass toJSON(vars)."
     required: true
   secrets:
-    description: "JSON-encoded secrets object — pass `${{ toJSON(secrets) }}`"
+    description: "JSON-encoded secrets object. The caller must pass toJSON(secrets)."
     required: true
 
 runs:
