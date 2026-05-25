@@ -17,9 +17,17 @@ runs:
         VARS_JSON: ${{ inputs.vars }}
         SECRETS_JSON: ${{ inputs.secrets }}
       run: |
+        # toJSON(vars) and toJSON(secrets) include every entry the workflow
+        # has access to (repo-level + env-level merged). Repo-level entries
+        # like SSH keys contain newlines that break the .env line format,
+        # so we skip any value that can't fit on a single line.
+        filter='to_entries[]
+          | select(.value | type == "string")
+          | select(.value | test("[\r\n]") | not)
+          | "\(.key)=\(.value)"'
         {
-          jq -r 'to_entries[] | "\(.key)=\(.value)"' <<< "$VARS_JSON"
-          jq -r 'to_entries[] | "\(.key)=\(.value)"' <<< "$SECRETS_JSON"
+          jq -r "$filter" <<< "$VARS_JSON"
+          jq -r "$filter" <<< "$SECRETS_JSON"
         } > .env
 
 branding:
