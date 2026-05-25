@@ -22,9 +22,9 @@
     "test:integration": "jest --config ./test/jest-integration.json",
     "docker:build": "docker build -f Dockerfile --target prod -t emiliosheinz/fortuna-api:latest $(git rev-parse --show-toplevel)",
     "migration:generate": "scripts/generate-migration.sh",
-    "migration:run": "tsx node_modules/typeorm/cli.js migration:run -d src/database/connection.ts",
-    "migration:revert": "tsx node_modules/typeorm/cli.js migration:revert -d src/database/connection.ts",
-    "migration:show": "tsx node_modules/typeorm/cli.js migration:show -d src/database/connection.ts"
+    "migration:run": "tsx -r tsconfig-paths/register node_modules/typeorm/cli.js migration:run -d src/database/connection.ts",
+    "migration:revert": "tsx -r tsconfig-paths/register node_modules/typeorm/cli.js migration:revert -d src/database/connection.ts",
+    "migration:show": "tsx -r tsconfig-paths/register node_modules/typeorm/cli.js migration:show -d src/database/connection.ts"
   },
   "dependencies": {
     "@fortuna/config": "workspace:*",
