@@ -1,5 +1,5 @@
 name: "Write .env from GitHub Environment"
-description: "Materializes every var and secret in the caller's scope into a root .env file via toJSON + jq. Adding entries to the GitHub Environment is enough — no workflow change needed."
+description: "Materializes the caller's GitHub vars/secrets into a root .env file. Only keys declared in .env.example are emitted, so repo-level secrets the workflow happens to have access to (SSH keys, npm tokens, etc.) cannot leak into .env."
 
 inputs:
   vars:
@@ -8,6 +8,10 @@ inputs:
   secrets:
     description: "JSON-encoded secrets object. The caller must pass toJSON(secrets)."
     required: true
+  example-file:
+    description: "Path to the .env.example file used as the key whitelist."
+    required: false
+    default: ".env.example"
 
 runs:
   using: "composite"
@@ -16,18 +20,27 @@ runs:
       env:
         VARS_JSON: ${{ inputs.vars }}
         SECRETS_JSON: ${{ inputs.secrets }}
+        EXAMPLE_FILE: ${{ inputs.example-file }}
       run: |
-        # toJSON(vars) and toJSON(secrets) include every entry the workflow
-        # has access to (repo-level + env-level merged). Repo-level entries
-        # like SSH keys contain newlines that break the .env line format,
-        # so we skip any value that can't fit on a single line.
-        filter='to_entries[]
+        if [ ! -f "$EXAMPLE_FILE" ]; then
+          echo "::error::$EXAMPLE_FILE not found" >&2
+          exit 1
+        fi
+
+        # Extract the allowed keys from .env.example. Lines matching
+        # ^KEY= become the whitelist; comments and blank lines are
+        # skipped naturally.
+        allowed=$(grep -oE '^[A-Z_][A-Z0-9_]*=' "$EXAMPLE_FILE" | sed 's/=$//' | jq -R . | jq -s .)
+
+        filter='
+          to_entries[]
           | select(.value | type == "string")
-          | select(.value | test("[\r\n]") | not)
-          | "\(.key)=\(.value)"'
+          | select(.key as $k | $allowed | any(. == $k))
+          | "\(.key)=\(.value)"
+        '
         {
-          jq -r "$filter" <<< "$VARS_JSON"
-          jq -r "$filter" <<< "$SECRETS_JSON"
+          jq -r --argjson allowed "$allowed" "$filter" <<< "$VARS_JSON"
+          jq -r --argjson allowed "$allowed" "$filter" <<< "$SECRETS_JSON"
         } > .env
 
 branding:
