@@ -1,0 +1,27 @@
+name: "Write .env from GitHub Environment"
+description: "Materializes every var and secret in the caller's scope into a root .env file via toJSON + jq. Adding entries to the GitHub Environment is enough — no workflow change needed."
+
+inputs:
+  vars:
+    description: "JSON-encoded vars object — pass `${{ toJSON(vars) }}`"
+    required: true
+  secrets:
+    description: "JSON-encoded secrets object — pass `${{ toJSON(secrets) }}`"
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - shell: bash
+      env:
+        VARS_JSON: ${{ inputs.vars }}
+        SECRETS_JSON: ${{ inputs.secrets }}
+      run: |
+        {
+          jq -r 'to_entries[] | "\(.key)=\(.value)"' <<< "$VARS_JSON"
+          jq -r 'to_entries[] | "\(.key)=\(.value)"' <<< "$SECRETS_JSON"
+        } > .env
+
+branding:
+  icon: download
+  color: gray-dark

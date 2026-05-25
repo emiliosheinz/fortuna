@@ -126,6 +126,13 @@ jobs:
   migration-check:
     name: Migration Check
     runs-on: ubuntu-latest
+    # Pulls every env value from the `ci` GitHub Environment. Docker Compose
+    # validates the entire prod compose file at parse time, so every
+    # ${VAR:?required} reference must resolve — vars live in GitHub repo
+    # settings, not in any file in the repo.
+    environment:
+      name: ci
+      deployment: false
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
@@ -133,18 +140,13 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # Explicit CI fixtures, not borrowed from .env.example. Docker Compose
-      # reads ${VAR} interpolation from the process environment, so no .env
-      # file is needed. Distinctive values (fortuna_ci, ci-fixed-*) make CI
-      # state obvious in logs and prevent dev/CI drift.
+      - name: Write .env from ci environment
+        uses: ./.github/actions/write-env-from-github
+        with:
+          vars: ${{ toJSON(vars) }}
+          secrets: ${{ toJSON(secrets) }}
+
       - name: Run migrations
-        env:
-          POSTGRES_HOST: postgres
-          POSTGRES_PORT: "5432"
-          POSTGRES_SSL: "false"
-          POSTGRES_DB: fortuna_ci
-          POSTGRES_USER: fortuna_ci
-          POSTGRES_PASSWORD: ci-fixed-postgres-password
         run: docker compose -f docker-compose.prod.yaml run --rm migration
 
       - name: Teardown
