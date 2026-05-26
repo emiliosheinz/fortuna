@@ -15,7 +15,13 @@ fi
 case "${1:-}" in
   db)
     shift
-    docker compose run --rm migration pnpm --filter api run "$@"
+    task="${1:-}"
+    if [ -z "$task" ]; then
+      echo "Usage: bin/fortuna db <task> [args...]" >&2
+      exit 1
+    fi
+    shift
+    docker compose run --rm migration pnpm turbo "$task" --filter=api -- "$@"
     ;;
   e2e)
     shift

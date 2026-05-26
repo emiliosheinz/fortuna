@@ -65,7 +65,7 @@ services:
       context: .
       target: dev
       dockerfile: apps/api/Dockerfile
-    command: ["pnpm", "--filter", "api", "run", "migration:run"]
+    command: ["pnpm", "turbo", "migration:run", "--filter=api"]
     environment:
       POSTGRES_HOST: ${POSTGRES_HOST:?required}
       POSTGRES_PORT: ${POSTGRES_PORT:?required}
