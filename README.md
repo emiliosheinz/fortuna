@@ -4,6 +4,8 @@
 
 A personal finance app for tracking spending, net worth, investments, and financial goals — built to give an honest picture of money over time.
 
+> **Heads up:** Fortuna is also a personal experiment in agentic coding. I'm using it as a playground to push my own ideas and see how far AI-assisted development can go on a real, end-to-end project. Expect choices that prioritize that experiment alongside the product itself.
+
 ## Quick start
 
 Docker is the only host requirement.
