@@ -1,15 +1,41 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Pass -it only when stdin is a terminal. Engineers running from iTerm
+# get the interactive shell; non-interactive callers (CI, Claude Code,
+# scripts piping through this) still execute inside the workspace
+# container but without requesting a TTY, which would otherwise fail
+# with "the input device is not a TTY".
+if [ -t 0 ]; then
+  docker_tty_flag="-it"
+else
+  docker_tty_flag=""
+fi
+
 case "${1:-}" in
   db)
     shift
-    docker compose run --rm migration pnpm --filter api run "$@"
+    task="${1:-}"
+    if [ -z "$task" ]; then
+      echo "Usage: bin/fortuna db <task> [args...]" >&2
+      exit 1
+    fi
+    shift
+    docker compose run --rm migration pnpm turbo "$task" --filter=api -- "$@"
+    ;;
+  e2e)
+    shift
+    if [ $# -eq 0 ]; then
+      trap 'docker compose -f docker-compose.e2e.yaml down' EXIT
+      docker compose -f docker-compose.e2e.yaml run --rm web-e2e
+    else
+      docker compose -f docker-compose.e2e.yaml "$@"
+    fi
     ;;
   "")
-    docker exec -it workspace sh
+    docker exec ${docker_tty_flag} workspace sh
     ;;
   *)
-    docker exec -it workspace "$@"
+    docker exec ${docker_tty_flag} workspace "$@"
     ;;
 esac

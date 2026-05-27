@@ -1,0 +1,14 @@
+global:
+  scrape_interval: 30s
+  scrape_timeout: 10s
+  evaluation_interval: 30s
+
+rule_files:
+  - /etc/prometheus/rules/*.yml
+
+scrape_configs:
+  - job_name: fortuna-api
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - api:3000

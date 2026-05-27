@@ -6,7 +6,12 @@ if (!process.env.E2E_APP_BASE_URL) {
 
 export default defineConfig({
   testDir: "./e2e-tests",
-  fullyParallel: true,
+  // Single shared mock-oauth2 identity + a destructive account-deletion
+  // test mean parallel workers can wipe sessions another worker depends on.
+  // Run tests serially within a project until per-test identity isolation
+  // lands.
+  fullyParallel: false,
+  workers: 1,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   reporter: "list",

@@ -5,7 +5,7 @@ Fortuna's entire development environment runs in Docker. The only host requireme
 ## First-time setup
 
 ```bash
-# Copy every .env.example to a matching .env (root + each app).
+# Single env file at the repo root — every compose service reads from it.
 ./scripts/setup-env.sh
 
 # Bring up Postgres, the workspace shell, the API, the web app, and run migrations.
@@ -54,21 +54,25 @@ bin/fortuna pnpm turbo test --affected       # all affected workspaces
 bin/fortuna pnpm turbo test --filter=api     # one workspace
 ```
 
-End-to-end tests are not started by `docker compose up`. Each app has its own e2e service under the `e2e` compose profile, which boots the dependencies it needs and then exits with the test result:
+End-to-end tests live in their own Compose project (`docker-compose.e2e.yaml`, project name `fortuna-e2e`) so they run safely alongside the dev stack — networks, volumes, and the `apps/web/.next` build cache are isolated. `bin/fortuna e2e` boots the dependencies, runs Playwright, and tears the project down:
 
 ```bash
-docker compose --profile e2e up --exit-code-from web-e2e web-e2e
+bin/fortuna e2e                              # full run + teardown
+bin/fortuna e2e logs web                     # ad-hoc compose against the e2e project
+bin/fortuna e2e down                         # manual teardown
 ```
 
 The Playwright runner uses a prebuilt base image (`ghcr.io/emiliosheinz/fortuna-playwright`) so browsers do not reinstall on every run. See [`apps/web/README.md`](../apps/web/README.md) for what the test suite covers.
 
 ## Production parity
 
-`docker-compose.prod.yaml` runs the same services with the `prod` Docker target instead of `dev`. CI uses this file for e2e and migration verification. Locally, it's the easiest way to reproduce a CI failure:
+`docker-compose.prod.yaml` runs the same services with the `prod` Docker target instead of `dev`. CI uses this file for migration verification and as the prod-target baseline. Locally, it's the easiest way to reproduce a CI failure:
 
 ```bash
-docker compose -f docker-compose.prod.yaml --profile e2e up --exit-code-from web-e2e web-e2e
+docker compose -f docker-compose.prod.yaml up -d
 ```
+
+E2E coverage against the prod target lives in `docker-compose.e2e.yaml` (driven by `bin/fortuna e2e`); it builds the same `prod` Docker target as `docker-compose.prod.yaml`.
 
 ## Running on the host (optional)
 

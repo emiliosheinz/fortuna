@@ -56,22 +56,51 @@ Scopes (e.g., `feat(api): …`) are encouraged for clarity but don't change beha
 - Tags: `{projectName}@{version}` (for example `api@1.4.0`, `web@0.3.0`, `@fortuna/config@0.2.1`).
 - GitHub releases are created per project with rendered changelogs that include authors and commit references.
 
-## CI environment variables
+## Environment variables
 
-Per-app `.env` files are required by every compose service. In CI the values come from GitHub Actions vars/secrets, assembled by a composite action:
+Three contexts, three sources of truth — kept deliberately separate so changes to one don't silently leak into the others.
 
-- `.github/actions/assemble-env/` reads `apps/<app>/.env.example` (or `.env.example` at repo root for `root`) and writes the corresponding `.env`.
-- Required env vars use a prefix scheme: for each `KEY` in `.env.example`, the action reads `${PREFIX}_${KEY}` from the workflow environment.
-  - `apps/web/.env.example` → prefix `WEB_` (e.g. `WEB_PORT`, `WEB_HOST`).
-  - `apps/api/.env.example` → prefix `API_` (e.g. `API_DB_HOST`, `API_DB_PASSWORD`).
-  - Root `.env.example` → prefix `ROOT_` (e.g. `ROOT_POSTGRES_USER`).
-- If any required prefixed var is missing, the action lists every missing variable before exiting non-zero. CI fails loudly rather than silently shipping with blanks.
-- The `migration-check` job uses `ROOT_POSTGRES_*` as the source of truth for database credentials and derives `API_DB_*` from them — there's one credential, not two.
+| Context | Source of truth | How values are supplied |
+|---------|-----------------|--------------------------|
+| Dev (local) | `.env` (gitignored) | `scripts/setup-env.sh` copies `.env.example` once; you edit the secrets you need (Google OAuth client, etc.). Every dev compose service reads it via `${VAR:?required}`. |
+| CI (`e2e-tests`) | `docker-compose.e2e.yaml` itself | All values pinned inline as fixtures (`fortuna_e2e`, `e2e-fixed-postgres-password`, `e2e-client-id`, mock-oauth2-server URLs). `.env` is never consulted. `bin/fortuna e2e` runs against any clone with zero setup. |
+| CI (`migration-check`) | The `ci` GitHub Environment | Every value `docker-compose.prod.yaml` interpolates lives as a `vars.*` (non-sensitive) or `secrets.*` (password-like) entry under the repo's `ci` Environment. The workflow uses the [`write-env-from-github`](../.github/actions/write-env-from-github/action.yml) composite action, which takes `toJSON(vars)` + `toJSON(secrets)`, **filters them through `.env.example` as a whitelist**, and writes the surviving entries to a root `.env`. Repo-level secrets like `DEPLOY_SSH_KEY` or `NPM_ACCESS_TOKEN` are silently dropped because they don't appear in `.env.example`. Compose validates the full prod file at parse time, so the whitelist must include every key prod compose interpolates (postgres, redis, api, web, grafana, OIDC) even though migration only uses the DB ones — `.env.example` is the single source of truth. |
+
+The rule of thumb: **CI never borrows from `.env.example`.** Dev defaults are dev's concern; if they change, CI must not silently pick them up. E2E pins fixtures in its compose file (so `bin/fortuna e2e` runs anywhere). Migration-check pulls from the `ci` GitHub Environment (so values live in repo settings, reviewable in the GitHub UI, changeable without a PR).
+
+The `ci` GitHub Environment must contain these entries:
+
+| Type    | Key                       | Suggested CI value                                  |
+|---------|---------------------------|------------------------------------------------------|
+| var     | `POSTGRES_HOST`           | `postgres`                                           |
+| var     | `POSTGRES_PORT`           | `5432`                                               |
+| var     | `POSTGRES_SSL`            | `false`                                              |
+| var     | `POSTGRES_DB`             | `fortuna_ci`                                         |
+| var     | `POSTGRES_USER`           | `fortuna_ci`                                         |
+| secret  | `POSTGRES_PASSWORD`       | any fixed string                                     |
+| var     | `REDIS_HOST`              | `redis`                                              |
+| var     | `REDIS_PORT`              | `6379`                                               |
+| secret  | `REDIS_PASSWORD`          | any fixed string                                     |
+| var     | `API_PORT`                | `3000`                                               |
+| var     | `API_HOST`                | `0.0.0.0`                                            |
+| var     | `API_BASE_URL`            | `http://api:3000`                                    |
+| var     | `WEB_PORT`                | `3001`                                               |
+| var     | `WEB_HOST`                | `0.0.0.0`                                            |
+| var     | `OIDC_ISSUER_URL`         | `https://accounts.google.com` (or any URL)          |
+| var     | `GOOGLE_CLIENT_ID`        | any fixture string                                   |
+| secret  | `GOOGLE_CLIENT_SECRET`    | any fixture string                                   |
+| var     | `GOOGLE_REDIRECT_URI`     | `http://localhost:3001/api/auth/callback/google`     |
+| var     | `GRAFANA_PORT`            | `3002`                                               |
+| var     | `GRAFANA_ADMIN_USER`      | `admin`                                              |
+| secret  | `GRAFANA_ADMIN_PASSWORD`  | any fixed string                                     |
 
 When adding a new env var:
 
-1. Add it to the relevant `.env.example` so it's picked up locally by `scripts/setup-env.sh`.
-2. Add `${PREFIX}_${KEY}` as a GitHub Actions variable or secret, then reference it in the workflow `env:` block.
+1. Add it to `.env.example` with a sensible dev default.
+2. Reference it from the relevant service's `environment:` block in `docker-compose.yaml` / `docker-compose.prod.yaml` via `${VAR:?required}`.
+3. If e2e exercises that code path, pin a fixture value inline in `docker-compose.e2e.yaml`.
+4. If `migration-check` (or any future job using the prod compose) needs it, add a `vars.*` or `secrets.*` entry to the `ci` GitHub Environment and plumb it onto the workflow step's `env:` block.
+5. For real secrets in real deployments, override in the deployment's `.env`.
 
 ## Auxiliary Docker base images
 

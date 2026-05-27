@@ -2,8 +2,10 @@ services:
   postgres:
     container_name: postgres
     image: postgres:17-alpine
-    env_file:
-      - ./.env
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?required}
+      POSTGRES_USER: ${POSTGRES_USER:?required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?required}
     volumes:
       - db-data:/var/lib/postgresql/data
     healthcheck:
@@ -14,19 +16,50 @@ services:
       start_period: 10s
     restart: unless-stopped
 
+  redis:
+    container_name: redis
+    image: redis:7-alpine
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?required}
+    command:
+      - sh
+      - -c
+      - exec redis-server --requirepass "$$REDIS_PASSWORD" --appendonly no
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" ping | grep -q PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+    restart: unless-stopped
+
   api:
     container_name: api
     build:
       context: .
       target: prod
       dockerfile: apps/api/Dockerfile
-    env_file:
-      - ./apps/api/.env
+    environment:
+      PORT: ${API_PORT:?required}
+      HOST: ${API_HOST:?required}
+      POSTGRES_HOST: ${POSTGRES_HOST:?required}
+      POSTGRES_PORT: ${POSTGRES_PORT:?required}
+      POSTGRES_SSL: ${POSTGRES_SSL:?required}
+      POSTGRES_DB: ${POSTGRES_DB:?required}
+      POSTGRES_USER: ${POSTGRES_USER:?required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?required}
+      REDIS_HOST: ${REDIS_HOST:?required}
+      REDIS_PORT: ${REDIS_PORT:?required}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?required}
+      OIDC_ISSUER_URL: ${OIDC_ISSUER_URL:?required}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:?required}
     depends_on:
       migration:
         condition: service_completed_successfully
+      redis:
+        condition: service_healthy
     ports:
-      - "3000:3000"
+      - "${API_PORT:?required}:${API_PORT:?required}"
 
   web:
     container_name: web
@@ -34,8 +67,14 @@ services:
       context: .
       target: prod
       dockerfile: apps/web/Dockerfile
-    env_file:
-      - ./apps/web/.env
+    environment:
+      PORT: ${WEB_PORT:?required}
+      HOST: ${WEB_HOST:?required}
+      API_BASE_URL: ${API_BASE_URL:?required}
+      OIDC_ISSUER_URL: ${OIDC_ISSUER_URL:?required}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:?required}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:?required}
+      GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:?required}
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://$${HOSTNAME}:$${PORT}/health || exit 1"]
       start_period: 10s
@@ -43,7 +82,7 @@ services:
       timeout: 3s
       retries: 10
     ports:
-      - "3001:3001"
+      - "${WEB_PORT:?required}:${WEB_PORT:?required}"
 
   migration:
     container_name: migration
@@ -52,27 +91,54 @@ services:
       target: prod
       dockerfile: apps/api/Dockerfile
     command: ["node", "node_modules/typeorm/cli.js", "migration:run", "-d", "dist/database/connection.js"]
-    env_file:
-      - ./apps/api/.env
+    environment:
+      POSTGRES_HOST: ${POSTGRES_HOST:?required}
+      POSTGRES_PORT: ${POSTGRES_PORT:?required}
+      POSTGRES_SSL: ${POSTGRES_SSL:?required}
+      POSTGRES_DB: ${POSTGRES_DB:?required}
+      POSTGRES_USER: ${POSTGRES_USER:?required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?required}
     depends_on:
       postgres:
         condition: service_healthy
     restart: "no"
 
-  web-e2e:
-    container_name: web-e2e
-    profiles: ["e2e"]
-    environment:
-      CI: "true"
-    build:
-      context: .
-      target: prod
-      dockerfile: apps/web/Dockerfile.e2e
-    env_file:
-      - ./apps/web/.env
+  # Scrapes apps/api at /metrics over the private `fortuna` network.
+  # No ports: published — the dashboard reaches Prometheus through Grafana
+  # (which IS port-published) so the scrape endpoint stays internal.
+  prometheus:
+    container_name: prometheus
+    image: prom/prometheus:v2.55.1
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=30d
+      - --web.enable-lifecycle
+    volumes:
+      - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./docker/prometheus/rules:/etc/prometheus/rules:ro
+      - prometheus-data:/prometheus
     depends_on:
-      web:
-        condition: service_healthy
+      - api
+    restart: unless-stopped
+
+  grafana:
+    container_name: grafana
+    image: grafana/grafana:11.3.1
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:?required}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?required}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+    volumes:
+      - ./docker/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./docker/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    ports:
+      - "${GRAFANA_PORT:?required}:3000"
+    restart: unless-stopped
 
 networks:
   default:
@@ -81,3 +147,5 @@ networks:
 
 volumes:
   db-data:
+  prometheus-data:
+  grafana-data:

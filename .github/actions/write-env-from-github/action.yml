@@ -1,0 +1,48 @@
+name: "Write .env from GitHub Environment"
+description: "Materializes the caller's GitHub vars/secrets into a root .env file. Only keys declared in .env.example are emitted, so repo-level secrets the workflow happens to have access to (SSH keys, npm tokens, etc.) cannot leak into .env."
+
+inputs:
+  vars:
+    description: "JSON-encoded vars object. The caller must pass toJSON(vars)."
+    required: true
+  secrets:
+    description: "JSON-encoded secrets object. The caller must pass toJSON(secrets)."
+    required: true
+  example-file:
+    description: "Path to the .env.example file used as the key whitelist."
+    required: false
+    default: ".env.example"
+
+runs:
+  using: "composite"
+  steps:
+    - shell: bash
+      env:
+        VARS_JSON: ${{ inputs.vars }}
+        SECRETS_JSON: ${{ inputs.secrets }}
+        EXAMPLE_FILE: ${{ inputs.example-file }}
+      run: |
+        if [ ! -f "$EXAMPLE_FILE" ]; then
+          echo "::error::$EXAMPLE_FILE not found" >&2
+          exit 1
+        fi
+
+        # Extract the allowed keys from .env.example. Lines matching
+        # ^KEY= become the whitelist; comments and blank lines are
+        # skipped naturally.
+        allowed=$(grep -oE '^[A-Z_][A-Z0-9_]*=' "$EXAMPLE_FILE" | sed 's/=$//' | jq -R . | jq -s .)
+
+        filter='
+          to_entries[]
+          | select(.value | type == "string")
+          | select(.key as $k | $allowed | any(. == $k))
+          | "\(.key)=\(.value)"
+        '
+        {
+          jq -r --argjson allowed "$allowed" "$filter" <<< "$VARS_JSON"
+          jq -r --argjson allowed "$allowed" "$filter" <<< "$SECRETS_JSON"
+        } > .env
+
+branding:
+  icon: download
+  color: gray-dark
