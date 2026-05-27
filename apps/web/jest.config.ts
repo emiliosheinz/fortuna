@@ -12,6 +12,11 @@ const config: Config = {
     ...(baseConfig.testPathIgnorePatterns ?? []),
     "/e2e-tests/",
   ],
+  moduleNameMapper: {
+    ...(baseConfig.moduleNameMapper ?? {}),
+    "^react-markdown$": "<rootDir>/src/test-utils/react-markdown-mock.tsx",
+    "^remark-gfm$": "<rootDir>/src/test-utils/remark-gfm-mock.ts",
+  },
 };
 
 export default createJestConfig(config);
