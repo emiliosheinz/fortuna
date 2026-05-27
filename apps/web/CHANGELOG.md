@@ -1,3 +1,17 @@
+## 0.4.0 (2026-05-27)
+
+### 🚀 Features
+
+- **web:** add terms of service and privacy policy pages ([#7](https://github.com/emiliosheinz/fortuna/pull/7))
+
+### 🧱 Updated Dependencies
+
+- Updated @fortuna/config to 0.3.1
+
+### ❤️ Thank You
+
+- Emilio Heinzmann @emiliosheinz
+
 ## 0.3.0 (2026-05-27)
 
 ### 🚀 Features
