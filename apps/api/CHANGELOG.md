@@ -1,3 +1,17 @@
+## 0.4.0 (2026-05-27)
+
+### 🚀 Features
+
+- authentication, observability and environmental improvements ([#5](https://github.com/emiliosheinz/fortuna/pull/5))
+
+### 🧱 Updated Dependencies
+
+- Updated @fortuna/config to 0.3.0
+
+### ❤️ Thank You
+
+- Emilio Heinzmann @emiliosheinz
+
 ## 0.3.0 (2026-05-15)
 
 ### 🚀 Features
