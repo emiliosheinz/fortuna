@@ -35,6 +35,7 @@ bin/fortuna   Helper that runs commands inside the workspace container
 
 | If you want to                               | See                                              |
 |----------------------------------------------|--------------------------------------------------|
+| Understand the product vision and strategy   | [`docs/product-vision.md`](./docs/product-vision.md) |
 | Run commands, tests, e2e, or migrations      | [`docs/development.md`](./docs/development.md)   |
 | Understand the release and publish pipeline  | [`docs/release.md`](./docs/release.md)           |
 | Read the rationale behind a technical choice | [`docs/architecture/decisions/`](./docs/architecture/decisions/) |
