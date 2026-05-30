@@ -4,7 +4,7 @@
 
 > Fortuna is the Roman goddess of fortune: chance, prosperity, and the turning of the wheel. This app is a small attempt to make that wheel a little less random by trading guesswork about money for an honest, forward-looking picture you can actually plan around.
 
-This document is the North Star for Fortuna. It explains what the product is for, who it serves, and where it's going. It's intentionally high level. 
+This document is the North Star for Fortuna. It explains what the product is for, who it serves, and where it's going. It's intentionally high-level.
 
 ---
 
