@@ -79,9 +79,8 @@ function AuthGuardSkeleton() {
           <Skeleton className="size-8 rounded-full" />
         </div>
       </header>
-      <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 p-8">
+      <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 px-4 py-8 sm:px-6">
         <Skeleton className="h-7 w-1/2" />
-        <Skeleton className="h-4 w-3/4" />
         <div className="flex flex-col gap-3">
           <Skeleton className="h-16 w-full" />
           <Skeleton className="h-16 w-full" />
