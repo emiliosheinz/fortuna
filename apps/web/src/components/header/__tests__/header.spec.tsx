@@ -16,14 +16,13 @@ const me: CurrentUser = {
 };
 
 describe("Header", () => {
-  it("renders the Fortuna logo and wordmark linking back to /", () => {
+  it("renders the Fortuna wordmark linking back to /", () => {
     render(<Header me={me} />);
 
     const banner = screen.getByRole("banner");
-    const homeLink = within(banner).getByRole("link", { name: /fortuna/i });
+    const homeLink = within(banner).getByRole("link", { name: "Fortuna" });
     expect(homeLink).toHaveAttribute("href", "/");
-    expect(within(homeLink).getByAltText(/fortuna/i)).toBeInTheDocument();
-    expect(within(banner).getByText("Fortuna")).toBeInTheDocument();
+    expect(within(banner).queryByRole("img")).not.toBeInTheDocument();
   });
 
   it("renders the avatar menu with the current user", () => {
