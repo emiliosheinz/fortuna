@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { UserAvatar } from "../user-avatar";
 
 describe("UserAvatar", () => {
@@ -47,6 +47,17 @@ describe("UserAvatar", () => {
   it("trims surrounding whitespace before deriving initials", () => {
     render(<UserAvatar name="  Ada   Lovelace  " avatarUrl={null} />);
 
+    expect(screen.getByTestId("user-avatar-initials")).toHaveTextContent("AL");
+  });
+
+  it("falls back to initials when the avatar image fails to load", () => {
+    render(
+      <UserAvatar name="Ada Lovelace" avatarUrl="https://cdn/blocked.jpg" />,
+    );
+
+    fireEvent.error(screen.getByRole("img", { name: /ada lovelace/i }));
+
+    expect(screen.queryByRole("img")).not.toBeInTheDocument();
     expect(screen.getByTestId("user-avatar-initials")).toHaveTextContent("AL");
   });
 });
