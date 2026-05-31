@@ -2,7 +2,8 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { SESSIONS_QUERY_KEY, sessionsApi } from "@/lib/sessions/api-client";
+import { sessionsApi } from "@/lib/sessions/api-client";
+import { SESSIONS_QUERY_KEY } from "@/lib/sessions/query-keys";
 
 const dateFormatter = new Intl.DateTimeFormat("en-US", {
   dateStyle: "medium",

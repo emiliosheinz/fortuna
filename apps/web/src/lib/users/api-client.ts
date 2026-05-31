@@ -7,8 +7,6 @@ export interface CurrentUser {
   avatarUrl: string | null;
 }
 
-export const USER_QUERY_KEY = ["users", "me"] as const;
-
 export const usersApi = {
   getMe: () => apiClient.get<CurrentUser>("/api/users/me"),
   deleteAccount: () =>

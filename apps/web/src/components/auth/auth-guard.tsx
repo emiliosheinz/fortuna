@@ -3,11 +3,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { createContext, useContext } from "react";
 import { Button } from "@/components/ui/button";
-import {
-  type CurrentUser,
-  USER_QUERY_KEY,
-  usersApi,
-} from "@/lib/users/api-client";
+import { type CurrentUser, usersApi } from "@/lib/users/api-client";
+import { USER_QUERY_KEY } from "@/lib/users/query-keys";
 
 interface AuthContextValue {
   me: CurrentUser;

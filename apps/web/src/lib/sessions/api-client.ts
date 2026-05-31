@@ -7,8 +7,6 @@ export interface SessionListItem {
   isCurrent: boolean;
 }
 
-export const SESSIONS_QUERY_KEY = ["sessions", "list"] as const;
-
 export const sessionsApi = {
   list: () => apiClient.get<SessionListItem[]>("/api/users/me/sessions"),
   revoke: (sessionId: string) =>
