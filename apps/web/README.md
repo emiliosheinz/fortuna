@@ -8,6 +8,14 @@ For day-to-day workflow (Docker, `bin/fortuna`, tests), see the top-level [devel
 
 This app does not connect to the database. All data flows through the API over HTTP — see [`apps/api/README.md`](../api/README.md) for the contract side.
 
+## Route groups
+
+Routes under [`src/app/`](./src/app/) are organized by who can access them. Route groups (parentheses) do not affect URLs; their layouts enforce the access rule.
+
+- `(authenticated)/`: only accessible to signed-in users. The layout wraps children in [`AuthGuard`](./src/components/auth/auth-guard.tsx), which validates the session via `/api/users/me` and exposes the current user through `useAuth()`.
+- `(unauthenticated)/`: only accessible to signed-out users. The layout reads the session cookie via `next/headers` and `redirect("/")` if present.
+- Everything else (e.g. `/privacy`, `/terms`): always accessible.
+
 ## Components
 
 Components live in [`src/components/`](./src/components/) and are managed by [shadcn/ui](https://ui.shadcn.com/) (`new-york` style, `neutral` base). They are copied into the repo and treated as vendored code, not consumed as a library; prefer wrappers and composition for customization rather than editing the generated shadcn components directly, in line with [ADR-0003](../../docs/architecture/decisions/0003-adopt-nextjs-tailwind-and-shadcn-for-the-web-app.md).
