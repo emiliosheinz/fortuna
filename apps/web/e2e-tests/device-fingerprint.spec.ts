@@ -19,7 +19,8 @@ test.describe("Device fingerprint cookie", () => {
     // No Domain attribute → host-only.
     expect(afterSignIn?.domain ?? "").not.toMatch(/^\./);
 
-    await page.getByRole("button", { name: "Sign out" }).click();
+    await page.getByRole("button", { name: "Account menu" }).click();
+    await page.getByRole("menuitem", { name: "Sign out" }).click();
     await page.waitForURL(/\/auth\/sign-in$/);
 
     const afterSignOut = (await context.cookies()).find(
