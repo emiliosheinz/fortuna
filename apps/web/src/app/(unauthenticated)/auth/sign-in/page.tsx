@@ -9,17 +9,20 @@ export default function SignInPage() {
       <div className="w-full max-w-sm rounded-2xl border bg-card p-8 shadow-sm">
         <div className="flex flex-col items-center gap-6 text-center">
           <Image
-            src="/fortuna-logo.svg"
+            src="/fortuna-logo.png"
             alt="Fortuna"
             width={48}
             height={48}
             priority
-            unoptimized
-            className="text-foreground"
           />
-          <h1 className="text-balance text-2xl font-semibold tracking-tight text-foreground">
-            Take control of your finances
-          </h1>
+          <div className="flex flex-col gap-2">
+            <h1 className="text-2xl font-semibold tracking-tight text-foreground">
+              Fortuna
+            </h1>
+            <p className="text-balance text-sm text-muted-foreground">
+              Take control of your finances
+            </p>
+          </div>
         </div>
         <Suspense fallback={null}>
           <SignInErrorBanner />

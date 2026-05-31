@@ -31,10 +31,13 @@ describe("Sign-in Page (/auth/sign-in)", () => {
     );
   });
 
-  it("renders the product headline", () => {
+  it("renders the Fortuna heading and tagline", () => {
     render(<Page />);
     expect(
-      screen.getByRole("heading", { name: /take control of your finances/i }),
+      screen.getByRole("heading", { name: "Fortuna" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/take control of your finances/i),
     ).toBeInTheDocument();
   });
 
