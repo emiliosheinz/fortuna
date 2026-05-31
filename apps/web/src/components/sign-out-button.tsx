@@ -2,32 +2,37 @@
 
 import { useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { apiClient, CLEAR_SESSION_PATH } from "@/lib/api-client";
+import { CLEAR_SESSION_PATH } from "@/lib/api-client";
+import { signOut } from "@/lib/auth/sign-out";
 import { navigateTo } from "@/lib/navigate";
 
-/**
- * Sign-out trigger. Calls `DELETE /api/auth/session` to revoke the server
- * session, then hands off to the clear-session route handler to drop the
- * cookie and land on `/auth/sign-in`. A 401 mid-flight means the session
- * was already invalid, which `apiClient` translates into the same redirect
- * — no extra branching needed here.
- */
 export function SignOutButton() {
-  const signOut = useMutation({
-    mutationFn: () => apiClient.delete("/api/auth/session"),
+  const mutation = useMutation({
+    mutationFn: signOut,
     onSuccess: () => {
       navigateTo(CLEAR_SESSION_PATH);
     },
   });
 
   return (
-    <Button
-      type="button"
-      variant="outline"
-      disabled={signOut.isPending}
-      onClick={() => signOut.mutate()}
-    >
-      Sign out
-    </Button>
+    <div className="flex flex-col items-center gap-2">
+      <Button
+        type="button"
+        variant="outline"
+        disabled={mutation.isPending}
+        onClick={() => mutation.mutate()}
+      >
+        {mutation.isPending ? "Signing out…" : "Sign out"}
+      </Button>
+      {mutation.isError ? (
+        <p
+          role="alert"
+          data-testid="sign-out-error"
+          className="text-xs text-destructive"
+        >
+          Could not sign out. Please try again.
+        </p>
+      ) : null}
+    </div>
   );
 }

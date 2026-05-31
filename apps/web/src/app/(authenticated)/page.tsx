@@ -6,7 +6,7 @@ import { SignOutButton } from "@/components/sign-out-button";
 import { Button } from "@/components/ui/button";
 
 export default function AuthenticatedRootPage() {
-  const me = useAuth();
+  const { me } = useAuth();
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center gap-4 bg-background p-8 text-foreground">

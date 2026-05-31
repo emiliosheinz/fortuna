@@ -1,11 +1,17 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
-import { apiClient } from "@/lib/api-client";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { type CurrentUser, usersApi } from "@/lib/users/api-client";
 import { AuthGuard, useAuth } from "../auth-guard";
 
-jest.mock("@/lib/api-client", () => ({ apiClient: { get: jest.fn() } }));
+jest.mock("@/lib/users/api-client", () => {
+  const actual = jest.requireActual("@/lib/users/api-client");
+  return {
+    ...actual,
+    usersApi: { getMe: jest.fn() },
+  };
+});
 
-const getMock = apiClient.get as jest.MockedFunction<typeof apiClient.get>;
+const getMeMock = usersApi.getMe as jest.MockedFunction<typeof usersApi.getMe>;
 
 function renderWithClient(ui: React.ReactNode): ReturnType<typeof render> {
   const client = new QueryClient({
@@ -17,19 +23,19 @@ function renderWithClient(ui: React.ReactNode): ReturnType<typeof render> {
 }
 
 function ChildExposingName() {
-  const me = useAuth();
+  const { me } = useAuth();
   return <div data-testid="name">{me.name}</div>;
 }
 
 describe("AuthGuard", () => {
   beforeEach(() => {
-    getMock.mockReset();
+    getMeMock.mockReset();
   });
 
-  it("renders a loading indicator while /api/users/me is in flight", () => {
-    let resolveFetch: (value: unknown) => void = () => undefined;
-    getMock.mockReturnValueOnce(
-      new Promise((resolve) => {
+  it("renders a loading indicator while the request is in flight", () => {
+    let resolveFetch: (value: CurrentUser) => void = () => undefined;
+    getMeMock.mockReturnValueOnce(
+      new Promise<CurrentUser>((resolve) => {
         resolveFetch = resolve;
       }),
     );
@@ -43,7 +49,6 @@ describe("AuthGuard", () => {
     expect(screen.getByTestId("auth-guard-loading")).toBeInTheDocument();
     expect(screen.queryByTestId("name")).not.toBeInTheDocument();
 
-    // Clean up the pending promise so jest doesn't complain.
     resolveFetch({
       id: "u_1",
       name: "Ada",
@@ -53,7 +58,7 @@ describe("AuthGuard", () => {
   });
 
   it("renders children with the user available via useAuth on success", async () => {
-    getMock.mockResolvedValueOnce({
+    getMeMock.mockResolvedValueOnce({
       id: "u_1",
       name: "Ada Lovelace",
       email: "ada@example.com",
@@ -71,26 +76,35 @@ describe("AuthGuard", () => {
     );
   });
 
-  it("renders nothing when /api/users/me fails (apiClient already redirected)", async () => {
-    getMock.mockRejectedValueOnce(new Error("401"));
+  it("renders an error state with a retry button on failure", async () => {
+    getMeMock.mockRejectedValueOnce(new Error("boom"));
 
-    const { container } = renderWithClient(
+    renderWithClient(
       <AuthGuard>
         <ChildExposingName />
       </AuthGuard>,
     );
 
     await waitFor(() =>
-      expect(
-        screen.queryByTestId("auth-guard-loading"),
-      ).not.toBeInTheDocument(),
+      expect(screen.getByTestId("auth-guard-error")).toBeInTheDocument(),
     );
     expect(screen.queryByTestId("name")).not.toBeInTheDocument();
-    expect(container).toBeEmptyDOMElement();
+
+    getMeMock.mockResolvedValueOnce({
+      id: "u_1",
+      name: "Ada Lovelace",
+      email: "ada@example.com",
+      avatarUrl: null,
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /retry/i }));
+
+    await waitFor(() =>
+      expect(screen.getByTestId("name")).toHaveTextContent("Ada Lovelace"),
+    );
   });
 
   it("throws from useAuth when called outside the guard", () => {
-    // Suppress React's expected error log for the thrown error.
     const spy = jest.spyOn(console, "error").mockImplementation(() => {});
     expect(() => render(<ChildExposingName />)).toThrow(
       /useAuth must be called inside/i,

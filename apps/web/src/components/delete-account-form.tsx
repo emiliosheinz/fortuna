@@ -3,26 +3,17 @@
 import { useMutation } from "@tanstack/react-query";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { apiClient, CLEAR_SESSION_PATH } from "@/lib/api-client";
+import { CLEAR_SESSION_PATH } from "@/lib/api-client";
 import { DELETE_ACCOUNT_CONFIRMATION_PHRASE } from "@/lib/auth/constants";
 import { navigateTo } from "@/lib/navigate";
+import { usersApi } from "@/lib/users/api-client";
 
-/**
- * Gates the destructive delete-account submit on the user typing the exact
- * confirmation phrase. The phrase check is a UX guard — the API also
- * requires `confirm: true`, so a phrase-bypass attempt still fails server-side.
- *
- * On success the session is gone server-side and we hand off to the
- * clear-session route handler, which drops the cookie and lands the user
- * on `/auth/sign-in`.
- */
 export function DeleteAccountForm() {
   const [phrase, setPhrase] = useState("");
   const canSubmit = phrase === DELETE_ACCOUNT_CONFIRMATION_PHRASE;
 
-  const deleteAccount = useMutation({
-    mutationFn: () =>
-      apiClient.delete("/api/users/me", { body: { confirm: true } }),
+  const mutation = useMutation({
+    mutationFn: () => usersApi.deleteAccount(),
     onSuccess: () => {
       navigateTo(CLEAR_SESSION_PATH);
     },
@@ -33,7 +24,7 @@ export function DeleteAccountForm() {
       onSubmit={(event) => {
         event.preventDefault();
         if (!canSubmit) return;
-        deleteAccount.mutate();
+        mutation.mutate();
       }}
       className="flex flex-col gap-3"
     >
@@ -59,10 +50,19 @@ export function DeleteAccountForm() {
       <Button
         type="submit"
         variant="destructive"
-        disabled={!canSubmit || deleteAccount.isPending}
+        disabled={!canSubmit || mutation.isPending}
       >
-        Delete my account
+        {mutation.isPending ? "Deleting…" : "Delete my account"}
       </Button>
+      {mutation.isError ? (
+        <p
+          role="alert"
+          data-testid="delete-account-error"
+          className="text-xs text-destructive"
+        >
+          Could not delete your account. Please try again.
+        </p>
+      ) : null}
     </form>
   );
 }

@@ -18,7 +18,11 @@ import { useState } from "react";
  * stays in the bundle but the component returns null, so there's no runtime
  * overhead beyond the (small) import cost.
  */
-export function QueryProvider({ children }: { children: React.ReactNode }) {
+interface QueryProviderProps {
+  children: React.ReactNode;
+}
+
+export function QueryProvider({ children }: QueryProviderProps) {
   const [client] = useState(
     () =>
       new QueryClient({

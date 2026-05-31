@@ -1,20 +1,21 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { apiClient, CLEAR_SESSION_PATH } from "@/lib/api-client";
+import { CLEAR_SESSION_PATH } from "@/lib/api-client";
 import { navigateTo } from "@/lib/navigate";
+import { usersApi } from "@/lib/users/api-client";
 import { DeleteAccountForm } from "../delete-account-form";
 
-jest.mock("@/lib/api-client", () => {
-  const actual = jest.requireActual("@/lib/api-client");
+jest.mock("@/lib/users/api-client", () => {
+  const actual = jest.requireActual("@/lib/users/api-client");
   return {
     ...actual,
-    apiClient: { delete: jest.fn() },
+    usersApi: { deleteAccount: jest.fn() },
   };
 });
 jest.mock("@/lib/navigate", () => ({ navigateTo: jest.fn() }));
 
-const deleteMock = apiClient.delete as jest.MockedFunction<
-  typeof apiClient.delete
+const deleteAccountMock = usersApi.deleteAccount as jest.MockedFunction<
+  typeof usersApi.deleteAccount
 >;
 const navigateToMock = navigateTo as jest.MockedFunction<typeof navigateTo>;
 
@@ -31,7 +32,7 @@ function renderForm(): ReturnType<typeof render> {
 
 describe("DeleteAccountForm", () => {
   beforeEach(() => {
-    deleteMock.mockReset();
+    deleteAccountMock.mockReset();
     navigateToMock.mockReset();
   });
 
@@ -50,8 +51,24 @@ describe("DeleteAccountForm", () => {
     expect(submit).toBeEnabled();
   });
 
-  it("DELETEs /api/users/me with confirm:true and navigates to clear-session on success", async () => {
-    deleteMock.mockResolvedValueOnce(undefined);
+  it("calls deleteAccount and navigates to clear-session on success", async () => {
+    deleteAccountMock.mockResolvedValueOnce(undefined);
+
+    renderForm();
+
+    fireEvent.change(screen.getByLabelText(/type.+to confirm/i), {
+      target: { value: "DELETE" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /delete my account/i }));
+
+    await waitFor(() => expect(deleteAccountMock).toHaveBeenCalledTimes(1));
+    await waitFor(() =>
+      expect(navigateToMock).toHaveBeenCalledWith(CLEAR_SESSION_PATH),
+    );
+  });
+
+  it("surfaces an inline error when the request fails", async () => {
+    deleteAccountMock.mockRejectedValueOnce(new Error("boom"));
 
     renderForm();
 
@@ -61,12 +78,8 @@ describe("DeleteAccountForm", () => {
     fireEvent.click(screen.getByRole("button", { name: /delete my account/i }));
 
     await waitFor(() =>
-      expect(deleteMock).toHaveBeenCalledWith("/api/users/me", {
-        body: { confirm: true },
-      }),
+      expect(screen.getByTestId("delete-account-error")).toBeInTheDocument(),
     );
-    await waitFor(() =>
-      expect(navigateToMock).toHaveBeenCalledWith(CLEAR_SESSION_PATH),
-    );
+    expect(navigateToMock).not.toHaveBeenCalled();
   });
 });

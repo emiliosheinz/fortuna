@@ -16,10 +16,12 @@ describe("Authenticated root page", () => {
 
   it("renders the signed-in user's name, email, and nav links", () => {
     useAuthMock.mockReturnValue({
-      id: "u_1",
-      name: "Ada Lovelace",
-      email: "ada@example.com",
-      avatarUrl: null,
+      me: {
+        id: "u_1",
+        name: "Ada Lovelace",
+        email: "ada@example.com",
+        avatarUrl: null,
+      },
     });
 
     render(<Page />);

@@ -2,23 +2,24 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { createContext, useContext } from "react";
-import { apiClient } from "@/lib/api-client";
+import { Button } from "@/components/ui/button";
+import {
+  type CurrentUser,
+  USER_QUERY_KEY,
+  usersApi,
+} from "@/lib/users/api-client";
 
-export interface AuthenticatedUser {
-  id: string;
-  name: string;
-  email: string;
-  avatarUrl: string | null;
+interface AuthContextValue {
+  me: CurrentUser;
 }
 
-const AuthContext = createContext<AuthenticatedUser | null>(null);
+interface AuthGuardProps {
+  children: React.ReactNode;
+}
 
-/**
- * Returns the currently signed-in user. Throws if called outside an
- * `<AuthGuard>`. Inside the guarded tree the user is always present —
- * the guard renders its children only after a successful session check.
- */
-export function useAuth(): AuthenticatedUser {
+const AuthContext = createContext<AuthContextValue | null>(null);
+
+export function useAuth(): AuthContextValue {
   const value = useContext(AuthContext);
   if (!value) {
     throw new Error("useAuth must be called inside <AuthGuard>");
@@ -26,26 +27,10 @@ export function useAuth(): AuthenticatedUser {
   return value;
 }
 
-/** Query key the guard owns; exported so mutations can invalidate it. */
-export const AUTH_QUERY_KEY = ["auth", "me"] as const;
-
-/**
- * Single entry point for the authenticated UI. Fetches the current user
- * once per tab via TanStack Query and exposes it through `useAuth()` to
- * any descendant client component.
- *
- * - While the initial fetch is in flight: renders a centred spinner so no
- *   authenticated content flashes for an unauthenticated visitor.
- * - On `401`: `apiClient` has already navigated to `/api/auth/clear-session`,
- *   which drops the cookie and lands the user on `/auth/sign-in`. The guard
- *   renders nothing while that navigation resolves.
- * - On success: children render inside an `AuthContext.Provider`, and
- *   `staleTime: Infinity` keeps the cache warm across navigations.
- */
-export function AuthGuard({ children }: { children: React.ReactNode }) {
-  const { data, isPending, isError } = useQuery({
-    queryKey: AUTH_QUERY_KEY,
-    queryFn: () => apiClient.get<AuthenticatedUser>("/api/users/me"),
+export function AuthGuard({ children }: AuthGuardProps) {
+  const { data, isPending, isError, refetch, isFetching } = useQuery({
+    queryKey: USER_QUERY_KEY,
+    queryFn: () => usersApi.getMe(),
     retry: false,
     staleTime: Number.POSITIVE_INFINITY,
   });
@@ -65,9 +50,30 @@ export function AuthGuard({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (isError || !data) {
-    return null;
+  if (isError) {
+    return (
+      <div
+        role="alert"
+        data-testid="auth-guard-error"
+        className="flex min-h-screen flex-col items-center justify-center gap-4 bg-background p-8 text-center text-foreground"
+      >
+        <h1 className="text-lg font-semibold">Something went wrong</h1>
+        <p className="max-w-sm text-sm text-muted-foreground">
+          We could not load your account. Check your connection and try again.
+        </p>
+        <Button
+          type="button"
+          variant="outline"
+          disabled={isFetching}
+          onClick={() => refetch()}
+        >
+          Retry
+        </Button>
+      </div>
+    );
   }
 
-  return <AuthContext.Provider value={data}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={{ me: data }}>{children}</AuthContext.Provider>
+  );
 }

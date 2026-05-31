@@ -4,7 +4,7 @@ import { useAuth } from "@/components/auth/auth-guard";
 import { DeleteAccountForm } from "@/components/delete-account-form";
 
 export default function AccountSettingsPage() {
-  const me = useAuth();
+  const { me } = useAuth();
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-2xl flex-col gap-6 bg-background p-8 text-foreground">

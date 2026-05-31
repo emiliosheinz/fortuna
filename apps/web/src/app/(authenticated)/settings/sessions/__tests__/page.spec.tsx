@@ -1,20 +1,29 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { apiClient } from "@/lib/api-client";
+import { sessionsApi } from "@/lib/sessions/api-client";
 import Page from "../page";
 
-jest.mock("@/lib/api-client", () => ({
-  apiClient: { get: jest.fn(), delete: jest.fn() },
-}));
+jest.mock("@/lib/sessions/api-client", () => {
+  const actual = jest.requireActual("@/lib/sessions/api-client");
+  return {
+    ...actual,
+    sessionsApi: { list: jest.fn(), revoke: jest.fn() },
+  };
+});
 
-const getMock = apiClient.get as jest.MockedFunction<typeof apiClient.get>;
-const deleteMock = apiClient.delete as jest.MockedFunction<
-  typeof apiClient.delete
+const listMock = sessionsApi.list as jest.MockedFunction<
+  typeof sessionsApi.list
+>;
+const revokeMock = sessionsApi.revoke as jest.MockedFunction<
+  typeof sessionsApi.revoke
 >;
 
 function renderPage(): ReturnType<typeof render> {
   const client = new QueryClient({
-    defaultOptions: { queries: { retry: false } },
+    defaultOptions: {
+      queries: { retry: false },
+      mutations: { retry: false },
+    },
   });
   return render(
     <QueryClientProvider client={client}>
@@ -25,12 +34,55 @@ function renderPage(): ReturnType<typeof render> {
 
 describe("Sessions page", () => {
   beforeEach(() => {
-    getMock.mockReset();
-    deleteMock.mockReset();
+    listMock.mockReset();
+    revokeMock.mockReset();
+  });
+
+  it("shows a loading indicator while the list is in flight", () => {
+    listMock.mockReturnValueOnce(new Promise(() => {}));
+
+    renderPage();
+
+    expect(screen.getByTestId("sessions-loading")).toBeInTheDocument();
+  });
+
+  it("shows an error state with a retry button on list failure", async () => {
+    listMock.mockRejectedValueOnce(new Error("boom"));
+
+    renderPage();
+
+    await waitFor(() =>
+      expect(screen.getByTestId("sessions-error")).toBeInTheDocument(),
+    );
+
+    listMock.mockResolvedValueOnce([
+      {
+        id: "s_current",
+        deviceLabel: "Chrome on macOS",
+        lastActiveAt: "2026-05-31T15:00:00.000Z",
+        isCurrent: true,
+      },
+    ]);
+
+    fireEvent.click(screen.getByRole("button", { name: /retry/i }));
+
+    await waitFor(() =>
+      expect(screen.getAllByTestId("session-item")).toHaveLength(1),
+    );
+  });
+
+  it("shows an empty state when the list is empty", async () => {
+    listMock.mockResolvedValueOnce([]);
+
+    renderPage();
+
+    await waitFor(() =>
+      expect(screen.getByTestId("sessions-empty")).toBeInTheDocument(),
+    );
   });
 
   it("renders one row per session with the current device tagged", async () => {
-    getMock.mockResolvedValueOnce([
+    listMock.mockResolvedValueOnce([
       {
         id: "s_current",
         deviceLabel: "Chrome on macOS",
@@ -55,7 +107,7 @@ describe("Sessions page", () => {
   });
 
   it("revokes a non-current session and refetches the list", async () => {
-    getMock
+    listMock
       .mockResolvedValueOnce([
         {
           id: "s_current",
@@ -78,7 +130,38 @@ describe("Sessions page", () => {
           isCurrent: true,
         },
       ]);
-    deleteMock.mockResolvedValueOnce(undefined);
+    revokeMock.mockResolvedValueOnce(undefined);
+
+    renderPage();
+
+    await waitFor(() =>
+      expect(screen.getAllByTestId("session-item")).toHaveLength(2),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Revoke" }));
+
+    await waitFor(() => expect(revokeMock).toHaveBeenCalledWith("s_other"));
+    await waitFor(() =>
+      expect(screen.getAllByTestId("session-item")).toHaveLength(1),
+    );
+  });
+
+  it("surfaces a revoke error inline", async () => {
+    listMock.mockResolvedValueOnce([
+      {
+        id: "s_current",
+        deviceLabel: "Chrome on macOS",
+        lastActiveAt: "2026-05-31T15:00:00.000Z",
+        isCurrent: true,
+      },
+      {
+        id: "s_other",
+        deviceLabel: "Safari on iOS",
+        lastActiveAt: "2026-05-30T10:00:00.000Z",
+        isCurrent: false,
+      },
+    ]);
+    revokeMock.mockRejectedValueOnce(new Error("boom"));
 
     renderPage();
 
@@ -89,10 +172,7 @@ describe("Sessions page", () => {
     fireEvent.click(screen.getByRole("button", { name: "Revoke" }));
 
     await waitFor(() =>
-      expect(deleteMock).toHaveBeenCalledWith("/api/users/me/sessions/s_other"),
-    );
-    await waitFor(() =>
-      expect(screen.getAllByTestId("session-item")).toHaveLength(1),
+      expect(screen.getByTestId("revoke-session-error")).toBeInTheDocument(),
     );
   });
 });
