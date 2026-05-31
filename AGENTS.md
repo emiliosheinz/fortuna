@@ -67,7 +67,7 @@ apps/
     scripts/generate-migration.sh     Wrapper invoked by `bin/fortuna db migration:generate`
   web/                                Next.js App Router frontend — no DB access
     src/
-      app/                            Routes: /, /home, /settings, /privacy, /terms, /api/auth/*
+      app/                            Routes grouped by auth state — (authenticated)/* and (unauthenticated)/*; plus /privacy, /terms, /api/auth/*
       components/                     shadcn (vendored, do not edit) + app components
       lib/auth/                       Auth feature: actions.ts, api-client.ts, cookies.ts, env.ts, oidc.ts
       lib/utils.ts, lib/constants.ts  Shared web utilities only
@@ -157,6 +157,7 @@ Biome is the single source of truth for formatting and linting (`biome.json` ext
 - Do: treat `apps/web/src/components/ui/*` (shadcn) as vendored. Customize via wrappers and theming, not by editing the generated component.
 - Do: use `console.warn`/`console.error` for diagnostics on the web side (no NestJS Logger here). Never raw `process.stdout.write`.
 - Do: pin Tailwind classes; do not edit `globals.css` for one-off styles.
+- Do: add new authenticated pages under `apps/web/src/app/(authenticated)/`. The middleware (`apps/web/src/middleware.ts`) plus the route group's `layout.tsx` enforce auth; do not add per-page redirects or `getMe()` calls. New public pages go under `apps/web/src/app/(unauthenticated)/` or alongside `/privacy`, `/terms`.
 
 ### Environment variables
 - Do: add every new env var to `.env.example` with a sensible dev default.
