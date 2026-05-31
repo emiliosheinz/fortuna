@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 import { signInWithGoogle } from "./helpers/auth";
 
 test.describe("Account deletion", () => {
-  test("typing DELETE on the danger zone hard-deletes the account, clears the cookie, and protects /home from the prior cookie", async ({
+  test("typing DELETE on the danger zone hard-deletes the account, clears the cookie, and protects authenticated routes from the prior cookie", async ({
     page,
     context,
   }) => {
@@ -29,11 +29,11 @@ test.describe("Account deletion", () => {
     await expect(submit).toBeEnabled();
 
     await submit.click();
-    await page.waitForURL(/\/$/);
+    await page.waitForURL(/\/auth\/sign-in$/);
 
     // The deletion handler cleared the session cookie. Subsequent navigation
-    // to a protected route bounces back to the landing page.
-    await page.goto("/home");
-    await page.waitForURL(/\/$/);
+    // to a protected route bounces back to the sign-in page.
+    await page.goto("/");
+    await page.waitForURL(/\/auth\/sign-in$/);
   });
 });

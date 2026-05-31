@@ -1,18 +1,19 @@
 import { randomBytes } from "node:crypto";
+import {
+  DEVICE_ID_COOKIE_NAME,
+  OAUTH_NONCE_COOKIE,
+  OAUTH_PKCE_COOKIE,
+  OAUTH_STATE_COOKIE,
+  SESSION_COOKIE_NAME,
+} from "./cookie-names";
 
-/** Name of the session cookie set after successful sign-in. */
-export const SESSION_COOKIE_NAME = "fortuna_session";
-
-/** Short-lived cookies carrying OAuth state, PKCE verifier, and nonce. */
-export const OAUTH_STATE_COOKIE = "fortuna_oauth_state";
-export const OAUTH_PKCE_COOKIE = "fortuna_oauth_pkce";
-export const OAUTH_NONCE_COOKIE = "fortuna_oauth_nonce";
-
-/**
- * Long-lived cookie carrying an opaque per-browser identifier. Combined
- * server-side with the UA family to derive the device fingerprint hash.
- */
-export const DEVICE_ID_COOKIE_NAME = "fortuna_device_id";
+export {
+  DEVICE_ID_COOKIE_NAME,
+  OAUTH_NONCE_COOKIE,
+  OAUTH_PKCE_COOKIE,
+  OAUTH_STATE_COOKIE,
+  SESSION_COOKIE_NAME,
+};
 /** Two years — matches the design's intent that fingerprints survive
  * long enough to avoid email-spamming users on every browser refresh. */
 export const DEVICE_ID_COOKIE_MAX_AGE_S = 2 * 365 * 24 * 60 * 60;

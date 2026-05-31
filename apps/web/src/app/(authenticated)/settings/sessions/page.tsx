@@ -1,35 +1,43 @@
-import { cookies } from "next/headers";
-import Link from "next/link";
-import { redirect } from "next/navigation";
-import { Button } from "@/components/ui/button";
-import { revokeSessionAction } from "@/lib/auth/actions";
-import { getSessions } from "@/lib/auth/api-client";
-import { SESSION_COOKIE_NAME } from "@/lib/auth/cookies";
+"use client";
 
-export const dynamic = "force-dynamic";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Button } from "@/components/ui/button";
+import { apiClient } from "@/lib/api-client";
+
+interface SessionListItem {
+  id: string;
+  deviceLabel: string;
+  lastActiveAt: string;
+  isCurrent: boolean;
+}
+
+const SESSIONS_QUERY_KEY = ["sessions", "list"] as const;
 
 const dateFormatter = new Intl.DateTimeFormat("en-US", {
   dateStyle: "medium",
   timeStyle: "short",
 });
 
-export default async function SessionsPage() {
-  const cookieStore = await cookies();
-  const sessionValue = cookieStore.get(SESSION_COOKIE_NAME)?.value;
-  const sessions = await getSessions(sessionValue);
+export default function SessionsPage() {
+  const queryClient = useQueryClient();
 
-  if (!sessions) {
-    redirect("/");
-  }
+  const { data: sessions = [] } = useQuery({
+    queryKey: SESSIONS_QUERY_KEY,
+    queryFn: () => apiClient.get<SessionListItem[]>("/api/users/me/sessions"),
+  });
+
+  const revoke = useMutation({
+    mutationFn: (sessionId: string) =>
+      apiClient.delete(
+        `/api/users/me/sessions/${encodeURIComponent(sessionId)}`,
+      ),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: SESSIONS_QUERY_KEY }),
+  });
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-2xl flex-col gap-6 bg-background p-8 text-foreground">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Active sessions</h1>
-        <Button asChild variant="ghost">
-          <Link href="/home">Back to home</Link>
-        </Button>
-      </div>
+      <h1 className="text-2xl font-semibold">Active sessions</h1>
 
       <p className="text-sm text-muted-foreground">
         Sessions are listed for every device you are signed in on. Revoke any
@@ -58,16 +66,15 @@ export default async function SessionsPage() {
                 Current
               </span>
             ) : (
-              <form action={revokeSessionAction}>
-                <input type="hidden" name="sessionId" value={session.id} />
-                <Button
-                  type="submit"
-                  variant="destructive"
-                  data-testid="revoke-session"
-                >
-                  Revoke
-                </Button>
-              </form>
+              <Button
+                type="button"
+                variant="destructive"
+                data-testid="revoke-session"
+                disabled={revoke.isPending}
+                onClick={() => revoke.mutate(session.id)}
+              >
+                Revoke
+              </Button>
             )}
           </li>
         ))}

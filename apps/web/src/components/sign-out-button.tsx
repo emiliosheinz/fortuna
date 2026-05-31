@@ -1,17 +1,33 @@
+"use client";
+
+import { useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
-import { signOutAction } from "@/lib/auth/actions";
+import { apiClient, CLEAR_SESSION_PATH } from "@/lib/api-client";
+import { navigateTo } from "@/lib/navigate";
 
 /**
- * Renders a sign-out button inside a server-action `<form>`. Posting the
- * form invokes {@link signOutAction}, which revokes the session row and
- * clears the cookie before redirecting to the landing page.
+ * Sign-out trigger. Calls `DELETE /api/auth/session` to revoke the server
+ * session, then hands off to the clear-session route handler to drop the
+ * cookie and land on `/auth/sign-in`. A 401 mid-flight means the session
+ * was already invalid, which `apiClient` translates into the same redirect
+ * — no extra branching needed here.
  */
 export function SignOutButton() {
+  const signOut = useMutation({
+    mutationFn: () => apiClient.delete("/api/auth/session"),
+    onSuccess: () => {
+      navigateTo(CLEAR_SESSION_PATH);
+    },
+  });
+
   return (
-    <form action={signOutAction}>
-      <Button type="submit" variant="outline">
-        Sign out
-      </Button>
-    </form>
+    <Button
+      type="button"
+      variant="outline"
+      disabled={signOut.isPending}
+      onClick={() => signOut.mutate()}
+    >
+      Sign out
+    </Button>
   );
 }

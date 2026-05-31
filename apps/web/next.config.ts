@@ -14,6 +14,26 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: monorepoRoot,
   },
+  /**
+   * Browser-bound `/api/:path*` requests are transparently forwarded to
+   * `apps/api`. File-system route handlers under `apps/web/src/app/api/`
+   * (the OAuth flow + clear-session) take precedence — they're matched
+   * before this rewrite applies. Everything else under `/api/*` reaches
+   * the backend with the session cookie forwarded automatically, so
+   * adding a new backend endpoint needs no web-side glue.
+   */
+  async rewrites() {
+    const apiBaseUrl = process.env.API_BASE_URL;
+    if (!apiBaseUrl) {
+      throw new Error("Environment variable API_BASE_URL must be set");
+    }
+    return [
+      {
+        source: "/api/:path*",
+        destination: `${apiBaseUrl}/:path*`,
+      },
+    ];
+  },
 };
 
 export default nextConfig;

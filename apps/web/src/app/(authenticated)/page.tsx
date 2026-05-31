@@ -1,21 +1,12 @@
-import { cookies } from "next/headers";
+"use client";
+
 import Link from "next/link";
-import { redirect } from "next/navigation";
+import { useAuth } from "@/components/auth/auth-guard";
 import { SignOutButton } from "@/components/sign-out-button";
 import { Button } from "@/components/ui/button";
-import { getMe } from "@/lib/auth/api-client";
-import { SESSION_COOKIE_NAME } from "@/lib/auth/cookies";
 
-export const dynamic = "force-dynamic";
-
-export default async function HomePage() {
-  const cookieStore = await cookies();
-  const sessionValue = cookieStore.get(SESSION_COOKIE_NAME)?.value;
-  const me = await getMe(sessionValue);
-
-  if (!me) {
-    redirect("/");
-  }
+export default function AuthenticatedRootPage() {
+  const me = useAuth();
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center gap-4 bg-background p-8 text-foreground">
