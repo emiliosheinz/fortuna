@@ -3,6 +3,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { createContext, useContext } from "react";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { type CurrentUser, usersApi } from "@/lib/users/api-client";
 import { USER_QUERY_KEY } from "@/lib/users/query-keys";
 
@@ -33,18 +34,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
   });
 
   if (isPending) {
-    return (
-      <div
-        data-testid="auth-guard-loading"
-        className="flex min-h-screen items-center justify-center bg-background"
-      >
-        <div
-          role="status"
-          aria-label="Loading"
-          className="size-8 animate-spin rounded-full border-2 border-muted-foreground border-t-transparent"
-        />
-      </div>
-    );
+    return <AuthGuardSkeleton />;
   }
 
   if (isError) {
@@ -72,5 +62,32 @@ export function AuthGuard({ children }: AuthGuardProps) {
 
   return (
     <AuthContext.Provider value={{ me: data }}>{children}</AuthContext.Provider>
+  );
+}
+
+function AuthGuardSkeleton() {
+  return (
+    <div
+      data-testid="auth-guard-loading"
+      aria-busy="true"
+      aria-live="polite"
+      className="flex min-h-screen flex-col bg-background"
+    >
+      <header className="sticky top-0 z-30 w-full border-b border-border bg-background/80 backdrop-blur">
+        <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-2 px-4 py-3 sm:px-6">
+          <Skeleton className="h-5 w-24" />
+          <Skeleton className="size-8 rounded-full" />
+        </div>
+      </header>
+      <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 p-8">
+        <Skeleton className="h-7 w-1/2" />
+        <Skeleton className="h-4 w-3/4" />
+        <div className="flex flex-col gap-3">
+          <Skeleton className="h-16 w-full" />
+          <Skeleton className="h-16 w-full" />
+          <Skeleton className="h-16 w-full" />
+        </div>
+      </div>
+    </div>
   );
 }
