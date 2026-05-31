@@ -11,7 +11,7 @@ export async function signInWithGoogle(
   subject: string,
 ): Promise<void> {
   await page.goto("/auth/sign-in");
-  await page.getByRole("link", { name: "Sign in with Google" }).click();
+  await page.getByRole("link", { name: "Continue with Google" }).click();
   await page.waitForURL(/mock-oauth2-server:8080\/default\/authorize/);
   await page.getByPlaceholder("Enter any user/subject").fill(subject);
   await page.getByRole("button", { name: "Sign-in" }).click();

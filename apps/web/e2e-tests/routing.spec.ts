@@ -6,7 +6,7 @@ test.describe("Public and authenticated routing", () => {
   }) => {
     await page.goto("/");
     await expect(page).toHaveURL(/\/auth\/sign-in$/);
-    await expect(page.getByText("Fortuna")).toBeVisible();
+    await expect(page.getByAltText("Fortuna")).toBeVisible();
   });
 
   test("redirects an unauthenticated visit to /settings/sessions over to the sign-in page", async ({

@@ -21,15 +21,34 @@ describe("Sign-in Page (/auth/sign-in)", () => {
     useSearchParamsMock.mockReturnValue(searchParams(""));
   });
 
-  it("renders the Fortuna name", () => {
+  it("renders the Fortuna logo", () => {
     render(<Page />);
-    expect(screen.getByText("Fortuna")).toBeInTheDocument();
+    const logo = screen.getByAltText("Fortuna");
+    expect(logo).toBeInTheDocument();
+    expect(logo).toHaveAttribute(
+      "src",
+      expect.stringContaining("fortuna-logo"),
+    );
   });
 
-  it("renders a sign-in link that triggers full-page navigation to /api/auth/sign-in", () => {
+  it("renders the product headline", () => {
     render(<Page />);
-    const cta = screen.getByRole("link", { name: /sign in with google/i });
+    expect(
+      screen.getByRole("heading", { name: /take control of your finances/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("renders a Continue with Google CTA that triggers full-page navigation to /api/auth/sign-in", () => {
+    render(<Page />);
+    const cta = screen.getByRole("link", { name: /continue with google/i });
     expect(cta).toHaveAttribute("href", "/api/auth/sign-in");
+  });
+
+  it("renders the Google G mark inside the CTA", () => {
+    render(<Page />);
+    const cta = screen.getByRole("link", { name: /continue with google/i });
+    const mark = cta.querySelector("img[src*='google-g']");
+    expect(mark).not.toBeNull();
   });
 
   it("links the consent notice to the Privacy Policy and Terms of Service", () => {
