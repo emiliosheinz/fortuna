@@ -20,7 +20,8 @@ test.describe("Session management", () => {
     await signInWithGoogle(page, "E2E User");
     await expect(page.getByText("Welcome, E2E User")).toBeVisible();
 
-    await page.getByRole("button", { name: "Sign out" }).click();
+    await page.getByRole("button", { name: "Account menu" }).click();
+    await page.getByRole("menuitem", { name: "Sign out" }).click();
     await page.waitForURL(/\/auth\/sign-in$/);
 
     await page.goto("/");
