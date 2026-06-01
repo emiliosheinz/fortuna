@@ -23,10 +23,10 @@ import { getOidcConfig } from "@/lib/auth/oidc";
  *    tokens are discarded — Fortuna only needs the ID token.
  * 3. Forwards the ID token + nonce to the API, which verifies it and mints a
  *    session.
- * 4. Sets the session cookie on the browser and redirects to `/home`.
+ * 4. Sets the session cookie on the browser and redirects to `/`.
  *
- * On any failure, redirects to `/?sign_in_error=<reason>` and surfaces a
- * generic message to the user.
+ * On any failure, redirects to `/auth/sign-in?sign_in_error=<reason>` and
+ * surfaces a generic message to the user.
  */
 export async function GET(req: NextRequest) {
   const state = req.cookies.get(OAUTH_STATE_COOKIE)?.value;
@@ -74,7 +74,7 @@ export async function GET(req: NextRequest) {
     return redirectToError("session_mint_failed");
   }
 
-  const response = relativeRedirect("/home");
+  const response = relativeRedirect("/");
   setSessionCookie(response.cookies, sessionToken, expiresAt);
   if (!existingDeviceId) {
     setDeviceIdCookie(response.cookies, deviceId);
@@ -85,7 +85,7 @@ export async function GET(req: NextRequest) {
 
 function redirectToError(reason: string): NextResponse {
   const response = relativeRedirect(
-    `/?sign_in_error=${encodeURIComponent(reason)}`,
+    `/auth/sign-in?sign_in_error=${encodeURIComponent(reason)}`,
   );
   clearOauthTempCookies(response.cookies);
   return response;

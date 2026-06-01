@@ -14,17 +14,18 @@ async function readCurrentSessionId(page: Page): Promise<string> {
 }
 
 test.describe("Session management", () => {
-  test("sign-out clears the cookie and protects /home from the prior cookie", async ({
+  test("sign-out clears the cookie and protects authenticated routes from the prior cookie", async ({
     page,
   }) => {
     await signInWithGoogle(page, "E2E User");
     await expect(page.getByText("Welcome, E2E User")).toBeVisible();
 
-    await page.getByRole("button", { name: "Sign out" }).click();
-    await page.waitForURL(/\/$/);
+    await page.getByRole("button", { name: "Account menu" }).click();
+    await page.getByRole("menuitem", { name: "Sign out" }).click();
+    await page.waitForURL(/\/auth\/sign-in$/);
 
-    await page.goto("/home");
-    await page.waitForURL(/\/$/);
+    await page.goto("/");
+    await page.waitForURL(/\/auth\/sign-in$/);
   });
 
   test("revoking another device from context A invalidates context B on next request", async ({
@@ -54,8 +55,8 @@ test.describe("Session management", () => {
       await expect(target).toHaveCount(0);
 
       // Context B can no longer authenticate — protected page bounces.
-      await pageB.goto("/home");
-      await pageB.waitForURL(/\/$/);
+      await pageB.goto("/");
+      await pageB.waitForURL(/\/auth\/sign-in$/);
     } finally {
       await contextA.close();
       await contextB.close();

@@ -62,9 +62,8 @@ export function ThemeSwitcher() {
   );
 }
 
-export function ThemeProvider({
-  children,
-  ...props
-}: React.ComponentProps<typeof NextThemesProvider>) {
+type ThemeProviderProps = React.ComponentProps<typeof NextThemesProvider>;
+
+export function ThemeProvider({ children, ...props }: ThemeProviderProps) {
   return <NextThemesProvider {...props}>{children}</NextThemesProvider>;
 }

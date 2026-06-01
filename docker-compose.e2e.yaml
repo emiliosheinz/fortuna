@@ -105,6 +105,12 @@ services:
         condition: service_started
       redis:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://$${HOSTNAME}:$${PORT}/ || exit 1"]
+      start_period: 10s
+      interval: 5s
+      timeout: 3s
+      retries: 10
     volumes:
       - .:/fortuna
 
@@ -149,7 +155,7 @@ services:
       web:
         condition: service_healthy
       api:
-        condition: service_started
+        condition: service_healthy
     volumes:
       - .:/fortuna
 
