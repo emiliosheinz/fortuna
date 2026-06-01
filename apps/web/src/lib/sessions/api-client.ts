@@ -8,7 +8,9 @@ export interface SessionListItem {
 }
 
 export const sessionsApi = {
-  list: () => apiClient.get<SessionListItem[]>("/api/users/me/sessions"),
+  list: () => apiClient.get<SessionListItem[]>("/api/v1/users/me/sessions"),
   revoke: (sessionId: string) =>
-    apiClient.delete(`/api/users/me/sessions/${encodeURIComponent(sessionId)}`),
+    apiClient.delete(
+      `/api/v1/users/me/sessions/${encodeURIComponent(sessionId)}`,
+    ),
 };

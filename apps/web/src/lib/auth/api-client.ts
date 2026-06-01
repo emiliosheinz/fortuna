@@ -24,8 +24,9 @@ export interface GoogleSignInResponse {
  * Runs server-side from the OAuth callback handler — this is the only
  * web-side path that talks to `apps/api` directly, because the response
  * carries a session token that the route handler must set as an HttpOnly
- * cookie. Every other API call goes through the `/api/:path*` rewrite from
- * the browser and uses `lib/api-client.ts`.
+ * cookie. Every other API call goes through the `/api/v1/*` namespace
+ * (proxied by `middleware.ts`) from the browser and uses
+ * `lib/api-client.ts`.
  */
 export async function createGoogleSession(
   idToken: string,

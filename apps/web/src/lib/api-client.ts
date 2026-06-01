@@ -72,8 +72,10 @@ async function request<T>(
 }
 
 /**
- * Browser-side wrapper around `fetch` for talking to `/api/*`. Every
- * authenticated query and mutation in the app goes through this client.
+ * Browser-side wrapper around `fetch` for talking to the backend via the
+ * `/api/v1/*` namespace (proxied to `API_BASE_URL` by `middleware.ts`).
+ * Every authenticated query and mutation in the app goes through this
+ * client.
  *
  * - Always uses `credentials: "same-origin"` so the HttpOnly session cookie
  *   is sent with the request.

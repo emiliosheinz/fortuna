@@ -36,12 +36,12 @@ describe("apiClient.get", () => {
       .mockResolvedValue(mockJsonResponse({ id: "u_1", name: "Ada" }));
 
     const result = await apiClient.get<{ id: string; name: string }>(
-      "/api/users/me",
+      "/api/v1/users/me",
     );
 
     expect(result).toEqual({ id: "u_1", name: "Ada" });
     expect(global.fetch).toHaveBeenCalledWith(
-      "/api/users/me",
+      "/api/v1/users/me",
       expect.objectContaining({
         method: "GET",
         credentials: "same-origin",
@@ -52,7 +52,7 @@ describe("apiClient.get", () => {
   it("navigates to the clear-session route on 401 and throws", async () => {
     global.fetch = jest.fn().mockResolvedValue(mockEmptyResponse(401));
 
-    await expect(apiClient.get("/api/users/me")).rejects.toThrow();
+    await expect(apiClient.get("/api/v1/users/me")).rejects.toThrow();
 
     expect(navigateToMock).toHaveBeenCalledWith(CLEAR_SESSION_PATH);
   });
@@ -62,7 +62,7 @@ describe("apiClient.get", () => {
       .fn()
       .mockResolvedValue(mockJsonResponse({ message: "boom" }, 500));
 
-    await expect(apiClient.get("/api/users/me")).rejects.toThrow(/500/);
+    await expect(apiClient.get("/api/v1/users/me")).rejects.toThrow(/500/);
     expect(navigateToMock).not.toHaveBeenCalled();
   });
 });
@@ -71,10 +71,10 @@ describe("apiClient.delete", () => {
   it("issues a DELETE with credentials and resolves on 204", async () => {
     global.fetch = jest.fn().mockResolvedValue(mockEmptyResponse(204));
 
-    await apiClient.delete("/api/users/me/sessions/s_1");
+    await apiClient.delete("/api/v1/users/me/sessions/s_1");
 
     expect(global.fetch).toHaveBeenCalledWith(
-      "/api/users/me/sessions/s_1",
+      "/api/v1/users/me/sessions/s_1",
       expect.objectContaining({
         method: "DELETE",
         credentials: "same-origin",
@@ -86,7 +86,7 @@ describe("apiClient.delete", () => {
     global.fetch = jest.fn().mockResolvedValue(mockEmptyResponse(401));
 
     await expect(
-      apiClient.delete("/api/users/me/sessions/s_1"),
+      apiClient.delete("/api/v1/users/me/sessions/s_1"),
     ).rejects.toThrow();
 
     expect(navigateToMock).toHaveBeenCalledWith(CLEAR_SESSION_PATH);
@@ -97,10 +97,10 @@ describe("apiClient.post", () => {
   it("serializes a JSON body and forwards the Content-Type", async () => {
     global.fetch = jest.fn().mockResolvedValue(mockJsonResponse({ ok: true }));
 
-    await apiClient.post("/api/things", { body: { name: "Ada" } });
+    await apiClient.post("/api/v1/things", { body: { name: "Ada" } });
 
     expect(global.fetch).toHaveBeenCalledWith(
-      "/api/things",
+      "/api/v1/things",
       expect.objectContaining({
         method: "POST",
         body: JSON.stringify({ name: "Ada" }),

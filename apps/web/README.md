@@ -12,7 +12,7 @@ This app does not connect to the database. All data flows through the API over H
 
 Routes under [`src/app/`](./src/app/) are organized by who can access them. Route groups (parentheses) do not affect URLs; their layouts enforce the access rule.
 
-- `(authenticated)/`: only accessible to signed-in users. The layout wraps children in [`AuthGuard`](./src/components/auth/auth-guard.tsx), which validates the session via `/api/users/me` and exposes the current user through `useAuth()`.
+- `(authenticated)/`: only accessible to signed-in users. The layout wraps children in [`AuthGuard`](./src/components/auth/auth-guard.tsx), which validates the session via `/api/v1/users/me` and exposes the current user through `useAuth()`.
 - `(unauthenticated)/`: only accessible to signed-out users. The layout reads the session cookie via `next/headers` and `redirect("/")` if present.
 - Everything else (e.g. `/privacy`, `/terms`): always accessible.
 

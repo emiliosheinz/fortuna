@@ -1,3 +1,3 @@
 import { apiClient } from "@/lib/api-client";
 
-export const signOut = () => apiClient.delete("/api/auth/session");
+export const signOut = () => apiClient.delete("/api/v1/auth/session");

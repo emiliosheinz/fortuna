@@ -45,12 +45,6 @@ jobs:
   build:
     name: Build Verification
     runs-on: ubuntu-latest
-    # Next.js evaluates `next.config.ts` at build time and the `/api/*`
-    # rewrite throws if `API_BASE_URL` is unset, so the build job needs
-    # the same env materialization as `migration-check`.
-    environment:
-      name: ci
-      deployment: false
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
@@ -59,15 +53,6 @@ jobs:
 
       - name: Setup Node dependencies
         uses: ./.github/actions/setup-node-dependencies
-
-      - name: Write .env from ci environment
-        uses: ./.github/actions/write-env-from-github
-        with:
-          vars: ${{ toJSON(vars) }}
-          secrets: ${{ toJSON(secrets) }}
-
-      - name: Export .env into GITHUB_ENV
-        run: cat .env >> "$GITHUB_ENV"
 
       - name: Build projects
         run: pnpm turbo build --affected
