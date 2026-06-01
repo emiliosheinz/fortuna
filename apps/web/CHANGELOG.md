@@ -1,3 +1,13 @@
+## 0.5.0 (2026-06-01)
+
+### 🚀 Features
+
+- improved authentication flow ([5c2a9e6](https://github.com/emiliosheinz/fortuna/commit/5c2a9e6))
+
+### ❤️ Thank You
+
+- Emilio Heinzmann @emiliosheinz
+
 ## 0.4.0 (2026-05-27)
 
 ### 🚀 Features
