@@ -73,7 +73,7 @@ async function request<T>(
 
 /**
  * Browser-side wrapper around `fetch` for talking to the backend via the
- * `/api/v1/*` namespace (proxied to `API_BASE_URL` by `middleware.ts`).
+ * `/api/v1/*` namespace (proxied to `API_BASE_URL` by `proxy.ts`).
  * Every authenticated query and mutation in the app goes through this
  * client.
  *

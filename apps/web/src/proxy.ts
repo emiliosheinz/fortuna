@@ -9,7 +9,7 @@ import { requireEnv } from "@/lib/auth/env";
  * `route.ts`. Reads `API_BASE_URL` per request, so the built image is
  * portable across environments.
  */
-export function middleware(req: NextRequest): NextResponse {
+export function proxy(req: NextRequest): NextResponse {
   const apiBaseUrl = requireEnv("API_BASE_URL").replace(/\/$/, "");
   const upstreamPath = req.nextUrl.pathname.replace(/^\/api\/v1/, "");
   const target = new URL(
