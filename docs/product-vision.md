@@ -10,15 +10,15 @@ This document is the North Star for Fortuna. It explains what the product is for
 
 ## Mission
 
-Give people an honest, forward-looking picture of their money: not just where they stand today, but where they're headed.
+Give people an honest, forward-looking picture of their money.
 
 ## Vision
 
 Most money apps are rear-view mirrors. They tell you what you spent last month across a handful of accounts and leave the most important question unanswered: *will I be okay?*
 
-Fortuna is built to answer that question. It unifies everything you own, owe, earn, and spend into a single source of truth, then projects it forward, months and years out, so the long-term consequences of today's decisions become visible. It thinks in decades, not billing cycles.
+Fortuna is built to answer that question. It unifies everything you own, owe, earn, and spend into a single source of truth, then projects it forward, months and years out, so the long-term consequences of today's decisions become visible.
 
-It's free, open source, and built in public. Your financial data is the most sensitive data you have, so Fortuna treats ownership, privacy, and the right to walk away with your data as first-class features, not afterthoughts.
+It's free, open source, and built in public. Your financial data is the most sensitive data you have, so Fortuna treats ownership, privacy, and the right to walk away with your data as first-class features.
 
 ## Why I'm Building It
 
@@ -46,8 +46,8 @@ Fortuna is built on a simple premise: *you can't forecast what you can't see.* S
 
 A single source of truth for everything financial.
 
-- Track accounts, assets, and liabilities side by side: cash, cards, loans, property, investments.
-- Manual entry that's fast and frictionless, with imports for people who'd rather not type.
+- Track accounts, assets, and liabilities side by side.
+- Quick, keyboard-first manual entry designed for daily use, with CSV imports for the bulk migration from your spreadsheet or statements.
 - Multi-currency aware, so accounts and assets in different currencies roll up into one honest total.
 - One number, always current: your real net worth, and how it's trending.
 
@@ -79,8 +79,8 @@ Because for most people, the long-term picture is mostly investments.
 
 Give the forecast something to aim at.
 
-- Define targets: an emergency fund, a down payment, financial independence, retirement.
-- Track progress against the projection, not just against today's balance.
+- Define targets.
+- Track progress against the projection.
 - Know not only *how far* you are from a goal, but *when* you're on track to reach it.
 
 ### 6. Scenarios and what-ifs
@@ -98,13 +98,17 @@ Treated as a feature, not fine print.
 - Open source and self-hostable. Run your own Fortuna if you'd rather not trust anyone with your money data.
 - Your data is yours. Leaving is always easy.
 
-## Integrations and Ecosystem
+## Data Entry and Ecosystem
 
-Fortuna works on day one with zero integrations. Manual entry and file imports (CSV/OFX) are first-class, not fallbacks. Integrations make it more convenient, never mandatory.
+Fortuna is manual-by-design. You decide what goes in; nothing reaches out to your bank, your brokerage, or any aggregator on your behalf. That is a deliberate choice, not a limitation.
 
-- **Account aggregation.** Optional connections to banks and brokerages via open-banking aggregators, so balances and transactions stay current without manual upkeep.
-- **Import and export anywhere.** Bring data in from spreadsheets and statements; take all of it out at any time, in open formats.
-- **Open by default.** Because the codebase is open source and self-hostable, the ecosystem is extensible by design: fork it, host it, or build on top of it.
+- **No credentials handed to third parties.** Open-banking and aggregator APIs are commercially out of reach for a solo open-source project, and using them means trusting one more party with the most sensitive data you have. Skipping them keeps Fortuna cheap to run and keeps your bank login where it belongs.
+- **Manual entry treated like the core experience it is.** Quick-add flows, sensible defaults, recurring rules, and keyboard-first capture so logging activity is the work of seconds, not a chore.
+- **Bulk imports as the migration path.** Bring history in from spreadsheets and statements via CSV, so day one isn't a blank slate.
+- **Open and portable in both directions.** Full export at any time, in open formats. Your data stays yours; leaving is always easy.
+- **Open by default.** The codebase is open source and self-hostable. Fork it, host it, or build the integrations you want on top of it.
+
+If a viable, privacy-respecting aggregator path opens up later, the architecture is built to accept one. It is not a promise for today.
 
 ## Target Audience
 
@@ -118,16 +122,14 @@ Fortuna works on day one with zero integrations. Manual entry and file imports (
 
 ## Sustainability and Monetization
 
-Fortuna is, first and foremost, a personal and portfolio project. It is free and open source, and there are no paywalls or monetization plans today.
+Fortuna is, first and foremost, a personal and portfolio project. It is free and open source, with no paywalls or monetization plans today. Staying manual-only is part of what makes that viable: no aggregator fees, no per-user infrastructure scaling against external financial APIs, no operational cost that grows faster than a single contributor's budget.
 
-If it ever needs to sustain itself, the model is deliberately simple and non-predatory: an optional hosted tier for people who want a managed instance with bank sync handled for them, while the full core stays free and self-hostable. Fortuna will never sell or monetize user data. That would betray the entire point of the product.
+If sustainability ever requires a revenue model, it will be deliberately simple and non-predatory, and the full core will stay free and self-hostable. Fortuna will never sell or monetize user data. That would betray the entire point of the product.
 
 ## Why Now
 
-1. **Open banking has matured.** Account-aggregation APIs are now accessible enough for a solo developer to offer convenient, optional sync.
+1. **Financial anxiety is high.** Inflation, volatile rates, and less linear careers have made *forward-looking* planning, not just budgeting, what people actually want.
 
-2. **Financial anxiety is high.** Inflation, volatile rates, and less linear careers have made *forward-looking* planning, not just budgeting, what people actually want.
+2. **Data ownership is mainstream.** Self-hosting and skepticism of closed apps holding sensitive data have gone from niche to expected, especially for money.
 
-3. **Data ownership is mainstream.** Self-hosting and skepticism of closed apps holding sensitive data have gone from niche to expected, especially for money.
-
-4. **The stack makes it feasible solo.** A modern foundation (Next.js, NestJS, PostgreSQL) makes a polished, private, forecasting-grade app something one person can realistically build and ship.
+3. **The stack makes it feasible solo.** A modern foundation (Next.js, NestJS, PostgreSQL) makes a polished, private, forecasting-grade app something one person can realistically build and ship.
