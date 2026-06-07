@@ -148,7 +148,7 @@ function IdentityPopover({ me }: { me: CurrentUser }) {
               data-testid="sidebar-identity"
               aria-label="Account menu"
               tooltip={me.name}
-              className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground group-data-[collapsible=icon]:!h-12 group-data-[collapsible=icon]:!w-full group-data-[collapsible=icon]:!justify-center group-data-[collapsible=icon]:!p-1"
+              className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground group-data-[collapsible=icon]:h-12! group-data-[collapsible=icon]:w-full! group-data-[collapsible=icon]:justify-center! group-data-[collapsible=icon]:p-1!"
             >
               <UserAvatar
                 name={me.name}
