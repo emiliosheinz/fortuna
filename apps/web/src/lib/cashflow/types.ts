@@ -9,6 +9,11 @@ export interface Transaction {
   kind: TransactionKind;
   categoryId: string | null;
   tagIds: string[];
+  baseAmount: string | null;
+  baseCurrency: string;
+  rateSubstituted: boolean;
+  rateDate: string | null;
+  unconvertible: boolean;
   createdAt: string;
   updatedAt: string;
 }

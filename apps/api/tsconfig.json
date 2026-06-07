@@ -17,5 +17,6 @@
     "outDir": "./dist",
     "paths": { "@/*": ["./src/*"] },
     "types": ["node", "jest"]
-  }
+  },
+  "exclude": ["dist", "scripts"]
 }

@@ -69,6 +69,20 @@ export class TransactionsController {
   }
 
   @UseGuards(SessionGuard)
+  @Get(":id")
+  async getOne(
+    @Req() req: AuthedRequest,
+    @Param("id", new ParseUUIDPipe()) id: string,
+  ): Promise<{ transaction: TransactionResponse }> {
+    const principal = requirePrincipal(req);
+    const transaction = await this.transactions.getForUser(
+      principal.userId,
+      id,
+    );
+    return { transaction };
+  }
+
+  @UseGuards(SessionGuard)
   @Patch(":id")
   async update(
     @Req() req: AuthedRequest,

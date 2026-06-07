@@ -111,6 +111,43 @@ describe("MetricsService", () => {
     });
   });
 
+  describe("fx_fetch_attempts_total", () => {
+    it("counts FX fetch attempts by result label", async () => {
+      const service = await buildService();
+      service.recordFxFetchAttempt("success");
+      service.recordFxFetchAttempt("retry");
+      service.recordFxFetchAttempt("retry");
+      service.recordFxFetchAttempt("failure");
+
+      const text = await metricsText(service);
+      expect(text).toContain('fx_fetch_attempts_total{result="success"} 1');
+      expect(text).toContain('fx_fetch_attempts_total{result="retry"} 2');
+      expect(text).toContain('fx_fetch_attempts_total{result="failure"} 1');
+    });
+  });
+
+  describe("fx_fetch_last_success_timestamp_seconds", () => {
+    it("sets the last-success epoch gauge", async () => {
+      const service = await buildService();
+      service.setFxFetchLastSuccessTimestampSeconds(1_700_000_000);
+
+      const text = await metricsText(service);
+      expect(text).toMatch(
+        /fx_fetch_last_success_timestamp_seconds\s+1700000000/,
+      );
+    });
+  });
+
+  describe("fx_rates_freshness_days", () => {
+    it("sets the rate freshness gauge", async () => {
+      const service = await buildService();
+      service.setFxRatesFreshnessDays(2);
+
+      const text = await metricsText(service);
+      expect(text).toMatch(/fx_rates_freshness_days\s+2/);
+    });
+  });
+
   describe("contentType", () => {
     it("exposes the prom-client content type for /metrics responses", async () => {
       const service = await buildService();

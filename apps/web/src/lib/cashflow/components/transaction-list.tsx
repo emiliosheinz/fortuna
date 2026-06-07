@@ -153,7 +153,7 @@ function TransactionRow({
             </span>
           ) : null}
         </div>
-        <div className="flex items-center gap-2 self-start sm:self-auto">
+        <div className="flex flex-col items-start gap-1 self-start sm:items-end sm:self-auto">
           <span
             className={
               row.kind === "expense"
@@ -164,6 +164,31 @@ function TransactionRow({
             {row.kind === "expense" ? "-" : "+"}
             {row.amount} {row.currency}
           </span>
+          {row.unconvertible ? (
+            <span
+              data-testid="transaction-row-unconvertible-badge"
+              title="No FX rate path to your base currency. The row is recorded but excluded from base-currency totals."
+              className="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-900 dark:bg-amber-900/40 dark:text-amber-100"
+            >
+              Unconvertible
+            </span>
+          ) : row.currency !== row.baseCurrency && row.baseAmount ? (
+            <span
+              data-testid="transaction-row-base-amount"
+              className="text-xs text-muted-foreground"
+            >
+              ≈ {row.baseAmount} {row.baseCurrency}
+              {row.rateSubstituted && row.rateDate ? (
+                <span
+                  data-testid="transaction-row-substituted-badge"
+                  title={`Rate from ${row.rateDate} used because no rate was published on ${row.date}.`}
+                  className="ml-1 rounded-full bg-sky-100 px-1.5 py-0.5 text-[10px] text-sky-900 dark:bg-sky-900/40 dark:text-sky-100"
+                >
+                  substituted
+                </span>
+              ) : null}
+            </span>
+          ) : null}
         </div>
       </button>
     </li>

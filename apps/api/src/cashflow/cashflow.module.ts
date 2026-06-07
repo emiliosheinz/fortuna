@@ -1,6 +1,7 @@
 import { Module } from "@nestjs/common";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { AuthModule } from "@/auth/auth.module";
+import { FxModule } from "@/fx/fx.module";
 import { UsersModule } from "@/users/users.module";
 import { CategoriesController } from "./controllers/categories.controller";
 import { TagsController } from "./controllers/tags.controller";
@@ -18,6 +19,7 @@ import { TransactionsService } from "./services/transactions.service";
     TypeOrmModule.forFeature([Transaction, Category, Tag, TransactionTag]),
     AuthModule,
     UsersModule,
+    FxModule,
   ],
   controllers: [TransactionsController, CategoriesController, TagsController],
   providers: [TransactionsService, CategoriesService, TagsService],

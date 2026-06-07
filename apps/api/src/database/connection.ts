@@ -9,6 +9,7 @@ import { Category } from "@/cashflow/entities/category.entity";
 import { Tag } from "@/cashflow/entities/tag.entity";
 import { Transaction } from "@/cashflow/entities/transaction.entity";
 import { TransactionTag } from "@/cashflow/entities/transaction-tag.entity";
+import { FxRate } from "@/fx/entities/fx-rate.entity";
 import { UserSettings } from "@/users/entities/user-settings.entity";
 
 export const AppDataSource = new DataSource({
@@ -30,6 +31,7 @@ export const AppDataSource = new DataSource({
     Category,
     Tag,
     TransactionTag,
+    FxRate,
   ],
   migrations: [path.join(__dirname, "migrations", "*.{ts,js}")],
   migrationsTableName: "migrations",

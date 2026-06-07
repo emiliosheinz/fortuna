@@ -16,6 +16,8 @@ import { Category } from "./cashflow/entities/category.entity";
 import { Tag } from "./cashflow/entities/tag.entity";
 import { Transaction } from "./cashflow/entities/transaction.entity";
 import { TransactionTag } from "./cashflow/entities/transaction-tag.entity";
+import { FxRate } from "./fx/entities/fx-rate.entity";
+import { FxModule } from "./fx/fx.module";
 import { MetricsModule } from "./metrics/metrics.module";
 import { UserSettings } from "./users/entities/user-settings.entity";
 import { UsersModule } from "./users/users.module";
@@ -42,6 +44,7 @@ import { UsersModule } from "./users/users.module";
           Category,
           Tag,
           TransactionTag,
+          FxRate,
         ],
         migrations: [
           path.join(__dirname, "database", "migrations", "*.{ts,js}"),
@@ -54,6 +57,7 @@ import { UsersModule } from "./users/users.module";
     MetricsModule,
     AuthModule,
     UsersModule,
+    FxModule,
     CashflowModule,
   ],
   controllers: [AppController],

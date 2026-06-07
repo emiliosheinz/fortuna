@@ -93,6 +93,11 @@ describe("CaptureForm", () => {
         kind: "expense",
         categoryId: null,
         tagIds: [],
+        baseAmount: "12.34",
+        baseCurrency: "USD",
+        rateSubstituted: false,
+        rateDate: "2026-06-07",
+        unconvertible: false,
         createdAt: "now",
         updatedAt: "now",
       },
@@ -131,6 +136,32 @@ describe("CaptureForm", () => {
     ).toHaveTextContent(/could not save/i);
   });
 
+  it("warns when the typed currency is outside frankfurter coverage", async () => {
+    renderForm();
+
+    const currencyInput = screen.getByTestId(
+      "capture-form-currency-input",
+    ) as HTMLInputElement;
+    fireEvent.change(currencyInput, { target: { value: "XYZ" } });
+
+    expect(
+      await screen.findByTestId("capture-form-currency-unconvertible"),
+    ).toHaveTextContent(/won't|isn't covered/i);
+  });
+
+  it("does not warn for a covered currency", () => {
+    renderForm();
+
+    const currencyInput = screen.getByTestId(
+      "capture-form-currency-input",
+    ) as HTMLInputElement;
+    fireEvent.change(currencyInput, { target: { value: "GBP" } });
+
+    expect(
+      screen.queryByTestId("capture-form-currency-unconvertible"),
+    ).toBeNull();
+  });
+
   it("sends typed tag names as part of the payload", async () => {
     createTransactionMock.mockResolvedValue({
       transaction: {
@@ -142,6 +173,11 @@ describe("CaptureForm", () => {
         kind: "expense",
         categoryId: null,
         tagIds: [],
+        baseAmount: "12.34",
+        baseCurrency: "USD",
+        rateSubstituted: false,
+        rateDate: "2026-06-07",
+        unconvertible: false,
         createdAt: "now",
         updatedAt: "now",
       },

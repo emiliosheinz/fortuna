@@ -47,6 +47,11 @@ const baseRow = {
   kind: "expense" as const,
   categoryId: null,
   tagIds: [],
+  baseAmount: "12.34",
+  baseCurrency: "USD",
+  rateSubstituted: false,
+  rateDate: "2026-06-07",
+  unconvertible: false,
   createdAt: "2026-06-07T00:00:00Z",
   updatedAt: "2026-06-07T00:00:00Z",
 };
@@ -95,6 +100,75 @@ describe("TransactionList", () => {
 
     expect(await screen.findByText("Lunch")).toBeInTheDocument();
     expect(screen.getByText(/-12\.34 USD/)).toBeInTheDocument();
+  });
+
+  it("shows the base-currency rollup for a foreign-currency row", async () => {
+    listMock.mockResolvedValue({
+      items: [
+        {
+          ...baseRow,
+          currency: "EUR",
+          baseAmount: "13.33",
+          baseCurrency: "USD",
+        },
+      ],
+      nextCursor: null,
+    });
+
+    renderList();
+
+    expect(
+      await screen.findByTestId("transaction-row-base-amount"),
+    ).toHaveTextContent(/13\.33 USD/);
+  });
+
+  it("renders the rate-substituted badge with the rate date in the title", async () => {
+    listMock.mockResolvedValue({
+      items: [
+        {
+          ...baseRow,
+          currency: "EUR",
+          baseAmount: "13.33",
+          baseCurrency: "USD",
+          rateSubstituted: true,
+          rateDate: "2026-06-05",
+        },
+      ],
+      nextCursor: null,
+    });
+
+    renderList();
+
+    const badge = await screen.findByTestId(
+      "transaction-row-substituted-badge",
+    );
+    expect(badge).toHaveAttribute(
+      "title",
+      expect.stringContaining("2026-06-05"),
+    );
+  });
+
+  it("renders the unconvertible badge when no rate path exists", async () => {
+    listMock.mockResolvedValue({
+      items: [
+        {
+          ...baseRow,
+          currency: "XYZ",
+          baseAmount: null,
+          baseCurrency: "USD",
+          rateSubstituted: false,
+          rateDate: null,
+          unconvertible: true,
+        },
+      ],
+      nextCursor: null,
+    });
+
+    renderList();
+
+    expect(
+      await screen.findByTestId("transaction-row-unconvertible-badge"),
+    ).toBeInTheDocument();
   });
 
   it("surfaces an error UI when the request fails", async () => {

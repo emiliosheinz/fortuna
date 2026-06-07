@@ -21,10 +21,11 @@ import {
 } from "@/components/ui/select";
 import { ApiError } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
-import { SUGGESTED_CURRENCIES, TRANSACTION_KINDS } from "../constants";
+import { isFrankfurterSupported, TRANSACTION_KINDS } from "../constants";
 import { useCreateTransaction } from "../hooks";
 import type { CreateTransactionInput, TransactionKind } from "../types";
 import { CategoryCombobox } from "./category-combobox";
+import { CurrencyInput } from "./currency-input";
 import { MoneyInput } from "./money-input";
 import { TagInput } from "./tag-input";
 
@@ -219,27 +220,24 @@ export function CaptureForm({ baseCurrency, onCaptured }: CaptureFormProps) {
 
       <div className="flex flex-col gap-1.5">
         <Label htmlFor={currencyId}>Currency</Label>
-        <Select
+        <CurrencyInput
+          id={currencyId}
           value={form.currency}
-          onValueChange={(value) => update("currency", value)}
-        >
-          <SelectTrigger
-            id={currencyId}
-            data-testid="capture-form-currency-trigger"
-            className="w-full"
-            aria-invalid={Boolean(errors.currency)}
-          >
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {SUGGESTED_CURRENCIES.map((code) => (
-              <SelectItem key={code} value={code}>
-                {code}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+          onChange={(next) => update("currency", next)}
+          aria-invalid={Boolean(errors.currency)}
+        />
         {errors.currency ? <FieldError message={errors.currency} /> : null}
+        {!errors.currency &&
+        form.currency.length === 3 &&
+        !isFrankfurterSupported(form.currency) ? (
+          <p
+            data-testid="capture-form-currency-unconvertible"
+            className="text-sm text-muted-foreground"
+          >
+            {form.currency} isn't covered by the FX provider — this row will
+            still record but its base-currency rollup will be unconvertible.
+          </p>
+        ) : null}
       </div>
 
       <div className="flex flex-col gap-1.5">

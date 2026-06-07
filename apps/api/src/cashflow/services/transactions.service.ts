@@ -5,6 +5,11 @@ import {
 } from "@nestjs/common";
 import { InjectDataSource, InjectRepository } from "@nestjs/typeorm";
 import { DataSource, In, Repository } from "typeorm";
+import {
+  FxLookupService,
+  type FxResolution,
+} from "@/fx/services/fx-lookup.service";
+import { UserSettingsService } from "@/users/services/user-settings.service";
 import type { CreateTransactionDto } from "../dto/create-transaction.dto";
 import type { UpdateTransactionDto } from "../dto/update-transaction.dto";
 import { Category } from "../entities/category.entity";
@@ -22,6 +27,11 @@ export interface TransactionResponse {
   kind: Transaction["kind"];
   categoryId: string | null;
   tagIds: string[];
+  baseAmount: string | null;
+  baseCurrency: string;
+  rateSubstituted: boolean;
+  rateDate: string | null;
+  unconvertible: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -43,17 +53,19 @@ export class TransactionsService {
     private readonly transactions: Repository<Transaction>,
     @InjectDataSource() private readonly dataSource: DataSource,
     private readonly tags: TagsService,
+    private readonly fxLookup: FxLookupService,
+    private readonly userSettings: UserSettingsService,
   ) {}
 
   async createForUser(
     userId: string,
     dto: CreateTransactionDto,
   ): Promise<TransactionResponse> {
-    return this.dataSource.transaction(async (manager) => {
+    const saved = await this.dataSource.transaction(async (manager) => {
       await this.assertCategoryOwned(userId, dto.categoryId, manager);
 
       const transactionRepo = manager.getRepository(Transaction);
-      const saved = await transactionRepo.save(
+      const row = await transactionRepo.save(
         transactionRepo.create({
           userId,
           date: dto.date,
@@ -74,16 +86,15 @@ export class TransactionsService {
         const join = manager.getRepository(TransactionTag);
         await join.save(
           tags.map((tag) =>
-            join.create({ transactionId: saved.id, tagId: tag.id }),
+            join.create({ transactionId: row.id, tagId: tag.id }),
           ),
         );
       }
-
-      return toResponse(
-        saved,
-        tags.map((t) => t.id),
-      );
+      return { row, tagIds: tags.map((t) => t.id) };
     });
+
+    const baseCurrency = await this.userSettings.getBaseCurrency(userId);
+    return this.enrichForResponse(saved.row, saved.tagIds, baseCurrency);
   }
 
   async listForUser(
@@ -113,12 +124,27 @@ export class TransactionsService {
       hasMore && last ? encodeCursor({ date: last.date, id: last.id }) : null;
 
     const tagsByTransaction = await this.loadTagIds(page.map((r) => r.id));
-    return {
-      items: page.map((row) =>
-        toResponse(row, tagsByTransaction.get(row.id) ?? []),
+    const baseCurrency = await this.userSettings.getBaseCurrency(userId);
+    const items = await Promise.all(
+      page.map((row) =>
+        this.enrichForResponse(
+          row,
+          tagsByTransaction.get(row.id) ?? [],
+          baseCurrency,
+        ),
       ),
-      nextCursor,
-    };
+    );
+    return { items, nextCursor };
+  }
+
+  async getForUser(userId: string, id: string): Promise<TransactionResponse> {
+    const row = await this.transactions.findOne({ where: { id, userId } });
+    if (!row) {
+      throw new NotFoundException("Transaction not found");
+    }
+    const tagIds = (await this.loadTagIds([row.id])).get(row.id) ?? [];
+    const baseCurrency = await this.userSettings.getBaseCurrency(userId);
+    return this.enrichForResponse(row, tagIds, baseCurrency);
   }
 
   async updateForUser(
@@ -126,7 +152,7 @@ export class TransactionsService {
     id: string,
     dto: UpdateTransactionDto,
   ): Promise<TransactionResponse> {
-    return this.dataSource.transaction(async (manager) => {
+    const saved = await this.dataSource.transaction(async (manager) => {
       const transactionRepo = manager.getRepository(Transaction);
       const row = await transactionRepo.findOne({ where: { id, userId } });
       if (!row) {
@@ -161,8 +187,11 @@ export class TransactionsService {
 
       const fresh = await transactionRepo.findOne({ where: { id: row.id } });
       if (!fresh) throw new NotFoundException("Transaction not found");
-      return toResponse(fresh, tagIds);
+      return { row: fresh, tagIds };
     });
+
+    const baseCurrency = await this.userSettings.getBaseCurrency(userId);
+    return this.enrichForResponse(saved.row, saved.tagIds, baseCurrency);
   }
 
   async deleteForUser(userId: string, id: string): Promise<void> {
@@ -170,6 +199,19 @@ export class TransactionsService {
     if (!result.affected) {
       throw new NotFoundException("Transaction not found");
     }
+  }
+
+  private async enrichForResponse(
+    row: Transaction,
+    tagIds: string[],
+    baseCurrency: string,
+  ): Promise<TransactionResponse> {
+    const resolution = await this.fxLookup.resolve({
+      date: row.date,
+      transactionCurrency: row.currency,
+      baseCurrency,
+    });
+    return toResponse(row, tagIds, baseCurrency, resolution);
   }
 
   private async assertCategoryOwned(
@@ -235,7 +277,16 @@ async function reconcileJoin(
   }
 }
 
-function toResponse(row: Transaction, tagIds: string[]): TransactionResponse {
+function toResponse(
+  row: Transaction,
+  tagIds: string[],
+  baseCurrency: string,
+  resolution: FxResolution,
+): TransactionResponse {
+  const unconvertible = resolution.unconvertible;
+  const baseAmount = unconvertible
+    ? null
+    : multiplyAndRound(row.amount, resolution.rate);
   return {
     id: row.id,
     date: row.date,
@@ -245,7 +296,18 @@ function toResponse(row: Transaction, tagIds: string[]): TransactionResponse {
     kind: row.kind,
     categoryId: row.categoryId,
     tagIds,
+    baseAmount,
+    baseCurrency,
+    rateSubstituted: unconvertible ? false : resolution.substituted,
+    rateDate: unconvertible ? null : resolution.rateDate,
+    unconvertible,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
+}
+
+function multiplyAndRound(amount: string, rate: string): string {
+  const value = Number(amount) * Number(rate);
+  if (!Number.isFinite(value)) return "0.00";
+  return value.toFixed(2);
 }

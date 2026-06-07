@@ -15,6 +15,8 @@ export type SessionRevocationReason =
   | "account_deletion"
   | "expiry";
 
+export type FxFetchResult = "success" | "retry" | "failure";
+
 /**
  * Holds the Prometheus registry and the `auth_*` metrics the design enumerates
  * under "Monitoring & Observability". Service-method helpers shield call sites
@@ -35,6 +37,9 @@ export class MetricsService {
   private readonly rateLimiterBlocks: Counter<string>;
   private readonly limiterDegraded: Counter<string>;
   private readonly sessionsActive: Gauge<string>;
+  private readonly fxFetchAttempts: Counter<"result">;
+  private readonly fxFetchLastSuccessTimestampSeconds: Gauge<string>;
+  private readonly fxRatesFreshnessDays: Gauge<string>;
 
   constructor() {
     this.registry = new PromRegistry();
@@ -90,6 +95,25 @@ export class MetricsService {
       help: "Active sessions (non-revoked, non-expired). Sampled periodically.",
       registers: [this.registry],
     });
+
+    this.fxFetchAttempts = new Counter({
+      name: "fx_fetch_attempts_total",
+      help: "FX rate fetch attempts grouped by terminal result.",
+      labelNames: ["result"],
+      registers: [this.registry],
+    });
+
+    this.fxFetchLastSuccessTimestampSeconds = new Gauge({
+      name: "fx_fetch_last_success_timestamp_seconds",
+      help: "Unix epoch (seconds) of the most recent successful FX fetch.",
+      registers: [this.registry],
+    });
+
+    this.fxRatesFreshnessDays = new Gauge({
+      name: "fx_rates_freshness_days",
+      help: "Days since the most recent stored FX rate_date.",
+      registers: [this.registry],
+    });
   }
 
   recordSignInOutcome(outcome: SignInOutcome): void {
@@ -122,6 +146,18 @@ export class MetricsService {
 
   setActiveSessions(count: number): void {
     this.sessionsActive.set(count);
+  }
+
+  recordFxFetchAttempt(result: FxFetchResult): void {
+    this.fxFetchAttempts.inc({ result });
+  }
+
+  setFxFetchLastSuccessTimestampSeconds(epochSeconds: number): void {
+    this.fxFetchLastSuccessTimestampSeconds.set(epochSeconds);
+  }
+
+  setFxRatesFreshnessDays(days: number): void {
+    this.fxRatesFreshnessDays.set(days);
   }
 
   scrape(): Promise<string> {

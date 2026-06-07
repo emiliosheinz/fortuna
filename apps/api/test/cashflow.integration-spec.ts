@@ -18,10 +18,21 @@ import { Category } from "@/cashflow/entities/category.entity";
 import { Tag } from "@/cashflow/entities/tag.entity";
 import { Transaction } from "@/cashflow/entities/transaction.entity";
 import { TransactionTag } from "@/cashflow/entities/transaction-tag.entity";
+import { FxRate } from "@/fx/entities/fx-rate.entity";
+import {
+  FX_FETCH_RETRY_OPTIONS,
+  FX_FRANKFURTER_CLIENT,
+} from "@/fx/services/fx-fetch.service";
+import { FxScheduledJob } from "@/fx/services/fx-scheduled-job";
 
 const ISSUER = "https://test-issuer.example.com";
 const AUDIENCE = "test-client-id";
 const NONCE = "test-nonce";
+
+interface FxClientStub {
+  fetchLatestEurAnchored: jest.Mock;
+  fetchHistoricalEurAnchored: jest.Mock;
+}
 
 describe("Cashflow integration", () => {
   let container: StartedPostgreSqlContainer;
@@ -31,6 +42,7 @@ describe("Cashflow integration", () => {
   let dataSource: DataSource;
   let signingPrivateKey: CryptoKey;
   let publicJwk: JWK;
+  let fxClientStub: FxClientStub;
 
   beforeAll(async () => {
     container = await new PostgreSqlContainer("postgres:17-alpine")
@@ -73,11 +85,25 @@ describe("Cashflow integration", () => {
       jwks: { keys: [publicJwk] },
     };
 
+    fxClientStub = {
+      fetchLatestEurAnchored: jest.fn(),
+      fetchHistoricalEurAnchored: jest.fn(),
+    };
+
     const moduleRef: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
     })
       .overrideProvider(GOOGLE_ID_TOKEN_VERIFIER_OPTIONS)
       .useValue(verifierOptions)
+      .overrideProvider(FX_FRANKFURTER_CLIENT)
+      .useValue(fxClientStub)
+      .overrideProvider(FX_FETCH_RETRY_OPTIONS)
+      .useValue({
+        maxAttempts: 2,
+        baseDelayMs: 1,
+        maxDelayMs: 1,
+        sleep: () => Promise.resolve(),
+      })
       .compile();
 
     app = moduleRef.createNestApplication();
@@ -98,7 +124,7 @@ describe("Cashflow integration", () => {
   beforeEach(async () => {
     if (!dataSource) return;
     await dataSource.query(
-      'TRUNCATE TABLE "transaction_tags", "tags", "categories", "transactions", "user_settings", "sign_in_events", "sessions", "device_fingerprints", "identities", "users" RESTART IDENTITY CASCADE',
+      'TRUNCATE TABLE "transaction_tags", "tags", "categories", "transactions", "user_settings", "sign_in_events", "sessions", "device_fingerprints", "identities", "users", "fx_rates" RESTART IDENTITY CASCADE',
     );
     if (redisAdmin?.status === "ready" || redisAdmin?.status === "connect") {
       await redisAdmin.flushdb().catch(() => undefined);
@@ -239,6 +265,11 @@ describe("Cashflow integration", () => {
         kind: "expense",
         categoryId: null,
         tagIds: [],
+        baseAmount: "12.34",
+        baseCurrency: "USD",
+        rateSubstituted: false,
+        rateDate: "2026-06-07",
+        unconvertible: false,
         createdAt: expect.any(String),
         updatedAt: expect.any(String),
       });
@@ -919,6 +950,211 @@ describe("Cashflow integration", () => {
         .delete(`/transactions/${tx.body.transaction.id}`)
         .set("Cookie", aliceC)
         .expect(404);
+    });
+  });
+
+  describe("FX read-time conversion on GET /transactions", () => {
+    async function seedRate(
+      rateDate: string,
+      quote: string,
+      rate: string,
+    ): Promise<void> {
+      await dataSource.getRepository(FxRate).insert({
+        rateDate,
+        baseCurrency: "EUR",
+        quoteCurrency: quote,
+        rate,
+        fetchedAt: new Date(),
+      });
+    }
+
+    it("includes a base-currency rollup using a same-day rate", async () => {
+      const { cookie } = await signInUser({
+        sub: "sub-a",
+        name: "Alice",
+        email: "alice@example.com",
+      });
+      await request(app.getHttpServer())
+        .put("/users/me/base-currency")
+        .set("Cookie", cookie)
+        .send({ baseCurrency: "USD" })
+        .expect(200);
+      await seedRate("2026-06-07", "USD", "1.080000");
+
+      await request(app.getHttpServer())
+        .post("/transactions")
+        .set("Cookie", cookie)
+        .send({
+          date: "2026-06-07",
+          amount: "100.00",
+          currency: "EUR",
+          description: "Travel",
+          kind: "expense",
+        })
+        .expect(201);
+
+      const list = await request(app.getHttpServer())
+        .get("/transactions")
+        .set("Cookie", cookie)
+        .expect(200);
+      const item = list.body.items[0];
+      expect(item.baseCurrency).toBe("USD");
+      expect(item.baseAmount).toBe("108.00");
+      expect(item.rateSubstituted).toBe(false);
+      expect(item.rateDate).toBe("2026-06-07");
+      expect(item.unconvertible).toBe(false);
+    });
+
+    it("falls back to the nearest prior rate and flags substituted", async () => {
+      const { cookie } = await signInUser({
+        sub: "sub-a",
+        name: "Alice",
+        email: "alice@example.com",
+      });
+      await request(app.getHttpServer())
+        .put("/users/me/base-currency")
+        .set("Cookie", cookie)
+        .send({ baseCurrency: "USD" })
+        .expect(200);
+      await seedRate("2026-06-05", "USD", "1.082000");
+
+      await request(app.getHttpServer())
+        .post("/transactions")
+        .set("Cookie", cookie)
+        .send({
+          date: "2026-06-07",
+          amount: "100.00",
+          currency: "EUR",
+          description: "Hotel",
+          kind: "expense",
+        })
+        .expect(201);
+
+      const list = await request(app.getHttpServer())
+        .get("/transactions")
+        .set("Cookie", cookie)
+        .expect(200);
+      expect(list.body.items[0].rateSubstituted).toBe(true);
+      expect(list.body.items[0].rateDate).toBe("2026-06-05");
+      expect(list.body.items[0].baseAmount).toBe("108.20");
+    });
+
+    it("marks rows as unconvertible when no rate path exists", async () => {
+      const { cookie } = await signInUser({
+        sub: "sub-a",
+        name: "Alice",
+        email: "alice@example.com",
+      });
+      await request(app.getHttpServer())
+        .put("/users/me/base-currency")
+        .set("Cookie", cookie)
+        .send({ baseCurrency: "USD" })
+        .expect(200);
+      // No rate seeded for the transaction currency.
+
+      await request(app.getHttpServer())
+        .post("/transactions")
+        .set("Cookie", cookie)
+        .send({
+          date: "2026-06-07",
+          amount: "9000.00",
+          currency: "XYZ",
+          description: "Mystery",
+          kind: "expense",
+        })
+        .expect(201);
+
+      const list = await request(app.getHttpServer())
+        .get("/transactions")
+        .set("Cookie", cookie)
+        .expect(200);
+      expect(list.body.items[0].unconvertible).toBe(true);
+      expect(list.body.items[0].baseAmount).toBeNull();
+      expect(list.body.items[0].rateDate).toBeNull();
+      expect(list.body.items[0].rateSubstituted).toBe(false);
+    });
+
+    it("GET /transactions/:id returns the converted shape", async () => {
+      const { cookie } = await signInUser({
+        sub: "sub-a",
+        name: "Alice",
+        email: "alice@example.com",
+      });
+      await request(app.getHttpServer())
+        .put("/users/me/base-currency")
+        .set("Cookie", cookie)
+        .send({ baseCurrency: "EUR" })
+        .expect(200);
+      await seedRate("2026-06-07", "BRL", "5.400000");
+
+      const created = await request(app.getHttpServer())
+        .post("/transactions")
+        .set("Cookie", cookie)
+        .send({
+          date: "2026-06-07",
+          amount: "54.00",
+          currency: "BRL",
+          description: "Snack",
+          kind: "expense",
+        })
+        .expect(201);
+
+      const id = created.body.transaction.id;
+      const res = await request(app.getHttpServer())
+        .get(`/transactions/${id}`)
+        .set("Cookie", cookie)
+        .expect(200);
+      expect(res.body.transaction.id).toBe(id);
+      expect(res.body.transaction.baseCurrency).toBe("EUR");
+      expect(res.body.transaction.baseAmount).toBe("10.00");
+      expect(res.body.transaction.rateSubstituted).toBe(false);
+    });
+
+    it("GET /transactions/:id returns 404 for another user's row", async () => {
+      const { cookie: aliceC } = await signInUser({
+        sub: "sub-a",
+        name: "Alice",
+        email: "alice@example.com",
+      });
+      const { cookie: bobC } = await signInUser({
+        sub: "sub-b",
+        name: "Bob",
+        email: "bob@example.com",
+      });
+      const created = await request(app.getHttpServer())
+        .post("/transactions")
+        .set("Cookie", aliceC)
+        .send({
+          date: "2026-06-07",
+          amount: "10.00",
+          currency: "USD",
+          description: "Coffee",
+          kind: "expense",
+        })
+        .expect(201);
+      await request(app.getHttpServer())
+        .get(`/transactions/${created.body.transaction.id}`)
+        .set("Cookie", bobC)
+        .expect(404);
+    });
+  });
+
+  describe("FX scheduled fetch persists EUR-anchored rates", () => {
+    it("upserts one row per quote currency and is idempotent across firings", async () => {
+      fxClientStub.fetchLatestEurAnchored.mockResolvedValue({
+        rateDate: "2026-06-07",
+        baseCurrency: "EUR" as const,
+        rates: { USD: "1.083000", BRL: "5.420000" },
+      });
+
+      const job = app.get(FxScheduledJob);
+      await job.runOnce();
+      await job.runOnce();
+
+      const rows = await dataSource.getRepository(FxRate).find();
+      expect(rows).toHaveLength(2);
+      const codes = rows.map((r) => r.quoteCurrency).sort();
+      expect(codes).toEqual(["BRL", "USD"]);
     });
   });
 
