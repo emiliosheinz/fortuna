@@ -21,8 +21,9 @@ describe("CreateTransactionDto validation", () => {
     expect(await check(valid)).toEqual([]);
   });
 
-  it("rejects a non-ISO-4217 currency code", async () => {
-    expect(await check({ ...valid, currency: "usd" })).toContain("matches");
+  it("rejects a currency outside the supported allowlist", async () => {
+    expect(await check({ ...valid, currency: "usd" })).toContain("isIn");
+    expect(await check({ ...valid, currency: "JPY" })).toContain("isIn");
   });
 
   it("rejects more than two decimal places on amount", async () => {

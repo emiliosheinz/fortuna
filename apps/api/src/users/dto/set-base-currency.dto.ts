@@ -1,16 +1,16 @@
-import { IsString, Matches } from "class-validator";
+import { IsIn, IsString } from "class-validator";
+import { SUPPORTED_CURRENCIES } from "@/fx/constants";
 
 /**
  * Request body for `PUT /users/me/base-currency`.
  *
- * Validated by Nest's global `ValidationPipe`. Anything other than three
- * uppercase letters is rejected before the handler runs; deeper coverage
- * checks against the FX provider live in Phase 3.
+ * Validated by Nest's global `ValidationPipe`. The base currency is restricted
+ * to the product-supported set (matches the read-time conversion coverage).
  */
 export class SetBaseCurrencyDto {
   @IsString()
-  @Matches(/^[A-Z]{3}$/, {
-    message: "baseCurrency must be a 3-letter ISO 4217 code",
+  @IsIn(SUPPORTED_CURRENCIES, {
+    message: `baseCurrency must be one of ${SUPPORTED_CURRENCIES.join(", ")}`,
   })
   declare baseCurrency: string;
 }

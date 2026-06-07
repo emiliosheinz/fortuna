@@ -29,7 +29,7 @@ import {
 } from "@/components/ui/select";
 import { ApiError } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
-import { SUGGESTED_CURRENCIES, TRANSACTION_KINDS } from "../constants";
+import { SUPPORTED_CURRENCIES, TRANSACTION_KINDS } from "../constants";
 import { useDeleteTransaction, useTags, useUpdateTransaction } from "../hooks";
 import type {
   Transaction,
@@ -209,7 +209,7 @@ export function TransactionEditDialog({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {SUGGESTED_CURRENCIES.map((code) => (
+                {SUPPORTED_CURRENCIES.map((code) => (
                   <SelectItem key={code} value={code}>
                     {code}
                   </SelectItem>

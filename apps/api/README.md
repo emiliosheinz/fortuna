@@ -48,35 +48,35 @@ Lists every migration with an `[X]` next to the ones that have been applied.
 
 ## FX rates
 
-The cashflow domain converts foreign-currency transactions to the user's base currency at read time using EUR-anchored daily rates from [frankfurter.app](https://www.frankfurter.app/). A daily cron (`FxScheduledJob`) pulls the latest rates at 06:00 UTC; in dev you usually want to populate rates on demand.
+The cashflow domain converts foreign-currency transactions to the user's base currency at read time using EUR-anchored daily rates from [frankfurter.app](https://www.frankfurter.app/). The product supports four currencies — **USD, EUR, BRL, GBP** — set in `src/fx/constants.ts`. Rates for anything else returned by Frankfurter are dropped on ingest.
 
-`bin/fortuna fx fetch` triggers the same job the cron runs, via a dev-only `POST /internal/fx/fetch` route on the API. The route returns 404 in production.
+### How the daily job works
 
-### Pull today's rates (no args)
+`FxScheduledJob` fires once a day at 06:00 UTC. Each firing is a self-healing catch-up: it reads the `fx_coverage` watermark (the last date the job has attempted to cover), fetches the open range `(watermark, today]` from Frankfurter, upserts every supported quote currency, and advances the watermark to today. The coverage window starts at `FX_COVERAGE_START_DATE = 2026-01-01`.
+
+Behaviour notes:
+
+- Idempotent: a second firing on the same day finds the watermark already at today and no-ops.
+- Self-healing: if the job misses N days, the next firing fetches the full N-day gap in one historical request.
+- Coverage anchor: the very first firing fetches `2026-01-01..today` in one shot. Frankfurter conveniently extends the lower bound to the last preceding business day, which gives Jan 1 a backstop rate.
+- Currency filter: only USD, BRL, and GBP rows are persisted (EUR is the pivot; same-currency lookup is identity).
+
+### Triggering the job locally
+
+`bin/fortuna fx fetch` runs the same job, via a dev-only `POST /internal/fx/fetch` route. The route returns 404 in production.
 
 ```bash
+# Catch-up to today (mirrors the prod cron)
 bin/fortuna fx fetch
-```
 
-Runs `FxFetchService.fetchAndPersistLatest()` — identical to the daily cron. Use this after a fresh `docker compose up -d` to seed today's row.
-
-### Backfill from a date until today
-
-```bash
+# Backfill from a date through today (explicit override of the watermark)
 bin/fortuna fx fetch --from 2026-06-01
-```
 
-Useful when seeding a window of recent rates for the transactions you're about to capture.
-
-### Backfill an explicit range
-
-```bash
+# Backfill an explicit range
 bin/fortuna fx fetch --from 2026-05-01 --to 2026-05-31
 ```
 
-Both bounds inclusive. Run before a historical cutover so older transactions resolve cleanly.
-
-All three modes upsert against the `(rate_date, base_currency, quote_currency)` primary key, so repeat invocations are idempotent.
+The catch-up form is what you want most of the time — after `docker compose up -d`, one call seeds the entire supported window. The explicit `--from`/`--to` forms bypass the watermark and are useful for re-seeding or testing.
 
 ## Local schema reset
 

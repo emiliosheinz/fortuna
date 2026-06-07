@@ -21,11 +21,10 @@ import {
 } from "@/components/ui/select";
 import { ApiError } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
-import { isFrankfurterSupported, TRANSACTION_KINDS } from "../constants";
+import { SUPPORTED_CURRENCIES, TRANSACTION_KINDS } from "../constants";
 import { useCreateTransaction } from "../hooks";
 import type { CreateTransactionInput, TransactionKind } from "../types";
 import { CategoryCombobox } from "./category-combobox";
-import { CurrencyInput } from "./currency-input";
 import { MoneyInput } from "./money-input";
 import { TagInput } from "./tag-input";
 
@@ -86,8 +85,8 @@ export function CaptureForm({ baseCurrency, onCaptured }: CaptureFormProps) {
       next.amount = "Use a non-negative amount with up to two decimals.";
     }
     if (!form.date) next.date = "Pick a date.";
-    if (!/^[A-Z]{3}$/.test(form.currency)) {
-      next.currency = "Pick a 3-letter ISO 4217 code.";
+    if (!(SUPPORTED_CURRENCIES as readonly string[]).includes(form.currency)) {
+      next.currency = "Pick a supported currency.";
     }
     return next;
   }
@@ -220,24 +219,27 @@ export function CaptureForm({ baseCurrency, onCaptured }: CaptureFormProps) {
 
       <div className="flex flex-col gap-1.5">
         <Label htmlFor={currencyId}>Currency</Label>
-        <CurrencyInput
-          id={currencyId}
+        <Select
           value={form.currency}
-          onChange={(next) => update("currency", next)}
-          aria-invalid={Boolean(errors.currency)}
-        />
-        {errors.currency ? <FieldError message={errors.currency} /> : null}
-        {!errors.currency &&
-        form.currency.length === 3 &&
-        !isFrankfurterSupported(form.currency) ? (
-          <p
-            data-testid="capture-form-currency-unconvertible"
-            className="text-sm text-muted-foreground"
+          onValueChange={(value) => update("currency", value)}
+        >
+          <SelectTrigger
+            id={currencyId}
+            data-testid="capture-form-currency-trigger"
+            className="w-full"
+            aria-invalid={Boolean(errors.currency)}
           >
-            {form.currency} isn't covered by the FX provider — this row will
-            still record but its base-currency rollup will be unconvertible.
-          </p>
-        ) : null}
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {SUPPORTED_CURRENCIES.map((code) => (
+              <SelectItem key={code} value={code}>
+                {code}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {errors.currency ? <FieldError message={errors.currency} /> : null}
       </div>
 
       <div className="flex flex-col gap-1.5">

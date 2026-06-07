@@ -9,9 +9,9 @@ import {
   Matches,
   MaxLength,
 } from "class-validator";
+import { SUPPORTED_CURRENCIES } from "@/fx/constants";
 
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
-const ISO_4217_RE = /^[A-Z]{3}$/;
 const NUMERIC_18_2_RE = /^\d+(\.\d{1,2})?$/;
 const DESCRIPTION_MAX = 500;
 const TAG_NAME_MAX = 100;
@@ -36,8 +36,8 @@ export class CreateTransactionDto {
   declare amount: string;
 
   @IsString()
-  @Matches(ISO_4217_RE, {
-    message: "currency must be a 3-letter ISO 4217 code",
+  @IsIn(SUPPORTED_CURRENCIES, {
+    message: `currency must be one of ${SUPPORTED_CURRENCIES.join(", ")}`,
   })
   declare currency: string;
 

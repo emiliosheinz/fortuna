@@ -124,11 +124,13 @@ describe("Cashflow integration", () => {
   beforeEach(async () => {
     if (!dataSource) return;
     await dataSource.query(
-      'TRUNCATE TABLE "transaction_tags", "tags", "categories", "transactions", "user_settings", "sign_in_events", "sessions", "device_fingerprints", "identities", "users", "fx_rates" RESTART IDENTITY CASCADE',
+      'TRUNCATE TABLE "transaction_tags", "tags", "categories", "transactions", "user_settings", "sign_in_events", "sessions", "device_fingerprints", "identities", "users", "fx_rates", "fx_coverage" RESTART IDENTITY CASCADE',
     );
     if (redisAdmin?.status === "ready" || redisAdmin?.status === "connect") {
       await redisAdmin.flushdb().catch(() => undefined);
     }
+    fxClientStub.fetchLatestEurAnchored.mockReset();
+    fxClientStub.fetchHistoricalEurAnchored.mockReset();
   });
 
   async function signInUser(profile: {
@@ -1072,7 +1074,7 @@ describe("Cashflow integration", () => {
       expect(list.body.items[0].rateDate).toBe("2026-05-30");
     });
 
-    it("marks rows as unconvertible when no rate path exists", async () => {
+    it("rejects POST /transactions when the currency is outside the supported set", async () => {
       const { cookie } = await signInUser({
         sub: "sub-a",
         name: "Alice",
@@ -1083,7 +1085,6 @@ describe("Cashflow integration", () => {
         .set("Cookie", cookie)
         .send({ baseCurrency: "USD" })
         .expect(200);
-      // No rate seeded for the transaction currency.
 
       await request(app.getHttpServer())
         .post("/transactions")
@@ -1095,16 +1096,7 @@ describe("Cashflow integration", () => {
           description: "Mystery",
           kind: "expense",
         })
-        .expect(201);
-
-      const list = await request(app.getHttpServer())
-        .get("/transactions")
-        .set("Cookie", cookie)
-        .expect(200);
-      expect(list.body.items[0].unconvertible).toBe(true);
-      expect(list.body.items[0].baseAmount).toBeNull();
-      expect(list.body.items[0].rateDate).toBeNull();
-      expect(list.body.items[0].rateSubstituted).toBe(false);
+        .expect(400);
     });
 
     it("GET /transactions/:id returns the converted shape", async () => {
@@ -1173,21 +1165,30 @@ describe("Cashflow integration", () => {
   });
 
   describe("POST /internal/fx/fetch trigger", () => {
-    it("with no body, pulls today's EUR-anchored rates", async () => {
-      fxClientStub.fetchLatestEurAnchored.mockResolvedValue({
-        rateDate: "2026-06-07",
-        baseCurrency: "EUR" as const,
-        rates: { USD: "1.083000" },
-      });
+    it("with no body, runs the self-healing catch-up over the missing window", async () => {
+      fxClientStub.fetchHistoricalEurAnchored.mockResolvedValue([
+        { rateDate: "2026-06-07", rates: { USD: "1.083000" } },
+      ]);
 
       const res = await request(app.getHttpServer())
         .post("/internal/fx/fetch")
         .send({})
         .expect(200);
 
-      expect(res.body).toEqual({ mode: "latest", persisted: 1 });
-      expect(fxClientStub.fetchLatestEurAnchored).toHaveBeenCalledTimes(1);
-      expect(fxClientStub.fetchHistoricalEurAnchored).not.toHaveBeenCalled();
+      expect(res.body.mode).toBe("catch-up");
+      expect(res.body.from).toBe("2026-01-01");
+      expect(res.body.to).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+      expect(res.body.noop).toBe(false);
+      expect(fxClientStub.fetchHistoricalEurAnchored).toHaveBeenCalledTimes(1);
+
+      // A second call advances coverage to today, so the second run is a no-op.
+      const second = await request(app.getHttpServer())
+        .post("/internal/fx/fetch")
+        .send({})
+        .expect(200);
+      expect(second.body.noop).toBe(true);
+      expect(second.body.persisted).toBe(0);
+      expect(fxClientStub.fetchHistoricalEurAnchored).toHaveBeenCalledTimes(1);
     });
 
     it("with from and to, backfills the explicit range", async () => {
@@ -1254,22 +1255,21 @@ describe("Cashflow integration", () => {
     });
   });
 
-  describe("FX scheduled fetch persists EUR-anchored rates", () => {
-    it("upserts one row per quote currency and is idempotent across firings", async () => {
-      fxClientStub.fetchLatestEurAnchored.mockResolvedValue({
-        rateDate: "2026-06-07",
-        baseCurrency: "EUR" as const,
-        rates: { USD: "1.083000", BRL: "5.420000" },
-      });
+  describe("FxScheduledJob catch-up", () => {
+    it("seeds rates over the coverage window and is idempotent across firings", async () => {
+      fxClientStub.fetchHistoricalEurAnchored.mockResolvedValue([
+        { rateDate: "2026-06-07", rates: { USD: "1.083000", BRL: "5.420000" } },
+      ]);
 
       const job = app.get(FxScheduledJob);
       await job.runOnce();
       await job.runOnce();
 
       const rows = await dataSource.getRepository(FxRate).find();
-      expect(rows).toHaveLength(2);
       const codes = rows.map((r) => r.quoteCurrency).sort();
       expect(codes).toEqual(["BRL", "USD"]);
+      // Second firing finds the watermark at today and never re-queries upstream.
+      expect(fxClientStub.fetchHistoricalEurAnchored).toHaveBeenCalledTimes(1);
     });
   });
 

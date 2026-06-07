@@ -136,30 +136,13 @@ describe("CaptureForm", () => {
     ).toHaveTextContent(/could not save/i);
   });
 
-  it("warns when the typed currency is outside frankfurter coverage", async () => {
+  it("offers only the supported currencies in the picker", () => {
     renderForm();
 
-    const currencyInput = screen.getByTestId(
-      "capture-form-currency-input",
-    ) as HTMLInputElement;
-    fireEvent.change(currencyInput, { target: { value: "XYZ" } });
-
-    expect(
-      await screen.findByTestId("capture-form-currency-unconvertible"),
-    ).toHaveTextContent(/won't|isn't covered/i);
-  });
-
-  it("does not warn for a covered currency", () => {
-    renderForm();
-
-    const currencyInput = screen.getByTestId(
-      "capture-form-currency-input",
-    ) as HTMLInputElement;
-    fireEvent.change(currencyInput, { target: { value: "GBP" } });
-
-    expect(
-      screen.queryByTestId("capture-form-currency-unconvertible"),
-    ).toBeNull();
+    const trigger = screen.getByTestId("capture-form-currency-trigger");
+    expect(trigger).toBeInTheDocument();
+    // The Select is closed by default; SelectValue shows the current code.
+    expect(trigger).toHaveTextContent(/USD/);
   });
 
   it("sends typed tag names as part of the payload", async () => {

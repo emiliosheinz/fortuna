@@ -2,6 +2,7 @@ import { Module } from "@nestjs/common";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { MetricsModule } from "@/metrics/metrics.module";
 import { FxInternalController } from "./controllers/fx-internal.controller";
+import { FxCoverage } from "./entities/fx-coverage.entity";
 import { FxRate } from "./entities/fx-rate.entity";
 import { FrankfurterClient } from "./services/frankfurter-client";
 import {
@@ -19,7 +20,7 @@ import { FxScheduledJob } from "./services/fx-scheduled-job";
  * routing through the cashflow module.
  */
 @Module({
-  imports: [TypeOrmModule.forFeature([FxRate]), MetricsModule],
+  imports: [TypeOrmModule.forFeature([FxRate, FxCoverage]), MetricsModule],
   controllers: [FxInternalController],
   providers: [
     FxLookupService,

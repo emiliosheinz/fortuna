@@ -1,6 +1,7 @@
 import { Test, TestingModule } from "@nestjs/testing";
 import { getRepositoryToken } from "@nestjs/typeorm";
 import { MetricsService } from "@/metrics/metrics.service";
+import { FxCoverage } from "../entities/fx-coverage.entity";
 import { FxRate } from "../entities/fx-rate.entity";
 import { FrankfurterClient, FrankfurterHttpError } from "./frankfurter-client";
 import {
@@ -14,7 +15,7 @@ interface UpsertedBatch {
   values: Array<Record<string, unknown>>;
 }
 
-function buildRepoStub(latestRateDate: string | null) {
+function buildFxRateRepoStub(latestRateDate: string | null) {
   const upserts: UpsertedBatch[] = [];
   const repo = {
     upsert: jest.fn(async (values: Array<Record<string, unknown>>) => {
@@ -28,22 +29,49 @@ function buildRepoStub(latestRateDate: string | null) {
   return { repo, upserts };
 }
 
+function buildCoverageRepoStub(initial: string | null) {
+  const state: { lastCoveredDate: string | null } = {
+    lastCoveredDate: initial,
+  };
+  const repo = {
+    findOne: jest.fn(async () =>
+      state.lastCoveredDate ? { lastCoveredDate: state.lastCoveredDate } : null,
+    ),
+    upsert: jest.fn(
+      async (
+        values: { id: number; lastCoveredDate: string } | undefined,
+        _options: unknown,
+      ) => {
+        if (values) state.lastCoveredDate = values.lastCoveredDate;
+      },
+    ),
+  };
+  return { repo, state };
+}
+
 async function buildService(options: {
   client: FrankfurterClient;
   latestRateDate?: string | null;
-  retryOptions?: Parameters<typeof Test.createTestingModule>[0];
+  coverage?: string | null;
 }): Promise<{
   service: FxFetchService;
   metrics: MetricsService;
   upserts: UpsertedBatch[];
+  coverageState: { lastCoveredDate: string | null };
 }> {
-  const { repo, upserts } = buildRepoStub(options.latestRateDate ?? null);
+  const { repo: fxRateRepo, upserts } = buildFxRateRepoStub(
+    options.latestRateDate ?? null,
+  );
+  const { repo: coverageRepo, state: coverageState } = buildCoverageRepoStub(
+    options.coverage ?? null,
+  );
 
   const moduleRef: TestingModule = await Test.createTestingModule({
     providers: [
       MetricsService,
       FxFetchService,
-      { provide: getRepositoryToken(FxRate), useValue: repo },
+      { provide: getRepositoryToken(FxRate), useValue: fxRateRepo },
+      { provide: getRepositoryToken(FxCoverage), useValue: coverageRepo },
       { provide: FX_FRANKFURTER_CLIENT, useValue: options.client },
       {
         provide: FX_FETCH_RETRY_OPTIONS,
@@ -61,6 +89,7 @@ async function buildService(options: {
     service: moduleRef.get(FxFetchService),
     metrics: moduleRef.get(MetricsService),
     upserts,
+    coverageState,
   };
 }
 
@@ -77,31 +106,28 @@ describe("FxFetchService", () => {
     });
   });
 
-  describe("fetchAndPersistLatest", () => {
-    it("upserts one row per quote currency and records a success metric", async () => {
+  describe("fetchAndPersistLatest (currency filter)", () => {
+    it("drops rates outside the supported quote set on persist", async () => {
       const client = {
         fetchLatestEurAnchored: jest.fn(async () => ({
           rateDate: "2026-06-07",
           baseCurrency: "EUR" as const,
-          rates: { USD: "1.083", BRL: "5.42" },
+          rates: { USD: "1.083", BRL: "5.42", JPY: "170", XYZ: "1" },
         })),
         fetchHistoricalEurAnchored: jest.fn(),
       } as unknown as FrankfurterClient;
-      const { service, metrics, upserts } = await buildService({ client });
+      const { service, upserts } = await buildService({ client });
 
       const written = await service.fetchAndPersistLatest();
 
       expect(written).toBe(2);
-      expect(upserts).toHaveLength(1);
       const codes = upserts[0]?.values
         .map((v) => v.quoteCurrency)
         .sort() as string[];
       expect(codes).toEqual(["BRL", "USD"]);
-      const text = await metrics.scrape();
-      expect(text).toContain('fx_fetch_attempts_total{result="success"} 1');
     });
 
-    it("retries on a transient HTTP failure then succeeds", async () => {
+    it("retries on transient failures and surfaces the success metric", async () => {
       const calls = jest
         .fn<Promise<unknown>, []>()
         .mockRejectedValueOnce(new FrankfurterHttpError(502))
@@ -140,6 +166,73 @@ describe("FxFetchService", () => {
       const text = await metrics.scrape();
       expect(text).toContain('fx_fetch_attempts_total{result="retry"} 2');
       expect(text).toContain('fx_fetch_attempts_total{result="failure"} 1');
+    });
+  });
+
+  describe("fetchAndPersistCatchUp", () => {
+    it("first run fetches from FX_COVERAGE_START_DATE through today", async () => {
+      const client = {
+        fetchLatestEurAnchored: jest.fn(),
+        fetchHistoricalEurAnchored: jest.fn(async () => [
+          { rateDate: "2026-06-05", rates: { USD: "1.080" } },
+        ]),
+      } as unknown as FrankfurterClient;
+      const { service, coverageState } = await buildService({
+        client,
+        coverage: null,
+      });
+
+      const result = await service.fetchAndPersistCatchUp("2026-06-07");
+
+      expect(client.fetchHistoricalEurAnchored).toHaveBeenCalledWith({
+        from: "2026-01-01",
+        to: "2026-06-07",
+      });
+      expect(result.noop).toBe(false);
+      expect(result.from).toBe("2026-01-01");
+      expect(result.to).toBe("2026-06-07");
+      expect(coverageState.lastCoveredDate).toBe("2026-06-07");
+    });
+
+    it("subsequent runs only fetch the gap and advance the watermark", async () => {
+      const client = {
+        fetchLatestEurAnchored: jest.fn(),
+        fetchHistoricalEurAnchored: jest.fn(async () => [
+          { rateDate: "2026-06-06", rates: { USD: "1.080" } },
+          { rateDate: "2026-06-07", rates: { USD: "1.081" } },
+        ]),
+      } as unknown as FrankfurterClient;
+      const { service, coverageState } = await buildService({
+        client,
+        coverage: "2026-06-05",
+      });
+
+      const result = await service.fetchAndPersistCatchUp("2026-06-07");
+
+      expect(client.fetchHistoricalEurAnchored).toHaveBeenCalledWith({
+        from: "2026-06-06",
+        to: "2026-06-07",
+      });
+      expect(result.from).toBe("2026-06-06");
+      expect(coverageState.lastCoveredDate).toBe("2026-06-07");
+    });
+
+    it("is a no-op when the watermark is already at today", async () => {
+      const client = {
+        fetchLatestEurAnchored: jest.fn(),
+        fetchHistoricalEurAnchored: jest.fn(),
+      } as unknown as FrankfurterClient;
+      const { service, coverageState } = await buildService({
+        client,
+        coverage: "2026-06-07",
+      });
+
+      const result = await service.fetchAndPersistCatchUp("2026-06-07");
+
+      expect(client.fetchHistoricalEurAnchored).not.toHaveBeenCalled();
+      expect(result.noop).toBe(true);
+      expect(result.persisted).toBe(0);
+      expect(coverageState.lastCoveredDate).toBe("2026-06-07");
     });
   });
 });

@@ -9,7 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { SUGGESTED_CURRENCIES } from "../constants";
+import { SUPPORTED_CURRENCIES } from "../constants";
 import { useSetBaseCurrency } from "../hooks";
 
 interface BaseCurrencyFormProps {
@@ -55,7 +55,7 @@ export function BaseCurrencyForm({ initial, onSaved }: BaseCurrencyFormProps) {
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          {SUGGESTED_CURRENCIES.map((code) => (
+          {SUPPORTED_CURRENCIES.map((code) => (
             <SelectItem key={code} value={code}>
               {code}
             </SelectItem>

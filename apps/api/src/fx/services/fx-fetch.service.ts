@@ -2,6 +2,12 @@ import { Inject, Injectable, Logger } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { MetricsService } from "@/metrics/metrics.service";
+import {
+  FX_BASE_CURRENCY,
+  FX_COVERAGE_START_DATE,
+  SUPPORTED_QUOTE_CURRENCIES,
+} from "../constants";
+import { FxCoverage } from "../entities/fx-coverage.entity";
 import { FxRate } from "../entities/fx-rate.entity";
 import {
   FrankfurterClient,
@@ -19,11 +25,20 @@ export interface FxFetchRetryOptions {
 export const FX_FETCH_RETRY_OPTIONS = Symbol("FX_FETCH_RETRY_OPTIONS");
 export const FX_FRANKFURTER_CLIENT = Symbol("FX_FRANKFURTER_CLIENT");
 
+const COVERAGE_SINGLETON_ID = 1;
+
 const DEFAULTS: Required<Omit<FxFetchRetryOptions, "sleep">> = {
   maxAttempts: 3,
   baseDelayMs: 250,
   maxDelayMs: 2_000,
 };
+
+export interface CatchUpResult {
+  persisted: number;
+  from: string;
+  to: string;
+  noop: boolean;
+}
 
 @Injectable()
 export class FxFetchService {
@@ -37,6 +52,8 @@ export class FxFetchService {
   constructor(
     @InjectRepository(FxRate)
     private readonly fxRates: Repository<FxRate>,
+    @InjectRepository(FxCoverage)
+    private readonly coverage: Repository<FxCoverage>,
     private readonly metrics: MetricsService,
     @Inject(FX_FRANKFURTER_CLIENT)
     client: FrankfurterClient,
@@ -51,11 +68,23 @@ export class FxFetchService {
   }
 
   /**
-   * Fetch the latest EUR-anchored rates and upsert one row per quote
-   * currency. Retries with exponential backoff up to `maxAttempts`. Returns
-   * the number of rows persisted; throws once the budget is exhausted so
-   * the scheduled job can surface the failure to the alert path.
+   * The job that runs in production. Fills any gap between the coverage
+   * watermark and today by issuing one historical fetch over the open
+   * range, persisting whatever Frankfurter returns, then advancing the
+   * watermark. Idempotent: a second call on the same day finds the
+   * watermark already at today and no-ops.
    */
+  async fetchAndPersistCatchUp(today = todayIsoUtc()): Promise<CatchUpResult> {
+    const watermark = await this.readCoverage();
+    const start = watermark ? nextDayIso(watermark) : FX_COVERAGE_START_DATE;
+    if (start > today) {
+      return { persisted: 0, from: start, to: today, noop: true };
+    }
+    const persisted = await this.fetchAndPersistRange(start, today);
+    await this.writeCoverage(today);
+    return { persisted, from: start, to: today, noop: false };
+  }
+
   async fetchAndPersistLatest(): Promise<number> {
     const result = await this.runWithRetry(() =>
       this.client.fetchLatestEurAnchored(),
@@ -73,7 +102,7 @@ export class FxFetchService {
     for (const day of result) {
       written += await this.persistDay({
         rateDate: day.rateDate,
-        baseCurrency: "EUR",
+        baseCurrency: FX_BASE_CURRENCY,
         rates: day.rates,
       });
     }
@@ -114,20 +143,36 @@ export class FxFetchService {
 
   private async persistDay(day: FrankfurterLatestResponse): Promise<number> {
     const fetchedAt = new Date();
-    const codes = Object.keys(day.rates);
-    if (codes.length === 0) return 0;
-
-    const values = codes.map((quote) => ({
-      rateDate: day.rateDate,
-      baseCurrency: day.baseCurrency,
-      quoteCurrency: quote,
-      rate: day.rates[quote] ?? "0",
-      fetchedAt,
-    }));
+    const values = Object.entries(day.rates)
+      .filter(([quote]) => SUPPORTED_QUOTE_CURRENCIES.includes(quote))
+      .map(([quote, rate]) => ({
+        rateDate: day.rateDate,
+        baseCurrency: day.baseCurrency,
+        quoteCurrency: quote,
+        rate,
+        fetchedAt,
+      }));
+    if (values.length === 0) return 0;
     await this.fxRates.upsert(values, {
       conflictPaths: ["rateDate", "baseCurrency", "quoteCurrency"],
     });
     return values.length;
+  }
+
+  private async readCoverage(): Promise<string | null> {
+    const row = await this.coverage.findOne({
+      where: { id: COVERAGE_SINGLETON_ID },
+      select: { lastCoveredDate: true },
+    });
+    if (!row) return null;
+    return normaliseDate(row.lastCoveredDate);
+  }
+
+  private async writeCoverage(date: string): Promise<void> {
+    await this.coverage.upsert(
+      { id: COVERAGE_SINGLETON_ID, lastCoveredDate: date },
+      { conflictPaths: ["id"] },
+    );
   }
 
   private async refreshFreshnessGauge(): Promise<void> {
@@ -167,6 +212,24 @@ export function toIsoDate(value: Date): string {
   const mm = String(value.getUTCMonth() + 1).padStart(2, "0");
   const dd = String(value.getUTCDate()).padStart(2, "0");
   return `${yyyy}-${mm}-${dd}`;
+}
+
+export function todayIsoUtc(): string {
+  return toIsoDate(new Date());
+}
+
+function normaliseDate(value: string | Date): string {
+  return value instanceof Date ? toIsoDate(value) : value;
+}
+
+function nextDayIso(iso: string): string {
+  const ms =
+    Date.UTC(
+      Number(iso.slice(0, 4)),
+      Number(iso.slice(5, 7)) - 1,
+      Number(iso.slice(8, 10)),
+    ) + 86_400_000;
+  return toIsoDate(new Date(ms));
 }
 
 function defaultSleep(ms: number): Promise<void> {

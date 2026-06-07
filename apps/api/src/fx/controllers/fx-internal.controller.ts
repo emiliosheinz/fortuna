@@ -6,18 +6,25 @@ import {
   NotFoundException,
   Post,
 } from "@nestjs/common";
+import { IsOptional, IsString } from "class-validator";
 import { FxFetchService } from "../services/fx-fetch.service";
 
-interface TriggerBody {
+class TriggerBody {
+  @IsOptional()
+  @IsString()
   from?: string;
+
+  @IsOptional()
+  @IsString()
   to?: string;
 }
 
 interface TriggerResult {
-  mode: "latest" | "range";
+  mode: "catch-up" | "range";
   persisted: number;
   from?: string;
   to?: string;
+  noop?: boolean;
 }
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -25,7 +32,7 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 /**
  * Dev-only trigger that runs the same FX fetch path the daily cron does.
  * Three modes:
- *  - no body              -> pull today's EUR-anchored rates (the prod cron)
+ *  - no body              -> run the self-healing catch-up job (the prod cron)
  *  - `{from}`             -> backfill from `from` to today (inclusive)
  *  - `{from, to}`         -> backfill the explicit range
  *
@@ -38,14 +45,22 @@ export class FxInternalController {
 
   @Post("fetch")
   @HttpCode(200)
-  async fetch(@Body() body: TriggerBody = {}): Promise<TriggerResult> {
+  async fetch(
+    @Body() body: TriggerBody = new TriggerBody(),
+  ): Promise<TriggerResult> {
     if (process.env.NODE_ENV === "production") {
       throw new NotFoundException();
     }
 
     if (!body.from && !body.to) {
-      const persisted = await this.fetcher.fetchAndPersistLatest();
-      return { mode: "latest", persisted };
+      const result = await this.fetcher.fetchAndPersistCatchUp();
+      return {
+        mode: "catch-up",
+        persisted: result.persisted,
+        from: result.from,
+        to: result.to,
+        noop: result.noop,
+      };
     }
 
     if (!body.from) {

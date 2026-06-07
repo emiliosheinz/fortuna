@@ -20,10 +20,16 @@ export class FxScheduledJob {
 
   async runOnce(): Promise<void> {
     try {
-      const persisted = await this.fetcher.fetchAndPersistLatest();
-      this.logger.log(`Daily FX fetch persisted ${persisted} rate row(s)`);
+      const result = await this.fetcher.fetchAndPersistCatchUp();
+      if (result.noop) {
+        this.logger.log("Daily FX catch-up no-op (coverage already at today)");
+      } else {
+        this.logger.log(
+          `Daily FX catch-up persisted ${result.persisted} row(s) over ${result.from}..${result.to}`,
+        );
+      }
     } catch (error) {
-      this.logger.error("Daily FX fetch failed", {
+      this.logger.error("Daily FX catch-up failed", {
         error: error instanceof Error ? error.message : String(error),
       });
     }

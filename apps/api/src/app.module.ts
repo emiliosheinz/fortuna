@@ -16,6 +16,7 @@ import { Category } from "./cashflow/entities/category.entity";
 import { Tag } from "./cashflow/entities/tag.entity";
 import { Transaction } from "./cashflow/entities/transaction.entity";
 import { TransactionTag } from "./cashflow/entities/transaction-tag.entity";
+import { FxCoverage } from "./fx/entities/fx-coverage.entity";
 import { FxRate } from "./fx/entities/fx-rate.entity";
 import { FxModule } from "./fx/fx.module";
 import { MetricsModule } from "./metrics/metrics.module";
@@ -45,6 +46,7 @@ import { UsersModule } from "./users/users.module";
           Tag,
           TransactionTag,
           FxRate,
+          FxCoverage,
         ],
         migrations: [
           path.join(__dirname, "database", "migrations", "*.{ts,js}"),
