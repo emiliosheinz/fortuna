@@ -70,18 +70,13 @@ export function Sidebar({ me }: { me: CurrentUser }) {
       className="border-r border-border"
     >
       <SidebarHeader>
-        <div className="flex h-8 items-center px-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
+        <div className="flex h-8 items-center overflow-hidden px-2">
           <Link
             href="/"
             aria-label="Fortuna home"
-            className="rounded-md font-semibold tracking-tight outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="whitespace-nowrap rounded-md font-semibold tracking-tight outline-none transition-opacity duration-200 focus-visible:ring-2 focus-visible:ring-ring group-data-[collapsible=icon]:pointer-events-none group-data-[collapsible=icon]:opacity-0"
           >
-            <span className="group-data-[collapsible=icon]:hidden">
-              Fortuna
-            </span>
-            <span className="hidden group-data-[collapsible=icon]:inline">
-              F
-            </span>
+            Fortuna
           </Link>
         </div>
         <IdentityPopover me={me} />
@@ -128,7 +123,9 @@ function SidebarNavItem({ item }: { item: NavItem }) {
           aria-current={isActive ? "page" : undefined}
         >
           <Icon aria-hidden />
-          <span>{item.label}</span>
+          <span className="transition-opacity duration-200 group-data-[collapsible=icon]:opacity-0">
+            {item.label}
+          </span>
         </Link>
       </SidebarMenuButton>
     </SidebarMenuItem>
@@ -151,14 +148,14 @@ function IdentityPopover({ me }: { me: CurrentUser }) {
               data-testid="sidebar-identity"
               aria-label="Account menu"
               tooltip={me.name}
-              className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+              className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground group-data-[collapsible=icon]:!h-12 group-data-[collapsible=icon]:!w-full group-data-[collapsible=icon]:!justify-center group-data-[collapsible=icon]:!p-1"
             >
               <UserAvatar
                 name={me.name}
                 avatarUrl={me.avatarUrl}
                 className="size-7"
               />
-              <div className="flex min-w-0 flex-col text-left">
+              <div className="flex min-w-0 flex-col text-left transition-opacity duration-200 group-data-[collapsible=icon]:opacity-0">
                 <span className="truncate text-sm font-medium">{me.name}</span>
                 <span className="truncate text-xs text-muted-foreground">
                   {me.email}
@@ -252,7 +249,9 @@ function ThemeToggle() {
           tooltip="Theme"
         >
           <PaletteIcon aria-hidden />
-          <span>Theme</span>
+          <span className="transition-opacity duration-200 group-data-[collapsible=icon]:opacity-0">
+            Theme
+          </span>
         </SidebarMenuButton>
       </DropdownMenuTrigger>
       <DropdownMenuContent
@@ -296,7 +295,9 @@ function CollapseToggle() {
       onClick={toggleSidebar}
     >
       <SidebarIcon aria-hidden />
-      <span>Collapse</span>
+      <span className="transition-opacity duration-200 group-data-[collapsible=icon]:opacity-0">
+        Collapse
+      </span>
     </SidebarMenuButton>
   );
 }
