@@ -145,10 +145,14 @@ export default function AuthenticatedRootPage() {
         </Link>
       </nav>
 
-      <TransactionFilterBar value={filters} onChange={onFiltersChange} />
-
-      <section aria-label="Recent transactions">
-        <TransactionList filters={toFilters(filters)} />
+      <section
+        aria-label="Recent transactions"
+        className="overflow-hidden rounded-md border border-border"
+      >
+        <TransactionFilterBar value={filters} onChange={onFiltersChange} />
+        <div className="border-t border-border">
+          <TransactionList filters={toFilters(filters)} frameless />
+        </div>
       </section>
     </main>
   );

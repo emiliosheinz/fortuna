@@ -10,12 +10,17 @@ import {
   WalletIcon,
   XIcon,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import type { DateRange } from "react-day-picker";
 import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
+  DropdownMenuPortal,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
@@ -26,7 +31,6 @@ import {
 } from "@/components/ui/popover";
 import { useCategories, useTags } from "../hooks";
 import type { TransactionKind } from "../types";
-import { DateRangePicker } from "./date-range-picker";
 
 export interface TransactionFilterState {
   from: string | null;
@@ -40,6 +44,7 @@ export interface TransactionFilterState {
 interface TransactionFilterBarProps {
   value: TransactionFilterState;
   onChange: (next: TransactionFilterState) => void;
+  searchDebounceMs?: number;
 }
 
 type FilterKey = "date" | "category" | "tag" | "kind";
@@ -58,37 +63,41 @@ const FILTER_ICONS: Record<FilterKey, typeof CalendarRangeIcon> = {
   kind: ListFilterIcon,
 };
 
+const DEFAULT_SEARCH_DEBOUNCE_MS = 300;
+
 export function TransactionFilterBar({
   value,
   onChange,
+  searchDebounceMs = DEFAULT_SEARCH_DEBOUNCE_MS,
 }: TransactionFilterBarProps) {
-  const [autoOpen, setAutoOpen] = useState<FilterKey | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
   const active = activeFilters(value);
   const unused = (Object.keys(FILTER_LABELS) as FilterKey[]).filter(
     (key) => !active.includes(key),
   );
 
-  function reset(...keys: FilterKey[]) {
+  function reset(key: FilterKey) {
     const next = { ...value };
-    for (const key of keys) {
-      if (key === "date") {
-        next.from = null;
-        next.to = null;
-      } else if (key === "category") {
-        next.categoryId = null;
-      } else if (key === "tag") {
-        next.tagId = null;
-      } else if (key === "kind") {
-        next.kind = null;
-      }
+    if (key === "date") {
+      next.from = null;
+      next.to = null;
+    } else if (key === "category") {
+      next.categoryId = null;
+    } else if (key === "tag") {
+      next.tagId = null;
+    } else if (key === "kind") {
+      next.kind = null;
     }
     onChange(next);
   }
 
   return (
-    <div data-testid="transaction-filter-bar" className="flex flex-col gap-2">
+    <div
+      data-testid="transaction-filter-bar"
+      className="flex flex-col gap-2 p-3"
+    >
       <div className="flex flex-wrap items-center gap-2">
-        <DropdownMenu>
+        <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
           <DropdownMenuTrigger asChild>
             <Button
               type="button"
@@ -102,34 +111,38 @@ export function TransactionFilterBar({
               <ChevronDownIcon className="size-3.5 opacity-60" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-44">
+          <DropdownMenuContent align="start" className="w-48">
             {unused.map((key) => {
               const Icon = FILTER_ICONS[key];
               return (
-                <DropdownMenuItem
-                  key={key}
-                  data-testid={`transaction-filter-add-${key}`}
-                  onSelect={() => setAutoOpen(key)}
-                >
-                  <Icon className="size-4 opacity-70" />
-                  {FILTER_LABELS[key]}
-                </DropdownMenuItem>
+                <DropdownMenuSub key={key}>
+                  <DropdownMenuSubTrigger
+                    data-testid={`transaction-filter-add-${key}`}
+                  >
+                    <Icon className="size-4 opacity-70" />
+                    {FILTER_LABELS[key]}
+                  </DropdownMenuSubTrigger>
+                  <DropdownMenuPortal>
+                    <DropdownMenuSubContent className="p-2">
+                      <FilterEditor
+                        filter={key}
+                        value={value}
+                        onChange={onChange}
+                        onApplied={() => setMenuOpen(false)}
+                      />
+                    </DropdownMenuSubContent>
+                  </DropdownMenuPortal>
+                </DropdownMenuSub>
               );
             })}
           </DropdownMenuContent>
         </DropdownMenu>
 
-        <div className="relative flex-1 min-w-48">
-          <SearchIcon className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            type="search"
-            data-testid="transaction-filter-q"
-            value={value.q ?? ""}
-            onChange={(e) => onChange({ ...value, q: e.target.value || null })}
-            placeholder="Search description"
-            className="pl-9"
-          />
-        </div>
+        <SearchInput
+          value={value.q}
+          onCommit={(next) => onChange({ ...value, q: next })}
+          debounceMs={searchDebounceMs}
+        />
 
         {active.length > 0 ? (
           <Button
@@ -153,8 +166,8 @@ export function TransactionFilterBar({
         ) : null}
       </div>
 
-      {active.length > 0 || autoOpen ? (
-        <div className="flex flex-wrap items-center gap-2">
+      {active.length > 0 ? (
+        <div className="flex flex-wrap items-center gap-1.5">
           {active.map((key) => (
             <FilterChip
               key={key}
@@ -162,24 +175,53 @@ export function TransactionFilterBar({
               value={value}
               onChange={onChange}
               onRemove={() => reset(key)}
-              openInitially={autoOpen === key}
-              onOpenHandled={() => setAutoOpen(null)}
             />
           ))}
-          {autoOpen && !active.includes(autoOpen) ? (
-            <FilterChip
-              key={`pending-${autoOpen}`}
-              filter={autoOpen}
-              value={value}
-              onChange={onChange}
-              onRemove={() => setAutoOpen(null)}
-              openInitially
-              pending
-              onOpenHandled={() => setAutoOpen(null)}
-            />
-          ) : null}
         </div>
       ) : null}
+    </div>
+  );
+}
+
+function SearchInput({
+  value,
+  onCommit,
+  debounceMs,
+}: {
+  value: string | null;
+  onCommit: (next: string | null) => void;
+  debounceMs: number;
+}) {
+  const [draft, setDraft] = useState(value ?? "");
+  const lastCommitted = useRef(value ?? "");
+
+  useEffect(() => {
+    if ((value ?? "") !== lastCommitted.current) {
+      setDraft(value ?? "");
+      lastCommitted.current = value ?? "";
+    }
+  }, [value]);
+
+  useEffect(() => {
+    if (draft === lastCommitted.current) return;
+    const handle = setTimeout(() => {
+      lastCommitted.current = draft;
+      onCommit(draft.length === 0 ? null : draft);
+    }, debounceMs);
+    return () => clearTimeout(handle);
+  }, [draft, debounceMs, onCommit]);
+
+  return (
+    <div className="relative min-w-48 flex-1">
+      <SearchIcon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+      <Input
+        type="search"
+        data-testid="transaction-filter-q"
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        placeholder="Search description"
+        className="pl-9"
+      />
     </div>
   );
 }
@@ -189,31 +231,15 @@ interface FilterChipProps {
   value: TransactionFilterState;
   onChange: (next: TransactionFilterState) => void;
   onRemove: () => void;
-  openInitially?: boolean;
-  pending?: boolean;
-  onOpenHandled?: () => void;
 }
 
-function FilterChip({
-  filter,
-  value,
-  onChange,
-  onRemove,
-  openInitially,
-  pending,
-  onOpenHandled,
-}: FilterChipProps) {
-  const [open, setOpen] = useState(Boolean(openInitially));
+function FilterChip({ filter, value, onChange, onRemove }: FilterChipProps) {
+  const [open, setOpen] = useState(false);
   const Icon = FILTER_ICONS[filter];
   const categories = useCategories();
   const tags = useTags();
 
-  function handleOpenChange(next: boolean) {
-    setOpen(next);
-    if (next) onOpenHandled?.();
-  }
-
-  const summary = summaryFor(filter, value, pending, {
+  const summary = summaryFor(filter, value, {
     categoryName:
       categories.data?.items.find((c) => c.id === value.categoryId)?.name ??
       null,
@@ -221,41 +247,41 @@ function FilterChip({
   });
 
   return (
-    <Popover open={open} onOpenChange={handleOpenChange}>
-      <div
-        data-testid={`transaction-filter-chip-${filter}`}
-        className="inline-flex items-center gap-1 rounded-full border border-border bg-background pl-2 text-xs"
-      >
+    <div
+      data-testid={`transaction-filter-chip-${filter}`}
+      className="inline-flex h-7 items-center gap-1 rounded-full border border-border bg-background pl-2.5 pr-1 text-xs"
+    >
+      <Icon className="size-3.5 text-muted-foreground" />
+      <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <button
             type="button"
             data-testid={`transaction-filter-chip-${filter}-trigger`}
-            className="inline-flex items-center gap-1.5 py-1 pr-1"
+            className="flex items-center gap-1.5 rounded-sm px-1 hover:bg-accent/40"
           >
-            <Icon className="size-3.5 text-muted-foreground" />
             <span className="font-medium">{FILTER_LABELS[filter]}</span>
             <span className="text-muted-foreground">{summary}</span>
           </button>
         </PopoverTrigger>
-        <button
-          type="button"
-          aria-label={`Remove ${FILTER_LABELS[filter]} filter`}
-          data-testid={`transaction-filter-chip-${filter}-remove`}
-          onClick={onRemove}
-          className="flex size-5 items-center justify-center rounded-full text-muted-foreground hover:bg-accent hover:text-foreground"
-        >
-          <XIcon className="size-3" />
-        </button>
-      </div>
-      <PopoverContent className="w-auto p-3" align="start">
-        <FilterEditor
-          filter={filter}
-          value={value}
-          onChange={onChange}
-          onApplied={() => setOpen(false)}
-        />
-      </PopoverContent>
-    </Popover>
+        <PopoverContent className="w-auto p-2" align="start">
+          <FilterEditor
+            filter={filter}
+            value={value}
+            onChange={onChange}
+            onApplied={() => setOpen(false)}
+          />
+        </PopoverContent>
+      </Popover>
+      <button
+        type="button"
+        aria-label={`Remove ${FILTER_LABELS[filter]} filter`}
+        data-testid={`transaction-filter-chip-${filter}-remove`}
+        onClick={onRemove}
+        className="ml-0.5 flex size-5 items-center justify-center rounded-full text-muted-foreground hover:bg-accent hover:text-foreground"
+      >
+        <XIcon className="size-3" />
+      </button>
+    </div>
   );
 }
 
@@ -268,15 +294,16 @@ function FilterEditor({
   filter: FilterKey;
   value: TransactionFilterState;
   onChange: (next: TransactionFilterState) => void;
-  onApplied: () => void;
+  onApplied?: () => void;
 }) {
   if (filter === "date") {
     return (
-      <DateRangePicker
-        value={{ from: value.from, to: value.to }}
-        data-testid="transaction-filter-date-editor"
+      <DateRangeCalendar
+        from={value.from}
+        to={value.to}
         onChange={(next) => {
           onChange({ ...value, from: next.from, to: next.to });
+          if (next.from && next.to) onApplied?.();
         }}
       />
     );
@@ -287,7 +314,7 @@ function FilterEditor({
         value={value.categoryId}
         onChange={(next) => {
           onChange({ ...value, categoryId: next });
-          if (next) onApplied();
+          if (next) onApplied?.();
         }}
       />
     );
@@ -298,7 +325,7 @@ function FilterEditor({
         value={value.tagId}
         onChange={(next) => {
           onChange({ ...value, tagId: next });
-          if (next) onApplied();
+          if (next) onApplied?.();
         }}
       />
     );
@@ -308,9 +335,43 @@ function FilterEditor({
       value={value.kind}
       onChange={(next) => {
         onChange({ ...value, kind: next });
-        if (next) onApplied();
+        if (next) onApplied?.();
       }}
     />
+  );
+}
+
+function DateRangeCalendar({
+  from,
+  to,
+  onChange,
+}: {
+  from: string | null;
+  to: string | null;
+  onChange: (next: { from: string | null; to: string | null }) => void;
+}) {
+  const selected: DateRange | undefined =
+    from || to
+      ? {
+          from: from ? parseISO(from) : undefined,
+          to: to ? parseISO(to) : undefined,
+        }
+      : undefined;
+  return (
+    <div data-testid="transaction-filter-date-editor">
+      <Calendar
+        mode="range"
+        numberOfMonths={2}
+        selected={selected}
+        onSelect={(next) =>
+          onChange({
+            from: next?.from ? format(next.from, "yyyy-MM-dd") : null,
+            to: next?.to ? format(next.to, "yyyy-MM-dd") : null,
+          })
+        }
+        autoFocus
+      />
+    </div>
   );
 }
 
@@ -451,10 +512,8 @@ function activeFilters(value: TransactionFilterState): FilterKey[] {
 function summaryFor(
   filter: FilterKey,
   value: TransactionFilterState,
-  pending: boolean | undefined,
   resolved: { categoryName: string | null; tagName: string | null },
 ): string {
-  if (pending) return "Pick a value";
   if (filter === "date") {
     if (value.from && value.to) {
       return `${shortDate(value.from)} – ${shortDate(value.to)}`;

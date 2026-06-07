@@ -15,9 +15,13 @@ import { TransactionEditDialog } from "./transaction-edit-dialog";
 
 interface TransactionListProps {
   filters?: TransactionFilters;
+  frameless?: boolean;
 }
 
-export function TransactionList({ filters }: TransactionListProps = {}) {
+export function TransactionList({
+  filters,
+  frameless = false,
+}: TransactionListProps = {}) {
   const {
     data,
     isPending,
@@ -46,14 +50,16 @@ export function TransactionList({ filters }: TransactionListProps = {}) {
     return () => observer.disconnect();
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
-  if (isPending) return <ListSkeleton />;
+  const containerClass = frameless ? "" : "rounded-md border border-border";
+
+  if (isPending) return <ListSkeleton frameless={frameless} />;
 
   if (isError) {
     return (
       <div
         role="alert"
         data-testid="transaction-list-error"
-        className="flex flex-col items-start gap-3 rounded-md border border-border p-4"
+        className={`flex flex-col items-start gap-3 p-4 ${containerClass}`}
       >
         <p className="text-sm text-muted-foreground">
           Could not load transactions.
@@ -70,7 +76,11 @@ export function TransactionList({ filters }: TransactionListProps = {}) {
     return (
       <p
         data-testid="transaction-list-empty"
-        className="rounded-md border border-dashed border-border p-6 text-center text-sm text-muted-foreground"
+        className={
+          frameless
+            ? "p-6 text-center text-sm text-muted-foreground"
+            : "rounded-md border border-dashed border-border p-6 text-center text-sm text-muted-foreground"
+        }
       >
         No transactions yet. Capture one above.
       </p>
@@ -88,7 +98,11 @@ export function TransactionList({ filters }: TransactionListProps = {}) {
     <>
       <ul
         data-testid="transaction-list"
-        className="flex flex-col divide-y divide-border rounded-md border border-border"
+        className={
+          frameless
+            ? "flex flex-col divide-y divide-border"
+            : "flex flex-col divide-y divide-border rounded-md border border-border"
+        }
       >
         {rows.map((row) => (
           <TransactionRow
@@ -204,12 +218,16 @@ function TransactionRow({
   );
 }
 
-function ListSkeleton() {
+function ListSkeleton({ frameless }: { frameless: boolean }) {
   return (
     <div
       data-testid="transaction-list-loading"
       aria-busy="true"
-      className="flex flex-col divide-y divide-border rounded-md border border-border"
+      className={
+        frameless
+          ? "flex flex-col divide-y divide-border"
+          : "flex flex-col divide-y divide-border rounded-md border border-border"
+      }
     >
       {[0, 1, 2, 3].map((i) => (
         <div key={i} className="flex items-center justify-between gap-4 p-3">

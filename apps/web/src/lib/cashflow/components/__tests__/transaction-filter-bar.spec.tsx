@@ -33,6 +33,7 @@ function renderBar(
   props: {
     value?: TransactionFilterState;
     onChange?: (s: TransactionFilterState) => void;
+    searchDebounceMs?: number;
   } = {},
 ) {
   const client = new QueryClient({
@@ -43,6 +44,7 @@ function renderBar(
       <TransactionFilterBar
         value={props.value ?? emptyState}
         onChange={props.onChange ?? jest.fn()}
+        searchDebounceMs={props.searchDebounceMs ?? 0}
       />
     </QueryClientProvider>,
   );
@@ -61,13 +63,28 @@ describe("TransactionFilterBar", () => {
     });
   });
 
-  it("fires onChange when the search input changes", () => {
+  it("commits the search input after the debounce window", async () => {
     const onChange = jest.fn();
     renderBar({ onChange });
     fireEvent.change(screen.getByTestId("transaction-filter-q"), {
       target: { value: "coffee" },
     });
-    expect(onChange).toHaveBeenCalledWith({ ...emptyState, q: "coffee" });
+    await waitFor(() => {
+      expect(onChange).toHaveBeenCalledWith({ ...emptyState, q: "coffee" });
+    });
+  });
+
+  it("debounces rapid keystrokes into a single commit", async () => {
+    const onChange = jest.fn();
+    renderBar({ onChange, searchDebounceMs: 50 });
+    const input = screen.getByTestId("transaction-filter-q");
+    fireEvent.change(input, { target: { value: "c" } });
+    fireEvent.change(input, { target: { value: "co" } });
+    fireEvent.change(input, { target: { value: "cof" } });
+    await waitFor(() => {
+      expect(onChange).toHaveBeenCalledWith({ ...emptyState, q: "cof" });
+    });
+    expect(onChange).toHaveBeenCalledTimes(1);
   });
 
   it("hides Clear all when no filter is active", () => {
