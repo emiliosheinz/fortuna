@@ -70,13 +70,21 @@ export function Sidebar({ me }: { me: CurrentUser }) {
       className="border-r border-border"
     >
       <SidebarHeader>
-        <div className="flex h-8 items-center overflow-hidden px-2">
+        <div className="flex h-8 items-center justify-center overflow-hidden px-2">
           <Link
             href="/"
             aria-label="Fortuna home"
-            className="whitespace-nowrap rounded-md font-semibold tracking-tight outline-none transition-opacity duration-200 focus-visible:ring-2 focus-visible:ring-ring group-data-[collapsible=icon]:pointer-events-none group-data-[collapsible=icon]:opacity-0"
+            className="grid rounded-md font-semibold tracking-tight whitespace-nowrap outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
-            Fortuna
+            <span className="col-start-1 row-start-1 transition-opacity duration-200 group-data-[collapsible=icon]:opacity-0">
+              Fortuna
+            </span>
+            <span
+              aria-hidden
+              className="col-start-1 row-start-1 text-center opacity-0 transition-opacity duration-200 group-data-[collapsible=icon]:opacity-100"
+            >
+              F
+            </span>
           </Link>
         </div>
         <IdentityPopover me={me} />
@@ -155,7 +163,7 @@ function IdentityPopover({ me }: { me: CurrentUser }) {
                 avatarUrl={me.avatarUrl}
                 className="size-7"
               />
-              <div className="flex min-w-0 flex-col text-left transition-opacity duration-200 group-data-[collapsible=icon]:opacity-0">
+              <div className="flex min-w-0 flex-col text-left transition-opacity duration-200 group-data-[collapsible=icon]:w-0 group-data-[collapsible=icon]:opacity-0">
                 <span className="truncate text-sm font-medium">{me.name}</span>
                 <span className="truncate text-xs text-muted-foreground">
                   {me.email}
