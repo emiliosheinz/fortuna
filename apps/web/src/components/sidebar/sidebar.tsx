@@ -70,21 +70,6 @@ export function Sidebar({ me }: { me: CurrentUser }) {
       className="border-r border-border"
     >
       <SidebarHeader>
-        <Link
-          href="/"
-          aria-label="Fortuna home"
-          className="relative flex h-8 items-center rounded-md font-semibold tracking-tight whitespace-nowrap outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        >
-          <span className="transition-opacity duration-200 group-data-[collapsible=icon]:opacity-0">
-            Fortuna
-          </span>
-          <span
-            aria-hidden
-            className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-0 transition-opacity duration-200 group-data-[collapsible=icon]:opacity-100"
-          >
-            F
-          </span>
-        </Link>
         <IdentityPopover me={me} />
       </SidebarHeader>
       <SidebarContent>
@@ -154,7 +139,7 @@ function IdentityPopover({ me }: { me: CurrentUser }) {
               data-testid="sidebar-identity"
               aria-label="Account menu"
               tooltip={me.name}
-              className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground group-data-[collapsible=icon]:h-12! group-data-[collapsible=icon]:w-full! group-data-[collapsible=icon]:gap-0! group-data-[collapsible=icon]:p-0.5!"
+              className="p-0.5! data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground group-data-[collapsible=icon]:h-12! group-data-[collapsible=icon]:w-full! group-data-[collapsible=icon]:gap-0! group-data-[collapsible=icon]:p-0.5!"
             >
               <UserAvatar
                 name={me.name}
