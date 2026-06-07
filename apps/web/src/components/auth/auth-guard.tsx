@@ -71,14 +71,13 @@ function AuthGuardSkeleton() {
       data-testid="auth-guard-loading"
       aria-busy="true"
       aria-live="polite"
-      className="flex min-h-screen flex-col bg-background"
+      className="flex min-h-screen bg-background"
     >
-      <header className="sticky top-0 z-30 w-full border-b border-border bg-background/80 backdrop-blur">
-        <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-2 px-4 py-3 sm:px-6">
-          <Skeleton className="h-5 w-24" />
-          <Skeleton className="size-8 rounded-full" />
-        </div>
-      </header>
+      <aside className="sticky top-0 flex h-screen w-64 shrink-0 flex-col gap-3 border-r border-border bg-background p-4">
+        <Skeleton className="h-6 w-24" />
+        <Skeleton className="mt-2 h-10 w-full" />
+        <Skeleton className="mt-2 h-8 w-full" />
+      </aside>
       <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 px-4 py-8 sm:px-6">
         <Skeleton className="h-7 w-1/2" />
         <div className="flex flex-col gap-3">

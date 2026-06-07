@@ -1,9 +1,9 @@
 import { expect, type Page, test } from "@playwright/test";
 import { signInWithGoogle } from "./helpers/auth";
 
-/** Read the principal's own session id from the sessions page. */
+/** Read the principal's own session id from the account page. */
 async function readCurrentSessionId(page: Page): Promise<string> {
-  await page.goto("/settings/sessions");
+  await page.goto("/settings/account");
   const current = page
     .locator('[data-testid="session-item"][data-is-current="true"]')
     .first();
@@ -22,8 +22,8 @@ test.describe("Session management", () => {
       page.getByRole("heading", { name: "Cashflow", level: 1 }),
     ).toBeVisible();
 
-    await page.getByRole("button", { name: "Account menu" }).click();
-    await page.getByRole("menuitem", { name: "Sign out" }).click();
+    await page.getByTestId("sidebar-identity").click();
+    await page.getByTestId("sign-out-button").click();
     await page.waitForURL(/\/auth\/sign-in$/);
 
     await page.goto("/");
@@ -46,7 +46,7 @@ test.describe("Session management", () => {
 
       const bSessionId = await readCurrentSessionId(pageB);
 
-      await pageA.goto("/settings/sessions");
+      await pageA.goto("/settings/account");
       const target = pageA.locator(
         `[data-testid="session-item"][data-session-id="${bSessionId}"]`,
       );

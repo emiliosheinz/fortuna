@@ -1,7 +1,8 @@
 "use client";
 
 import { AuthGuard, useAuth } from "@/components/auth/auth-guard";
-import { Header } from "@/components/header/header";
+import { NewTransactionFab } from "@/components/new-transaction-fab";
+import { Sidebar } from "@/components/sidebar/sidebar";
 
 interface AuthenticatedLayoutProps {
   children: React.ReactNode;
@@ -20,9 +21,12 @@ export default function AuthenticatedLayout({
 function AuthenticatedShell({ children }: { children: React.ReactNode }) {
   const { me } = useAuth();
   return (
-    <div className="flex min-h-screen flex-col bg-background text-foreground">
-      <Header me={me} />
-      <div className="flex-1">{children}</div>
+    <div className="flex min-h-screen bg-background text-foreground">
+      <Sidebar me={me} />
+      <div className="relative flex min-h-screen flex-1 flex-col">
+        {children}
+        <NewTransactionFab />
+      </div>
     </div>
   );
 }

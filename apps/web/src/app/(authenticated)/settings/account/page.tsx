@@ -3,8 +3,10 @@
 import { useAuth } from "@/components/auth/auth-guard";
 import { DeleteAccountForm } from "@/components/delete-account-form";
 import { Skeleton } from "@/components/ui/skeleton";
+import { SignOutButton } from "@/lib/auth/components/sign-out-button";
 import { BaseCurrencyForm } from "@/lib/cashflow/components/base-currency-form";
 import { useBaseCurrency } from "@/lib/cashflow/hooks";
+import { SessionsSection } from "@/lib/sessions/components/sessions-section";
 
 export default function AccountSettingsPage() {
   const { me } = useAuth();
@@ -12,7 +14,10 @@ export default function AccountSettingsPage() {
 
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-8 sm:px-6">
-      <h1 className="text-2xl font-semibold">Account</h1>
+      <header className="flex items-start justify-between gap-4">
+        <h1 className="text-2xl font-semibold">Account</h1>
+        <SignOutButton />
+      </header>
 
       <section className="flex flex-col gap-2 rounded-md border border-border p-4">
         <h2 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
@@ -42,6 +47,8 @@ export default function AccountSettingsPage() {
           <BaseCurrencyForm initial={baseCurrency.data.baseCurrency} />
         )}
       </section>
+
+      <SessionsSection />
 
       <section
         data-testid="danger-zone"

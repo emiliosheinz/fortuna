@@ -1,18 +1,8 @@
 "use client";
 
-import { PlusIcon } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useState } from "react";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
-import { CaptureForm } from "@/lib/cashflow/components/capture-form";
 import {
   TransactionFilterBar,
   type TransactionFilterState,
@@ -91,7 +81,6 @@ function syncFiltersToUrl(state: TransactionFilterState): void {
 
 export default function AuthenticatedRootPage() {
   const { data, isPending, isError } = useBaseCurrency();
-  const [captureOpen, setCaptureOpen] = useState(false);
   const [filters, setFilters] = useState<TransactionFilterState>(() =>
     initialFilters(),
   );
@@ -122,30 +111,11 @@ export default function AuthenticatedRootPage() {
 
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-col gap-8 px-4 py-8 sm:px-6">
-      <header className="flex items-start justify-between gap-4">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-2xl font-semibold">Cashflow</h1>
-          <p className="text-sm text-muted-foreground">
-            Review your recent transactions. Rolled up into {data.baseCurrency}.
-          </p>
-        </div>
-        <Dialog open={captureOpen} onOpenChange={setCaptureOpen}>
-          <DialogTrigger asChild>
-            <Button type="button" data-testid="open-capture-dialog">
-              <PlusIcon className="size-4" />
-              New transaction
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>New transaction</DialogTitle>
-            </DialogHeader>
-            <CaptureForm
-              baseCurrency={data.baseCurrency}
-              onCaptured={() => setCaptureOpen(false)}
-            />
-          </DialogContent>
-        </Dialog>
+      <header className="flex flex-col gap-1">
+        <h1 className="text-2xl font-semibold">Cashflow</h1>
+        <p className="text-sm text-muted-foreground">
+          Review your recent transactions. Rolled up into {data.baseCurrency}.
+        </p>
       </header>
 
       <nav

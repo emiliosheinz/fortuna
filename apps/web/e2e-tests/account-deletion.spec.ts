@@ -17,8 +17,7 @@ test.describe("Account deletion", () => {
     );
     expect(before).toBeDefined();
 
-    await page.getByRole("button", { name: "Account menu" }).click();
-    await page.getByRole("menuitem", { name: "Account" }).click();
+    await page.getByTestId("sidebar-identity").click();
     await page.waitForURL(/\/settings\/account$/);
 
     const submit = page.getByRole("button", { name: /delete my account/i });

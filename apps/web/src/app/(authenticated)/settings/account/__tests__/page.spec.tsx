@@ -7,6 +7,12 @@ jest.mock("@/components/auth/auth-guard", () => ({ useAuth: jest.fn() }));
 jest.mock("@/components/delete-account-form", () => ({
   DeleteAccountForm: () => <div data-testid="delete-account-form" />,
 }));
+jest.mock("@/lib/auth/components/sign-out-button", () => ({
+  SignOutButton: () => <div data-testid="sign-out-button" />,
+}));
+jest.mock("@/lib/sessions/components/sessions-section", () => ({
+  SessionsSection: () => <div data-testid="sessions-section" />,
+}));
 
 jest.mock("@/lib/cashflow/hooks", () => ({
   useBaseCurrency: jest.fn(),
@@ -53,7 +59,7 @@ describe("Account settings page", () => {
     } as unknown as ReturnType<typeof useSetBaseCurrency>);
   });
 
-  it("renders the signed-in user's profile, base currency section, and the danger zone", () => {
+  it("renders the profile, base currency, sessions, sign-out, and danger zone sections", () => {
     useBaseCurrencyMock.mockReturnValue({
       data: { baseCurrency: "USD" },
       isPending: false,
@@ -64,8 +70,10 @@ describe("Account settings page", () => {
 
     expect(screen.getByText("Ada Lovelace")).toBeInTheDocument();
     expect(screen.getByText("ada@example.com")).toBeInTheDocument();
+    expect(screen.getByTestId("sign-out-button")).toBeInTheDocument();
     expect(screen.getByTestId("base-currency-section")).toBeInTheDocument();
     expect(screen.getByTestId("base-currency-form")).toBeInTheDocument();
+    expect(screen.getByTestId("sessions-section")).toBeInTheDocument();
     expect(screen.getByTestId("danger-zone")).toBeInTheDocument();
     expect(screen.getByTestId("delete-account-form")).toBeInTheDocument();
   });

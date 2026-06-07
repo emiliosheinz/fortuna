@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { sessionsApi } from "@/lib/sessions/api-client";
-import Page from "../page";
+import { SessionsSection } from "../sessions-section";
 
 jest.mock("@/lib/sessions/api-client", () => {
   const actual = jest.requireActual("@/lib/sessions/api-client");
@@ -18,7 +18,7 @@ const revokeMock = sessionsApi.revoke as jest.MockedFunction<
   typeof sessionsApi.revoke
 >;
 
-function renderPage(): ReturnType<typeof render> {
+function renderSection(): ReturnType<typeof render> {
   const client = new QueryClient({
     defaultOptions: {
       queries: { retry: false },
@@ -27,12 +27,12 @@ function renderPage(): ReturnType<typeof render> {
   });
   return render(
     <QueryClientProvider client={client}>
-      <Page />
+      <SessionsSection />
     </QueryClientProvider>,
   );
 }
 
-describe("Sessions page", () => {
+describe("SessionsSection", () => {
   beforeEach(() => {
     listMock.mockReset();
     revokeMock.mockReset();
@@ -41,7 +41,7 @@ describe("Sessions page", () => {
   it("shows a loading indicator while the list is in flight", () => {
     listMock.mockReturnValueOnce(new Promise(() => {}));
 
-    renderPage();
+    renderSection();
 
     expect(screen.getByTestId("sessions-loading")).toBeInTheDocument();
   });
@@ -49,7 +49,7 @@ describe("Sessions page", () => {
   it("shows an error state with a retry button on list failure", async () => {
     listMock.mockRejectedValueOnce(new Error("boom"));
 
-    renderPage();
+    renderSection();
 
     await waitFor(() =>
       expect(screen.getByTestId("sessions-error")).toBeInTheDocument(),
@@ -74,7 +74,7 @@ describe("Sessions page", () => {
   it("shows an empty state when the list is empty", async () => {
     listMock.mockResolvedValueOnce([]);
 
-    renderPage();
+    renderSection();
 
     await waitFor(() =>
       expect(screen.getByTestId("sessions-empty")).toBeInTheDocument(),
@@ -97,7 +97,7 @@ describe("Sessions page", () => {
       },
     ]);
 
-    renderPage();
+    renderSection();
 
     await waitFor(() =>
       expect(screen.getAllByTestId("session-item")).toHaveLength(2),
@@ -132,7 +132,7 @@ describe("Sessions page", () => {
       ]);
     revokeMock.mockResolvedValueOnce(undefined);
 
-    renderPage();
+    renderSection();
 
     await waitFor(() =>
       expect(screen.getAllByTestId("session-item")).toHaveLength(2),
@@ -163,7 +163,7 @@ describe("Sessions page", () => {
     ]);
     revokeMock.mockRejectedValueOnce(new Error("boom"));
 
-    renderPage();
+    renderSection();
 
     await waitFor(() =>
       expect(screen.getAllByTestId("session-item")).toHaveLength(2),

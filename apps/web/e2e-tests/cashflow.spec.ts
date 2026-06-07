@@ -57,8 +57,7 @@ test.describe("Base currency setting", () => {
   }) => {
     await signInWithGoogle(page, "Base Currency User");
 
-    await page.getByRole("button", { name: "Account menu" }).click();
-    await page.getByRole("menuitem", { name: "Account" }).click();
+    await page.getByTestId("sidebar-identity").click();
     await page.waitForURL(/\/settings\/account$/);
 
     // Pick whichever currency the user is not currently on, so the test is
