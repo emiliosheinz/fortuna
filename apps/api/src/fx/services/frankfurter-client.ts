@@ -31,13 +31,6 @@ export interface FrankfurterClientOptions {
 
 const DEFAULT_ENDPOINT = "https://api.frankfurter.app";
 
-interface RawLatestResponse {
-  amount?: number;
-  base?: string;
-  date?: string;
-  rates?: Record<string, number>;
-}
-
 interface RawHistoricalResponse {
   base?: string;
   rates?: Record<string, Record<string, number>>;
@@ -55,24 +48,6 @@ export class FrankfurterClient {
   constructor(options: FrankfurterClientOptions = {}) {
     this.endpoint = options.endpoint ?? DEFAULT_ENDPOINT;
     this.fetcher = options.fetcher ?? defaultFetcher;
-  }
-
-  async fetchLatestEurAnchored(): Promise<FrankfurterLatestResponse> {
-    const response = await this.fetcher(`${this.endpoint}/latest?base=EUR`);
-    if (!response.ok) {
-      throw new FrankfurterHttpError(response.status);
-    }
-    const body = JSON.parse(await response.text()) as RawLatestResponse;
-    if (!body.date || !body.rates || body.base !== "EUR") {
-      throw new FrankfurterShapeError(
-        "frankfurter /latest response missing expected fields",
-      );
-    }
-    return {
-      rateDate: body.date,
-      baseCurrency: "EUR",
-      rates: stringifyRates(body.rates),
-    };
   }
 
   async fetchHistoricalEurAnchored(

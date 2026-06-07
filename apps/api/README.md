@@ -66,17 +66,10 @@ Behaviour notes:
 `bin/fortuna fx fetch` runs the same job, via a dev-only `POST /internal/fx/fetch` route. The route returns 404 in production.
 
 ```bash
-# Catch-up to today (mirrors the prod cron)
 bin/fortuna fx fetch
-
-# Backfill from a date through today (explicit override of the watermark)
-bin/fortuna fx fetch --from 2026-06-01
-
-# Backfill an explicit range
-bin/fortuna fx fetch --from 2026-05-01 --to 2026-05-31
 ```
 
-The catch-up form is what you want most of the time — after `docker compose up -d`, one call seeds the entire supported window. The explicit `--from`/`--to` forms bypass the watermark and are useful for re-seeding or testing.
+After a fresh `docker compose up -d`, one call seeds the entire supported window. Re-runs are no-ops until tomorrow.
 
 ## Local schema reset
 

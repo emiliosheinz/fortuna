@@ -46,10 +46,8 @@ bin/fortuna db migration:run                           # apply pending
 bin/fortuna db migration:revert                        # revert last
 bin/fortuna db migration:show                          # show status
 
-# FX rates (dev only — fires the same job the daily cron runs in prod)
-bin/fortuna fx fetch                                   # pull today's EUR-anchored rates
-bin/fortuna fx fetch --from <ISO>                      # backfill from that date until today
-bin/fortuna fx fetch --from <ISO> --to <ISO>           # backfill the explicit range
+# FX rates (dev only — fires the same self-healing job the daily cron runs in prod)
+bin/fortuna fx fetch                                   # catch up fx_rates from the coverage watermark to today
 
 # Production-parity / CI reproduction
 docker compose -f docker-compose.prod.yaml up -d       # prod Docker target locally

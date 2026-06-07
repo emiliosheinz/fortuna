@@ -35,37 +35,13 @@ case "${1:-}" in
   fx)
     shift
     task="${1:-}"
-    if [ "$task" != "fetch" ]; then
-      echo "Usage: bin/fortuna fx fetch [--from YYYY-MM-DD] [--to YYYY-MM-DD]" >&2
-      echo "  no args                pull today's EUR-anchored rates (the prod cron)" >&2
-      echo "  --from <ISO>           backfill from that date until today" >&2
-      echo "  --from <ISO> --to <ISO> backfill the explicit range" >&2
+    if [ "$task" != "fetch" ] || [ "$#" -gt 1 ]; then
+      echo "Usage: bin/fortuna fx fetch" >&2
+      echo "  Runs the same self-healing catch-up job the daily cron fires" >&2
+      echo "  in production." >&2
       exit 1
     fi
-    shift
-    from=""
-    to=""
-    while [ $# -gt 0 ]; do
-      case "$1" in
-        --from) from="${2:-}"; shift 2 ;;
-        --to)   to="${2:-}";   shift 2 ;;
-        *) echo "Unknown argument: $1" >&2; exit 1 ;;
-      esac
-    done
-    if [ -n "$from" ] && [ -n "$to" ]; then
-      body="{\"from\":\"$from\",\"to\":\"$to\"}"
-    elif [ -n "$from" ]; then
-      body="{\"from\":\"$from\"}"
-    elif [ -n "$to" ]; then
-      echo "Error: --to requires --from" >&2
-      exit 1
-    else
-      body="{}"
-    fi
-    docker exec api curl -fsS -X POST \
-      -H 'Content-Type: application/json' \
-      -d "$body" \
-      http://localhost:3000/internal/fx/fetch
+    docker exec api curl -fsS -X POST http://localhost:3000/internal/fx/fetch
     echo
     ;;
   "")

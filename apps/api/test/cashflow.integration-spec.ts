@@ -30,7 +30,6 @@ const AUDIENCE = "test-client-id";
 const NONCE = "test-nonce";
 
 interface FxClientStub {
-  fetchLatestEurAnchored: jest.Mock;
   fetchHistoricalEurAnchored: jest.Mock;
 }
 
@@ -86,7 +85,6 @@ describe("Cashflow integration", () => {
     };
 
     fxClientStub = {
-      fetchLatestEurAnchored: jest.fn(),
       fetchHistoricalEurAnchored: jest.fn(),
     };
 
@@ -129,7 +127,6 @@ describe("Cashflow integration", () => {
     if (redisAdmin?.status === "ready" || redisAdmin?.status === "connect") {
       await redisAdmin.flushdb().catch(() => undefined);
     }
-    fxClientStub.fetchLatestEurAnchored.mockReset();
     fxClientStub.fetchHistoricalEurAnchored.mockReset();
   });
 
@@ -1165,93 +1162,24 @@ describe("Cashflow integration", () => {
   });
 
   describe("POST /internal/fx/fetch trigger", () => {
-    it("with no body, runs the self-healing catch-up over the missing window", async () => {
+    it("runs the catch-up on first call and no-ops on the next", async () => {
       fxClientStub.fetchHistoricalEurAnchored.mockResolvedValue([
         { rateDate: "2026-06-07", rates: { USD: "1.083000" } },
       ]);
 
-      const res = await request(app.getHttpServer())
+      const first = await request(app.getHttpServer())
         .post("/internal/fx/fetch")
-        .send({})
         .expect(200);
+      expect(first.body.from).toBe("2026-01-01");
+      expect(first.body.to).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+      expect(first.body.noop).toBe(false);
 
-      expect(res.body.mode).toBe("catch-up");
-      expect(res.body.from).toBe("2026-01-01");
-      expect(res.body.to).toMatch(/^\d{4}-\d{2}-\d{2}$/);
-      expect(res.body.noop).toBe(false);
-      expect(fxClientStub.fetchHistoricalEurAnchored).toHaveBeenCalledTimes(1);
-
-      // A second call advances coverage to today, so the second run is a no-op.
       const second = await request(app.getHttpServer())
         .post("/internal/fx/fetch")
-        .send({})
         .expect(200);
       expect(second.body.noop).toBe(true);
       expect(second.body.persisted).toBe(0);
       expect(fxClientStub.fetchHistoricalEurAnchored).toHaveBeenCalledTimes(1);
-    });
-
-    it("with from and to, backfills the explicit range", async () => {
-      fxClientStub.fetchHistoricalEurAnchored.mockResolvedValue([
-        { rateDate: "2026-06-01", rates: { USD: "1.080000" } },
-        { rateDate: "2026-06-02", rates: { USD: "1.081000" } },
-      ]);
-
-      const res = await request(app.getHttpServer())
-        .post("/internal/fx/fetch")
-        .send({ from: "2026-06-01", to: "2026-06-02" })
-        .expect(200);
-
-      expect(res.body).toMatchObject({
-        mode: "range",
-        persisted: 2,
-        from: "2026-06-01",
-        to: "2026-06-02",
-      });
-      expect(fxClientStub.fetchHistoricalEurAnchored).toHaveBeenCalledWith({
-        from: "2026-06-01",
-        to: "2026-06-02",
-      });
-    });
-
-    it("with only from, defaults to to=today", async () => {
-      fxClientStub.fetchHistoricalEurAnchored.mockResolvedValue([
-        { rateDate: "2026-06-01", rates: { USD: "1.080000" } },
-      ]);
-
-      const res = await request(app.getHttpServer())
-        .post("/internal/fx/fetch")
-        .send({ from: "2026-06-01" })
-        .expect(200);
-
-      expect(res.body.mode).toBe("range");
-      expect(res.body.from).toBe("2026-06-01");
-      expect(res.body.to).toMatch(/^\d{4}-\d{2}-\d{2}$/);
-      const callArg =
-        fxClientStub.fetchHistoricalEurAnchored.mock.calls[0]?.[0];
-      expect(callArg).toMatchObject({ from: "2026-06-01" });
-      expect(callArg.to).toMatch(/^\d{4}-\d{2}-\d{2}$/);
-    });
-
-    it("rejects to without from", async () => {
-      await request(app.getHttpServer())
-        .post("/internal/fx/fetch")
-        .send({ to: "2026-06-07" })
-        .expect(400);
-    });
-
-    it("rejects a malformed date", async () => {
-      await request(app.getHttpServer())
-        .post("/internal/fx/fetch")
-        .send({ from: "not-a-date" })
-        .expect(400);
-    });
-
-    it("rejects to before from", async () => {
-      await request(app.getHttpServer())
-        .post("/internal/fx/fetch")
-        .send({ from: "2026-06-07", to: "2026-06-01" })
-        .expect(400);
     });
   });
 

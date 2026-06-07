@@ -85,16 +85,10 @@ export class FxFetchService {
     return { persisted, from: start, to: today, noop: false };
   }
 
-  async fetchAndPersistLatest(): Promise<number> {
-    const result = await this.runWithRetry(() =>
-      this.client.fetchLatestEurAnchored(),
-    );
-    const written = await this.persistDay(result);
-    await this.refreshFreshnessGauge();
-    return written;
-  }
-
-  async fetchAndPersistRange(from: string, to: string): Promise<number> {
+  private async fetchAndPersistRange(
+    from: string,
+    to: string,
+  ): Promise<number> {
     const result = await this.runWithRetry(() =>
       this.client.fetchHistoricalEurAnchored({ from, to }),
     );
