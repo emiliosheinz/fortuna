@@ -1,5 +1,6 @@
 "use client";
 
+import { XIcon } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -89,7 +90,7 @@ export function CategoryCombobox({
 
   return (
     <div ref={wrapperRef} className="relative flex flex-col gap-1.5">
-      <div className="flex items-center gap-2">
+      <div className="relative">
         <Input
           id={id}
           value={query}
@@ -98,6 +99,7 @@ export function CategoryCombobox({
           aria-expanded={open}
           placeholder="Pick or create a category"
           data-testid="category-combobox-input"
+          className={cn(value ? "pr-9" : undefined)}
           onFocus={() => setOpen(true)}
           onChange={(e) => {
             setQuery(e.target.value);
@@ -111,10 +113,11 @@ export function CategoryCombobox({
           <button
             type="button"
             data-testid="category-combobox-clear"
-            className="text-xs text-muted-foreground underline"
+            aria-label="Clear category"
             onClick={clear}
+            className="absolute right-2 top-1/2 -translate-y-1/2 rounded-sm p-0.5 text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
-            Clear
+            <XIcon className="size-4" />
           </button>
         ) : null}
       </div>
