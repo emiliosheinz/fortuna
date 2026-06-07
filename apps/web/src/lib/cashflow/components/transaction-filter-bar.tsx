@@ -4,6 +4,7 @@ import { format, parseISO } from "date-fns";
 import {
   CalendarRangeIcon,
   ChevronDownIcon,
+  ChevronRightIcon,
   HashIcon,
   ListFilterIcon,
   SearchIcon,
@@ -14,15 +15,6 @@ import { useEffect, useRef, useState } from "react";
 import type { DateRange } from "react-day-picker";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuPortal,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import {
   Popover,
@@ -95,45 +87,13 @@ export function TransactionFilterBar({
       className="flex flex-col gap-2 p-3"
     >
       <div className="flex flex-wrap items-center gap-2">
-        <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
-          <DropdownMenuTrigger asChild>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              data-testid="transaction-filter-add"
-            >
-              <ListFilterIcon className="size-4" />
-              Add filter
-              <ChevronDownIcon className="size-3.5 opacity-60" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-48">
-            {allFilters.map((key) => {
-              const Icon = FILTER_ICONS[key];
-              return (
-                <DropdownMenuSub key={key}>
-                  <DropdownMenuSubTrigger
-                    data-testid={`transaction-filter-add-${key}`}
-                  >
-                    <Icon className="size-4 opacity-70" />
-                    {FILTER_LABELS[key]}
-                  </DropdownMenuSubTrigger>
-                  <DropdownMenuPortal>
-                    <DropdownMenuSubContent className="p-2">
-                      <FilterEditor
-                        filter={key}
-                        value={value}
-                        onChange={onChange}
-                        onApplied={() => setMenuOpen(false)}
-                      />
-                    </DropdownMenuSubContent>
-                  </DropdownMenuPortal>
-                </DropdownMenuSub>
-              );
-            })}
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <AddFilterPopover
+          open={menuOpen}
+          onOpenChange={setMenuOpen}
+          filters={allFilters}
+          value={value}
+          onChange={onChange}
+        />
 
         <SearchInput
           value={value.q}
@@ -177,6 +137,80 @@ export function TransactionFilterBar({
         </div>
       ) : null}
     </div>
+  );
+}
+
+function AddFilterPopover({
+  open,
+  onOpenChange,
+  filters,
+  value,
+  onChange,
+}: {
+  open: boolean;
+  onOpenChange: (next: boolean) => void;
+  filters: FilterKey[];
+  value: TransactionFilterState;
+  onChange: (next: TransactionFilterState) => void;
+}) {
+  const [hovered, setHovered] = useState<FilterKey>(filters[0] ?? "date");
+
+  useEffect(() => {
+    if (!open) setHovered(filters[0] ?? "date");
+  }, [open, filters]);
+
+  return (
+    <Popover open={open} onOpenChange={onOpenChange}>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          data-testid="transaction-filter-add"
+        >
+          <ListFilterIcon className="size-4" />
+          Add filter
+          <ChevronDownIcon className="size-3.5 opacity-60" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent
+        align="start"
+        className="flex w-auto gap-0 overflow-hidden p-0"
+      >
+        <ul className="flex w-48 flex-col border-r border-border py-1">
+          {filters.map((key) => {
+            const Icon = FILTER_ICONS[key];
+            return (
+              <li key={key}>
+                <button
+                  type="button"
+                  data-testid={`transaction-filter-add-${key}`}
+                  onMouseEnter={() => setHovered(key)}
+                  onFocus={() => setHovered(key)}
+                  className={
+                    hovered === key
+                      ? "flex w-full items-center gap-2 bg-accent px-3 py-1.5 text-left text-sm"
+                      : "flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm hover:bg-accent/50"
+                  }
+                >
+                  <Icon className="size-4 opacity-70" />
+                  <span className="flex-1">{FILTER_LABELS[key]}</span>
+                  <ChevronRightIcon className="size-4 opacity-40" />
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+        <div className="min-w-[18rem] p-2">
+          <FilterEditor
+            filter={hovered}
+            value={value}
+            onChange={onChange}
+            onApplied={() => onOpenChange(false)}
+          />
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }
 
