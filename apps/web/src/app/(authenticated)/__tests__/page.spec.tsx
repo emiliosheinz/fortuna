@@ -1,29 +1,80 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
-import { useAuth } from "@/components/auth/auth-guard";
 import Page from "../page";
 
-jest.mock("@/components/auth/auth-guard", () => ({ useAuth: jest.fn() }));
+jest.mock("@/lib/cashflow/components/capture-form", () => ({
+  CaptureForm: ({ baseCurrency }: { baseCurrency: string }) => (
+    <div data-testid="capture-form-stub">{baseCurrency}</div>
+  ),
+}));
 
-const useAuthMock = useAuth as jest.MockedFunction<typeof useAuth>;
+jest.mock("@/lib/cashflow/components/transaction-list", () => ({
+  TransactionList: () => <div data-testid="transaction-list-stub" />,
+}));
 
-describe("Authenticated root page", () => {
+jest.mock("@/lib/cashflow/hooks", () => ({
+  useBaseCurrency: jest.fn(),
+}));
+
+import { useBaseCurrency } from "@/lib/cashflow/hooks";
+
+const useBaseCurrencyMock = useBaseCurrency as jest.MockedFunction<
+  typeof useBaseCurrency
+>;
+
+function renderPage() {
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  return render(
+    <QueryClientProvider client={client}>
+      <Page />
+    </QueryClientProvider>,
+  );
+}
+
+describe("Authenticated home page (cashflow surface)", () => {
   beforeEach(() => {
-    useAuthMock.mockReset();
+    useBaseCurrencyMock.mockReset();
   });
 
-  it("renders the signed-in user's name and email", () => {
-    useAuthMock.mockReturnValue({
-      me: {
-        id: "u_1",
-        name: "Ada Lovelace",
-        email: "ada@example.com",
-        avatarUrl: null,
-      },
-    });
+  it("renders the capture form and list once the base currency loads", () => {
+    useBaseCurrencyMock.mockReturnValue({
+      data: { baseCurrency: "USD" },
+      isPending: false,
+      isError: false,
+    } as unknown as ReturnType<typeof useBaseCurrency>);
 
-    render(<Page />);
+    renderPage();
 
-    expect(screen.getByText(/welcome, ada lovelace/i)).toBeInTheDocument();
-    expect(screen.getByText("ada@example.com")).toBeInTheDocument();
+    expect(screen.getByTestId("capture-form-stub")).toHaveTextContent("USD");
+    expect(screen.getByTestId("transaction-list-stub")).toBeInTheDocument();
+    expect(screen.getByText(/Rolled up into USD/)).toBeInTheDocument();
+  });
+
+  it("shows a loading skeleton while the base currency is loading", () => {
+    useBaseCurrencyMock.mockReturnValue({
+      data: undefined,
+      isPending: true,
+      isError: false,
+    } as unknown as ReturnType<typeof useBaseCurrency>);
+
+    renderPage();
+
+    expect(screen.queryByTestId("capture-form-stub")).not.toBeInTheDocument();
+  });
+
+  it("shows an error message when the base currency query fails", () => {
+    useBaseCurrencyMock.mockReturnValue({
+      data: undefined,
+      isPending: false,
+      isError: true,
+    } as unknown as ReturnType<typeof useBaseCurrency>);
+
+    renderPage();
+
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      /Could not load your cashflow/i,
+    );
   });
 });

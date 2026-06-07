@@ -5,6 +5,8 @@ import { Identity } from "@/auth/entities/identity.entity";
 import { Session } from "@/auth/entities/session.entity";
 import { SignInEvent } from "@/auth/entities/sign-in-event.entity";
 import { User } from "@/auth/entities/user.entity";
+import { Transaction } from "@/cashflow/entities/transaction.entity";
+import { UserSettings } from "@/users/entities/user-settings.entity";
 
 export const AppDataSource = new DataSource({
   type: "postgres",
@@ -14,7 +16,15 @@ export const AppDataSource = new DataSource({
   username: process.env.POSTGRES_USER,
   password: process.env.POSTGRES_PASSWORD,
   ssl: process.env.POSTGRES_SSL === "true",
-  entities: [User, Identity, Session, SignInEvent, DeviceFingerprint],
+  entities: [
+    User,
+    Identity,
+    Session,
+    SignInEvent,
+    DeviceFingerprint,
+    UserSettings,
+    Transaction,
+  ],
   migrations: [path.join(__dirname, "migrations", "*.{ts,js}")],
   migrationsTableName: "migrations",
 });
