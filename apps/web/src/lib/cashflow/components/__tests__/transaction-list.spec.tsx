@@ -7,9 +7,19 @@ import { TransactionList } from "../transaction-list";
 jest.mock("../../api-client", () => ({
   cashflowApi: {
     createTransaction: jest.fn(),
+    updateTransaction: jest.fn(),
+    deleteTransaction: jest.fn(),
     listTransactions: jest.fn(),
     getBaseCurrency: jest.fn(),
     setBaseCurrency: jest.fn(),
+    listCategories: jest.fn().mockResolvedValue({ items: [] }),
+    createCategory: jest.fn(),
+    renameCategory: jest.fn(),
+    deleteCategory: jest.fn(),
+    listTags: jest.fn().mockResolvedValue({ items: [] }),
+    createTag: jest.fn(),
+    renameTag: jest.fn(),
+    deleteTag: jest.fn(),
   },
 }));
 
@@ -35,6 +45,8 @@ const baseRow = {
   currency: "USD",
   description: "Lunch",
   kind: "expense" as const,
+  categoryId: null,
+  tagIds: [],
   createdAt: "2026-06-07T00:00:00Z",
   updatedAt: "2026-06-07T00:00:00Z",
 };

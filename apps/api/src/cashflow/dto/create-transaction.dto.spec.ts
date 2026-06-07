@@ -50,4 +50,44 @@ describe("CreateTransactionDto validation", () => {
       "maxLength",
     );
   });
+
+  it("accepts an optional categoryId in UUID form", async () => {
+    expect(
+      await check({
+        ...valid,
+        categoryId: "11111111-1111-4111-8111-111111111111",
+      }),
+    ).toEqual([]);
+  });
+
+  it("rejects a non-UUID categoryId", async () => {
+    expect(await check({ ...valid, categoryId: "not-a-uuid" })).toContain(
+      "isUuid",
+    );
+  });
+
+  it("accepts a tagNames array of strings", async () => {
+    expect(await check({ ...valid, tagNames: ["travel", "lisbon"] })).toEqual(
+      [],
+    );
+  });
+
+  it("rejects a non-array tagNames", async () => {
+    expect(await check({ ...valid, tagNames: "travel" })).toContain("isArray");
+  });
+
+  it("rejects more than the cap of tag names", async () => {
+    expect(
+      await check({
+        ...valid,
+        tagNames: Array.from({ length: 21 }, (_, i) => `t${i}`),
+      }),
+    ).toContain("arrayMaxSize");
+  });
+
+  it("rejects a tag name longer than the per-tag cap", async () => {
+    expect(await check({ ...valid, tagNames: ["a".repeat(101)] })).toContain(
+      "maxLength",
+    );
+  });
 });

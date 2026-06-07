@@ -2,8 +2,12 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
+  Param,
+  ParseUUIDPipe,
+  Patch,
   Post,
   Query,
   Req,
@@ -14,6 +18,7 @@ import type { Request } from "express";
 import { SessionGuard } from "@/auth/guards/session.guard";
 import { CreateTransactionDto } from "../dto/create-transaction.dto";
 import { ListTransactionsDto } from "../dto/list-transactions.dto";
+import { UpdateTransactionDto } from "../dto/update-transaction.dto";
 import type {
   ListTransactionsResult,
   TransactionResponse,
@@ -61,6 +66,33 @@ export class TransactionsController {
       }
       throw err;
     }
+  }
+
+  @UseGuards(SessionGuard)
+  @Patch(":id")
+  async update(
+    @Req() req: AuthedRequest,
+    @Param("id", new ParseUUIDPipe()) id: string,
+    @Body() body: UpdateTransactionDto,
+  ): Promise<{ transaction: TransactionResponse }> {
+    const principal = requirePrincipal(req);
+    const transaction = await this.transactions.updateForUser(
+      principal.userId,
+      id,
+      body,
+    );
+    return { transaction };
+  }
+
+  @UseGuards(SessionGuard)
+  @Delete(":id")
+  @HttpCode(204)
+  async remove(
+    @Req() req: AuthedRequest,
+    @Param("id", new ParseUUIDPipe()) id: string,
+  ): Promise<void> {
+    const principal = requirePrincipal(req);
+    await this.transactions.deleteForUser(principal.userId, id);
   }
 }
 

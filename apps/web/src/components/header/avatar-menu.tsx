@@ -64,6 +64,12 @@ export function AvatarMenu({ me }: AvatarMenuProps) {
             <Link href="/settings/account">Account</Link>
           </DropdownMenuItem>
           <DropdownMenuItem asChild>
+            <Link href="/settings/categories">Categories</Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem asChild>
+            <Link href="/settings/tags">Tags</Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem asChild>
             <Link href="/settings/sessions">Sessions</Link>
           </DropdownMenuItem>
           <DropdownMenuSub>

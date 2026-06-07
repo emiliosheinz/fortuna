@@ -14,7 +14,10 @@ import {
   GOOGLE_ID_TOKEN_VERIFIER_OPTIONS,
   type GoogleIdTokenVerifierOptions,
 } from "@/auth/services/google-id-token-verifier";
+import { Category } from "@/cashflow/entities/category.entity";
+import { Tag } from "@/cashflow/entities/tag.entity";
 import { Transaction } from "@/cashflow/entities/transaction.entity";
+import { TransactionTag } from "@/cashflow/entities/transaction-tag.entity";
 
 const ISSUER = "https://test-issuer.example.com";
 const AUDIENCE = "test-client-id";
@@ -95,7 +98,7 @@ describe("Cashflow integration", () => {
   beforeEach(async () => {
     if (!dataSource) return;
     await dataSource.query(
-      'TRUNCATE TABLE "transactions", "user_settings", "sign_in_events", "sessions", "device_fingerprints", "identities", "users" RESTART IDENTITY CASCADE',
+      'TRUNCATE TABLE "transaction_tags", "tags", "categories", "transactions", "user_settings", "sign_in_events", "sessions", "device_fingerprints", "identities", "users" RESTART IDENTITY CASCADE',
     );
     if (redisAdmin?.status === "ready" || redisAdmin?.status === "connect") {
       await redisAdmin.flushdb().catch(() => undefined);
@@ -234,6 +237,8 @@ describe("Cashflow integration", () => {
         currency: "USD",
         description: "Lunch",
         kind: "expense",
+        categoryId: null,
+        tagIds: [],
         createdAt: expect.any(String),
         updatedAt: expect.any(String),
       });
@@ -395,8 +400,530 @@ describe("Cashflow integration", () => {
     });
   });
 
+  describe("/categories CRUD", () => {
+    async function aliceCookie(): Promise<string> {
+      const { cookie } = await signInUser({
+        sub: "sub-a",
+        name: "Alice",
+        email: "alice@example.com",
+      });
+      return cookie;
+    }
+
+    it("creates, lists, renames, and deletes user-scoped categories", async () => {
+      const cookie = await aliceCookie();
+
+      const created = await request(app.getHttpServer())
+        .post("/categories")
+        .set("Cookie", cookie)
+        .send({ name: "Groceries" })
+        .expect(201);
+      const id = created.body.category.id as string;
+      expect(created.body.category).toEqual({ id, name: "Groceries" });
+
+      await request(app.getHttpServer())
+        .post("/categories")
+        .set("Cookie", cookie)
+        .send({ name: "Transport" })
+        .expect(201);
+
+      const list = await request(app.getHttpServer())
+        .get("/categories")
+        .set("Cookie", cookie)
+        .expect(200);
+      expect(list.body.items.map((c: { name: string }) => c.name)).toEqual([
+        "Groceries",
+        "Transport",
+      ]);
+
+      const renamed = await request(app.getHttpServer())
+        .patch(`/categories/${id}`)
+        .set("Cookie", cookie)
+        .send({ name: "Food" })
+        .expect(200);
+      expect(renamed.body.category.name).toBe("Food");
+
+      await request(app.getHttpServer())
+        .delete(`/categories/${id}`)
+        .set("Cookie", cookie)
+        .expect(204);
+
+      const after = await request(app.getHttpServer())
+        .get("/categories")
+        .set("Cookie", cookie)
+        .expect(200);
+      expect(after.body.items).toHaveLength(1);
+    });
+
+    it("rejects a duplicate name on create with 409", async () => {
+      const cookie = await aliceCookie();
+      await request(app.getHttpServer())
+        .post("/categories")
+        .set("Cookie", cookie)
+        .send({ name: "Groceries" })
+        .expect(201);
+      await request(app.getHttpServer())
+        .post("/categories")
+        .set("Cookie", cookie)
+        .send({ name: "Groceries" })
+        .expect(409);
+    });
+
+    it("rejects a rename that collides with another category for the same user", async () => {
+      const cookie = await aliceCookie();
+      const first = await request(app.getHttpServer())
+        .post("/categories")
+        .set("Cookie", cookie)
+        .send({ name: "Groceries" })
+        .expect(201);
+      await request(app.getHttpServer())
+        .post("/categories")
+        .set("Cookie", cookie)
+        .send({ name: "Transport" })
+        .expect(201);
+
+      await request(app.getHttpServer())
+        .patch(`/categories/${first.body.category.id}`)
+        .set("Cookie", cookie)
+        .send({ name: "Transport" })
+        .expect(409);
+    });
+
+    it("sets category_id to NULL on linked transactions when the category is deleted", async () => {
+      const cookie = await aliceCookie();
+      const cat = await request(app.getHttpServer())
+        .post("/categories")
+        .set("Cookie", cookie)
+        .send({ name: "Groceries" })
+        .expect(201);
+      const tx = await request(app.getHttpServer())
+        .post("/transactions")
+        .set("Cookie", cookie)
+        .send({
+          date: "2026-06-07",
+          amount: "10.00",
+          currency: "USD",
+          description: "row",
+          kind: "expense",
+          categoryId: cat.body.category.id,
+        })
+        .expect(201);
+      expect(tx.body.transaction.categoryId).toBe(cat.body.category.id);
+
+      await request(app.getHttpServer())
+        .delete(`/categories/${cat.body.category.id}`)
+        .set("Cookie", cookie)
+        .expect(204);
+
+      const reread = await request(app.getHttpServer())
+        .get("/transactions")
+        .set("Cookie", cookie)
+        .expect(200);
+      expect(reread.body.items[0].categoryId).toBeNull();
+      const txCount = await dataSource.getRepository(Transaction).count();
+      expect(txCount).toBe(1);
+    });
+
+    it("never leaks another user's categories through the list endpoint", async () => {
+      const aliceC = await aliceCookie();
+      const { cookie: bobC } = await signInUser({
+        sub: "sub-b",
+        name: "Bob",
+        email: "bob@example.com",
+      });
+
+      await request(app.getHttpServer())
+        .post("/categories")
+        .set("Cookie", aliceC)
+        .send({ name: "Alice-cat" })
+        .expect(201);
+      const bobCat = await request(app.getHttpServer())
+        .post("/categories")
+        .set("Cookie", bobC)
+        .send({ name: "Bob-cat" })
+        .expect(201);
+
+      const aliceList = await request(app.getHttpServer())
+        .get("/categories")
+        .set("Cookie", aliceC)
+        .expect(200);
+      expect(
+        aliceList.body.items.some(
+          (c: { name: string }) => c.name === "Bob-cat",
+        ),
+      ).toBe(false);
+
+      await request(app.getHttpServer())
+        .patch(`/categories/${bobCat.body.category.id}`)
+        .set("Cookie", aliceC)
+        .send({ name: "hijacked" })
+        .expect(404);
+      await request(app.getHttpServer())
+        .delete(`/categories/${bobCat.body.category.id}`)
+        .set("Cookie", aliceC)
+        .expect(404);
+    });
+  });
+
+  describe("/tags CRUD", () => {
+    async function aliceCookie(): Promise<string> {
+      const { cookie } = await signInUser({
+        sub: "sub-a",
+        name: "Alice",
+        email: "alice@example.com",
+      });
+      return cookie;
+    }
+
+    it("creates, lists, renames, and deletes user-scoped tags", async () => {
+      const cookie = await aliceCookie();
+      const created = await request(app.getHttpServer())
+        .post("/tags")
+        .set("Cookie", cookie)
+        .send({ name: "travel" })
+        .expect(201);
+      const id = created.body.tag.id as string;
+
+      const renamed = await request(app.getHttpServer())
+        .patch(`/tags/${id}`)
+        .set("Cookie", cookie)
+        .send({ name: "vacation" })
+        .expect(200);
+      expect(renamed.body.tag.name).toBe("vacation");
+
+      await request(app.getHttpServer())
+        .delete(`/tags/${id}`)
+        .set("Cookie", cookie)
+        .expect(204);
+      const after = await request(app.getHttpServer())
+        .get("/tags")
+        .set("Cookie", cookie)
+        .expect(200);
+      expect(after.body.items).toHaveLength(0);
+    });
+
+    it("rejects a duplicate tag on create with 409", async () => {
+      const cookie = await aliceCookie();
+      await request(app.getHttpServer())
+        .post("/tags")
+        .set("Cookie", cookie)
+        .send({ name: "travel" })
+        .expect(201);
+      await request(app.getHttpServer())
+        .post("/tags")
+        .set("Cookie", cookie)
+        .send({ name: "travel" })
+        .expect(409);
+    });
+
+    it("detaches the tag from every linked transaction on delete; transactions remain", async () => {
+      const cookie = await aliceCookie();
+      const tx = await request(app.getHttpServer())
+        .post("/transactions")
+        .set("Cookie", cookie)
+        .send({
+          date: "2026-06-07",
+          amount: "10.00",
+          currency: "USD",
+          description: "row",
+          kind: "expense",
+          tagNames: ["travel", "lisbon"],
+        })
+        .expect(201);
+      expect(tx.body.transaction.tagIds).toHaveLength(2);
+
+      const tagsList = await request(app.getHttpServer())
+        .get("/tags")
+        .set("Cookie", cookie)
+        .expect(200);
+      const travel = tagsList.body.items.find(
+        (t: { name: string }) => t.name === "travel",
+      );
+
+      await request(app.getHttpServer())
+        .delete(`/tags/${travel.id}`)
+        .set("Cookie", cookie)
+        .expect(204);
+
+      const reread = await request(app.getHttpServer())
+        .get("/transactions")
+        .set("Cookie", cookie)
+        .expect(200);
+      expect(reread.body.items[0].tagIds).toHaveLength(1);
+      const txCount = await dataSource.getRepository(Transaction).count();
+      expect(txCount).toBe(1);
+      const joinCount = await dataSource.getRepository(TransactionTag).count();
+      expect(joinCount).toBe(1);
+    });
+
+    it("never leaks another user's tags through the list endpoint", async () => {
+      const aliceC = await aliceCookie();
+      const { cookie: bobC } = await signInUser({
+        sub: "sub-b",
+        name: "Bob",
+        email: "bob@example.com",
+      });
+      await request(app.getHttpServer())
+        .post("/tags")
+        .set("Cookie", aliceC)
+        .send({ name: "alice-tag" })
+        .expect(201);
+      await request(app.getHttpServer())
+        .post("/tags")
+        .set("Cookie", bobC)
+        .send({ name: "bob-tag" })
+        .expect(201);
+
+      const aliceList = await request(app.getHttpServer())
+        .get("/tags")
+        .set("Cookie", aliceC)
+        .expect(200);
+      expect(
+        aliceList.body.items.some(
+          (t: { name: string }) => t.name === "bob-tag",
+        ),
+      ).toBe(false);
+    });
+  });
+
+  describe("POST /transactions with categories and tags", () => {
+    async function aliceCookie(): Promise<string> {
+      const { cookie } = await signInUser({
+        sub: "sub-a",
+        name: "Alice",
+        email: "alice@example.com",
+      });
+      return cookie;
+    }
+
+    it("attaches an existing categoryId and resolves a mix of existing and new tag names in one DB transaction", async () => {
+      const cookie = await aliceCookie();
+      const cat = await request(app.getHttpServer())
+        .post("/categories")
+        .set("Cookie", cookie)
+        .send({ name: "Food" })
+        .expect(201);
+      await request(app.getHttpServer())
+        .post("/tags")
+        .set("Cookie", cookie)
+        .send({ name: "travel" })
+        .expect(201);
+
+      const tx = await request(app.getHttpServer())
+        .post("/transactions")
+        .set("Cookie", cookie)
+        .send({
+          date: "2026-06-07",
+          amount: "10.00",
+          currency: "USD",
+          description: "row",
+          kind: "expense",
+          categoryId: cat.body.category.id,
+          tagNames: ["travel", "lisbon"],
+        })
+        .expect(201);
+      expect(tx.body.transaction.categoryId).toBe(cat.body.category.id);
+      expect(tx.body.transaction.tagIds).toHaveLength(2);
+
+      const tags = await dataSource.getRepository(Tag).find({
+        order: { name: "ASC" },
+      });
+      expect(tags.map((t) => t.name)).toEqual(["lisbon", "travel"]);
+    });
+
+    it("rejects a categoryId that does not belong to the user with 400", async () => {
+      const aliceC = await aliceCookie();
+      const { cookie: bobC } = await signInUser({
+        sub: "sub-b",
+        name: "Bob",
+        email: "bob@example.com",
+      });
+      const bobCat = await request(app.getHttpServer())
+        .post("/categories")
+        .set("Cookie", bobC)
+        .send({ name: "Bob" })
+        .expect(201);
+
+      await request(app.getHttpServer())
+        .post("/transactions")
+        .set("Cookie", aliceC)
+        .send({
+          date: "2026-06-07",
+          amount: "10.00",
+          currency: "USD",
+          description: "row",
+          kind: "expense",
+          categoryId: bobCat.body.category.id,
+        })
+        .expect(400);
+    });
+  });
+
+  describe("PATCH /transactions/:id", () => {
+    async function aliceCookie(): Promise<string> {
+      const { cookie } = await signInUser({
+        sub: "sub-a",
+        name: "Alice",
+        email: "alice@example.com",
+      });
+      return cookie;
+    }
+
+    it("reconciles tag names, swapping the link set wholesale", async () => {
+      const cookie = await aliceCookie();
+      const tx = await request(app.getHttpServer())
+        .post("/transactions")
+        .set("Cookie", cookie)
+        .send({
+          date: "2026-06-07",
+          amount: "10.00",
+          currency: "USD",
+          description: "row",
+          kind: "expense",
+          tagNames: ["travel", "lisbon"],
+        })
+        .expect(201);
+
+      const patched = await request(app.getHttpServer())
+        .patch(`/transactions/${tx.body.transaction.id}`)
+        .set("Cookie", cookie)
+        .send({ tagNames: ["lisbon", "food"] })
+        .expect(200);
+      expect(patched.body.transaction.tagIds).toHaveLength(2);
+
+      const tagsForTx = await dataSource
+        .getRepository(TransactionTag)
+        .count({ where: { transactionId: tx.body.transaction.id } });
+      expect(tagsForTx).toBe(2);
+
+      const allTags = await dataSource.getRepository(Tag).find();
+      expect(allTags.map((t) => t.name).sort()).toEqual([
+        "food",
+        "lisbon",
+        "travel",
+      ]);
+    });
+
+    it("clears the category when categoryId is null and changes the kind", async () => {
+      const cookie = await aliceCookie();
+      const cat = await request(app.getHttpServer())
+        .post("/categories")
+        .set("Cookie", cookie)
+        .send({ name: "Food" })
+        .expect(201);
+      const tx = await request(app.getHttpServer())
+        .post("/transactions")
+        .set("Cookie", cookie)
+        .send({
+          date: "2026-06-07",
+          amount: "10.00",
+          currency: "USD",
+          description: "row",
+          kind: "expense",
+          categoryId: cat.body.category.id,
+        })
+        .expect(201);
+
+      const patched = await request(app.getHttpServer())
+        .patch(`/transactions/${tx.body.transaction.id}`)
+        .set("Cookie", cookie)
+        .send({ categoryId: null, kind: "income", amount: "20.00" })
+        .expect(200);
+      expect(patched.body.transaction.categoryId).toBeNull();
+      expect(patched.body.transaction.kind).toBe("income");
+      expect(patched.body.transaction.amount).toBe("20.00");
+    });
+
+    it("returns 404 when patching another user's transaction", async () => {
+      const aliceC = await aliceCookie();
+      const { cookie: bobC } = await signInUser({
+        sub: "sub-b",
+        name: "Bob",
+        email: "bob@example.com",
+      });
+      const tx = await request(app.getHttpServer())
+        .post("/transactions")
+        .set("Cookie", bobC)
+        .send({
+          date: "2026-06-07",
+          amount: "10.00",
+          currency: "USD",
+          description: "row",
+          kind: "expense",
+        })
+        .expect(201);
+
+      await request(app.getHttpServer())
+        .patch(`/transactions/${tx.body.transaction.id}`)
+        .set("Cookie", aliceC)
+        .send({ description: "hijack" })
+        .expect(404);
+    });
+  });
+
+  describe("DELETE /transactions/:id", () => {
+    async function aliceCookie(): Promise<string> {
+      const { cookie } = await signInUser({
+        sub: "sub-a",
+        name: "Alice",
+        email: "alice@example.com",
+      });
+      return cookie;
+    }
+
+    it("removes the transaction and cascades its tag join rows", async () => {
+      const cookie = await aliceCookie();
+      const tx = await request(app.getHttpServer())
+        .post("/transactions")
+        .set("Cookie", cookie)
+        .send({
+          date: "2026-06-07",
+          amount: "10.00",
+          currency: "USD",
+          description: "row",
+          kind: "expense",
+          tagNames: ["travel"],
+        })
+        .expect(201);
+
+      await request(app.getHttpServer())
+        .delete(`/transactions/${tx.body.transaction.id}`)
+        .set("Cookie", cookie)
+        .expect(204);
+
+      expect(await dataSource.getRepository(Transaction).count()).toBe(0);
+      expect(await dataSource.getRepository(TransactionTag).count()).toBe(0);
+      expect(await dataSource.getRepository(Tag).count()).toBe(1);
+    });
+
+    it("returns 404 when deleting another user's transaction", async () => {
+      const aliceC = await aliceCookie();
+      const { cookie: bobC } = await signInUser({
+        sub: "sub-b",
+        name: "Bob",
+        email: "bob@example.com",
+      });
+      const tx = await request(app.getHttpServer())
+        .post("/transactions")
+        .set("Cookie", bobC)
+        .send({
+          date: "2026-06-07",
+          amount: "10.00",
+          currency: "USD",
+          description: "row",
+          kind: "expense",
+        })
+        .expect(201);
+
+      await request(app.getHttpServer())
+        .delete(`/transactions/${tx.body.transaction.id}`)
+        .set("Cookie", aliceC)
+        .expect(404);
+    });
+  });
+
   describe("erasure: deleting a user removes their cashflow rows", () => {
-    it("cascades transactions and user_settings on user delete", async () => {
+    it("cascades transactions, categories, tags, joins, and user_settings on user delete", async () => {
       const { cookie } = await signInUser({
         sub: "sub-a",
         name: "Alice",
@@ -407,6 +934,11 @@ describe("Cashflow integration", () => {
         .set("Cookie", cookie)
         .send({ baseCurrency: "USD" })
         .expect(200);
+      const cat = await request(app.getHttpServer())
+        .post("/categories")
+        .set("Cookie", cookie)
+        .send({ name: "Food" })
+        .expect(201);
       await request(app.getHttpServer())
         .post("/transactions")
         .set("Cookie", cookie)
@@ -416,6 +948,8 @@ describe("Cashflow integration", () => {
           currency: "USD",
           description: "Lunch",
           kind: "expense",
+          categoryId: cat.body.category.id,
+          tagNames: ["travel"],
         })
         .expect(201);
 
@@ -425,8 +959,10 @@ describe("Cashflow integration", () => {
         .send({ confirm: true })
         .expect(204);
 
-      const txCount = await dataSource.getRepository(Transaction).count();
-      expect(txCount).toBe(0);
+      expect(await dataSource.getRepository(Transaction).count()).toBe(0);
+      expect(await dataSource.getRepository(TransactionTag).count()).toBe(0);
+      expect(await dataSource.getRepository(Category).count()).toBe(0);
+      expect(await dataSource.getRepository(Tag).count()).toBe(0);
       const settingsCount = await dataSource.query(
         'SELECT COUNT(*)::int AS c FROM "user_settings"',
       );

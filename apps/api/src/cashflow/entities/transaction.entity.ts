@@ -9,6 +9,7 @@ import {
   UpdateDateColumn,
 } from "typeorm";
 import { User } from "@/auth/entities/user.entity";
+import { Category } from "./category.entity";
 
 export type TransactionKind = "income" | "expense";
 
@@ -17,11 +18,12 @@ export type TransactionKind = "income" | "expense";
  *
  * The recorded amount lives in the transaction's own currency; the
  * base-currency rollup is computed at read time from `fx_rates` (Phase 3),
- * so no stored base-currency amount is kept on this row. `category_id`
- * and `group_id` land in later phases.
+ * so no stored base-currency amount is kept on this row. `group_id` lands
+ * in a later phase.
  */
 @Entity({ name: "transactions" })
 @Index("transactions_user_date_id_idx", ["userId", "date", "id"])
+@Index("transactions_user_category_idx", ["userId", "categoryId"])
 export class Transaction {
   @PrimaryGeneratedColumn("uuid")
   declare id: string;
@@ -47,6 +49,13 @@ export class Transaction {
 
   @Column({ type: "varchar", length: 16 })
   declare kind: TransactionKind;
+
+  @Column({ name: "category_id", type: "uuid", nullable: true })
+  declare categoryId: string | null;
+
+  @ManyToOne(() => Category, { onDelete: "SET NULL", nullable: true })
+  @JoinColumn({ name: "category_id" })
+  declare category: Category | null;
 
   @CreateDateColumn({ name: "created_at", type: "timestamptz" })
   declare createdAt: Date;

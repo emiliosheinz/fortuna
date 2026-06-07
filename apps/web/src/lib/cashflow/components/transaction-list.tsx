@@ -1,11 +1,12 @@
 "use client";
 
 import { format, parseISO } from "date-fns";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useTransactions } from "../hooks";
+import { useCategories, useTags, useTransactions } from "../hooks";
 import type { Transaction } from "../types";
+import { TransactionEditDialog } from "./transaction-edit-dialog";
 
 export function TransactionList() {
   const {
@@ -17,7 +18,10 @@ export function TransactionList() {
     hasNextPage,
     isFetchingNextPage,
   } = useTransactions();
-  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  const categories = useCategories();
+  const tags = useTags();
+  const sentinelRef = useRef<HTMLLIElement | null>(null);
+  const [editing, setEditing] = useState<Transaction | null>(null);
 
   useEffect(() => {
     const node = sentinelRef.current;
@@ -64,48 +68,104 @@ export function TransactionList() {
     );
   }
 
+  const categoryNameById = new Map(
+    (categories.data?.items ?? []).map((c) => [c.id, c.name]),
+  );
+  const tagNameById = new Map(
+    (tags.data?.items ?? []).map((t) => [t.id, t.name]),
+  );
+
   return (
-    <ul
-      data-testid="transaction-list"
-      className="flex flex-col divide-y divide-border rounded-md border border-border"
-    >
-      {rows.map((row) => (
-        <TransactionRow key={row.id} row={row} />
-      ))}
-      {hasNextPage ? (
-        <li
-          ref={sentinelRef}
-          data-testid="transaction-list-sentinel"
-          className="p-2 text-center text-xs text-muted-foreground"
-        >
-          {isFetchingNextPage ? "Loading more…" : "Scroll to load more"}
-        </li>
+    <>
+      <ul
+        data-testid="transaction-list"
+        className="flex flex-col divide-y divide-border rounded-md border border-border"
+      >
+        {rows.map((row) => (
+          <TransactionRow
+            key={row.id}
+            row={row}
+            categoryName={
+              row.categoryId ? categoryNameById.get(row.categoryId) : undefined
+            }
+            tagNames={row.tagIds
+              .map((id) => tagNameById.get(id))
+              .filter((n): n is string => Boolean(n))}
+            onSelect={setEditing}
+          />
+        ))}
+        {hasNextPage ? (
+          <li
+            ref={sentinelRef}
+            data-testid="transaction-list-sentinel"
+            className="p-2 text-center text-xs text-muted-foreground"
+          >
+            {isFetchingNextPage ? "Loading more…" : "Scroll to load more"}
+          </li>
+        ) : null}
+      </ul>
+
+      {editing ? (
+        <TransactionEditDialog
+          transaction={editing}
+          onClose={() => setEditing(null)}
+        />
       ) : null}
-    </ul>
+    </>
   );
 }
 
-function TransactionRow({ row }: { row: Transaction }) {
+function TransactionRow({
+  row,
+  categoryName,
+  tagNames,
+  onSelect,
+}: {
+  row: Transaction;
+  categoryName: string | undefined;
+  tagNames: string[];
+  onSelect: (row: Transaction) => void;
+}) {
   return (
-    <li className="flex flex-col gap-1 p-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-      <div className="flex flex-col gap-0.5">
-        <span className="text-sm font-medium">{row.description}</span>
-        <span className="text-xs text-muted-foreground">
-          {format(parseISO(row.date), "PPP")}
-        </span>
-      </div>
-      <div className="flex items-center gap-2 self-start sm:self-auto">
-        <span
-          className={
-            row.kind === "expense"
-              ? "text-sm font-semibold text-destructive"
-              : "text-sm font-semibold text-emerald-600 dark:text-emerald-400"
-          }
-        >
-          {row.kind === "expense" ? "-" : "+"}
-          {row.amount} {row.currency}
-        </span>
-      </div>
+    <li>
+      <button
+        type="button"
+        data-testid="transaction-row"
+        onClick={() => onSelect(row)}
+        className="flex w-full flex-col gap-1 p-3 text-left transition hover:bg-accent/40 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
+      >
+        <div className="flex flex-col gap-0.5">
+          <span className="text-sm font-medium">{row.description}</span>
+          <span className="text-xs text-muted-foreground">
+            {format(parseISO(row.date), "PPP")}
+            {categoryName ? <> · {categoryName}</> : null}
+          </span>
+          {tagNames.length > 0 ? (
+            <span className="flex flex-wrap gap-1 pt-1">
+              {tagNames.map((name) => (
+                <span
+                  key={name}
+                  className="rounded-full bg-accent px-2 py-0.5 text-xs text-muted-foreground"
+                >
+                  {name}
+                </span>
+              ))}
+            </span>
+          ) : null}
+        </div>
+        <div className="flex items-center gap-2 self-start sm:self-auto">
+          <span
+            className={
+              row.kind === "expense"
+                ? "text-sm font-semibold text-destructive"
+                : "text-sm font-semibold text-emerald-600 dark:text-emerald-400"
+            }
+          >
+            {row.kind === "expense" ? "-" : "+"}
+            {row.amount} {row.currency}
+          </span>
+        </div>
+      </button>
     </li>
   );
 }

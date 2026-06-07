@@ -24,7 +24,9 @@ import { cn } from "@/lib/utils";
 import { SUGGESTED_CURRENCIES, TRANSACTION_KINDS } from "../constants";
 import { useCreateTransaction } from "../hooks";
 import type { CreateTransactionInput, TransactionKind } from "../types";
+import { CategoryCombobox } from "./category-combobox";
 import { MoneyInput } from "./money-input";
+import { TagInput } from "./tag-input";
 
 const AMOUNT_RE = /^\d+(\.\d{1,2})?$/;
 
@@ -39,6 +41,8 @@ interface FormState {
   date: string;
   kind: TransactionKind;
   currency: string;
+  categoryId: string | null;
+  tagNames: string[];
 }
 
 function todayIso(): string {
@@ -51,12 +55,16 @@ export function CaptureForm({ baseCurrency, onCaptured }: CaptureFormProps) {
   const dateId = useId();
   const kindId = useId();
   const currencyId = useId();
+  const categoryId = useId();
+  const tagsId = useId();
   const [form, setForm] = useState<FormState>(() => ({
     description: "",
     amount: "",
     date: todayIso(),
     kind: "expense",
     currency: baseCurrency,
+    categoryId: null,
+    tagNames: [],
   }));
   const [errors, setErrors] = useState<
     Partial<Record<keyof FormState, string>>
@@ -96,6 +104,8 @@ export function CaptureForm({ baseCurrency, onCaptured }: CaptureFormProps) {
       currency: form.currency,
       description: form.description.trim(),
       kind: form.kind,
+      categoryId: form.categoryId,
+      tagNames: form.tagNames,
     };
 
     try {
@@ -104,6 +114,8 @@ export function CaptureForm({ baseCurrency, onCaptured }: CaptureFormProps) {
         ...prev,
         description: "",
         amount: "",
+        categoryId: null,
+        tagNames: [],
       }));
       onCaptured?.();
     } catch (err) {
@@ -175,7 +187,7 @@ export function CaptureForm({ baseCurrency, onCaptured }: CaptureFormProps) {
                   setCalendarOpen(false);
                 }
               }}
-              initialFocus
+              autoFocus
             />
           </PopoverContent>
         </Popover>
@@ -228,6 +240,24 @@ export function CaptureForm({ baseCurrency, onCaptured }: CaptureFormProps) {
           </SelectContent>
         </Select>
         {errors.currency ? <FieldError message={errors.currency} /> : null}
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor={categoryId}>Category</Label>
+        <CategoryCombobox
+          id={categoryId}
+          value={form.categoryId}
+          onChange={(next) => update("categoryId", next)}
+        />
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor={tagsId}>Tags</Label>
+        <TagInput
+          id={tagsId}
+          value={form.tagNames}
+          onChange={(next) => update("tagNames", next)}
+        />
       </div>
 
       {submitError ? (

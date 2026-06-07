@@ -8,6 +8,7 @@ import {
   IsUUID,
   Matches,
   MaxLength,
+  ValidateIf,
 } from "class-validator";
 
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -20,38 +21,46 @@ const TAG_LIST_MAX = 20;
 export type TransactionKind = "income" | "expense";
 
 /**
- * Request body for `POST /transactions`. The transaction-currency amount is
- * accepted as a string to preserve the `numeric(18, 2)` contract end-to-end —
- * a JS number can't represent `0.10` precisely.
+ * Request body for `PATCH /transactions/:id`. Every field is optional;
+ * absent fields are not touched. `categoryId: null` clears the link;
+ * `tagNames: []` clears every tag. Passing `tagNames` reconciles the link
+ * set: tags not present are detached, names not yet linked are attached
+ * (creating the tag row on demand).
  */
-export class CreateTransactionDto {
+export class UpdateTransactionDto {
+  @IsOptional()
   @IsString()
   @Matches(ISO_DATE_RE, { message: "date must be YYYY-MM-DD" })
-  declare date: string;
+  declare date?: string;
 
+  @IsOptional()
   @IsString()
   @Matches(NUMERIC_18_2_RE, {
     message: "amount must be a non-negative decimal with at most two places",
   })
-  declare amount: string;
+  declare amount?: string;
 
+  @IsOptional()
   @IsString()
   @Matches(ISO_4217_RE, {
     message: "currency must be a 3-letter ISO 4217 code",
   })
-  declare currency: string;
+  declare currency?: string;
 
+  @IsOptional()
   @IsString()
   @IsNotEmpty()
   @MaxLength(DESCRIPTION_MAX)
-  declare description: string;
-
-  @IsIn(["income", "expense"])
-  declare kind: TransactionKind;
+  declare description?: string;
 
   @IsOptional()
+  @IsIn(["income", "expense"])
+  declare kind?: TransactionKind;
+
+  @ValidateIf((_, value) => value !== null)
+  @IsOptional()
   @IsUUID()
-  declare categoryId?: string;
+  declare categoryId?: string | null;
 
   @IsOptional()
   @IsArray()
