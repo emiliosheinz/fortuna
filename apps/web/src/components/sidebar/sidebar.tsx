@@ -70,23 +70,21 @@ export function Sidebar({ me }: { me: CurrentUser }) {
       className="border-r border-border"
     >
       <SidebarHeader>
-        <div className="flex h-8 items-center overflow-hidden px-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
-          <Link
-            href="/"
-            aria-label="Fortuna home"
-            className="grid rounded-md font-semibold tracking-tight whitespace-nowrap outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        <Link
+          href="/"
+          aria-label="Fortuna home"
+          className="relative flex h-8 items-center rounded-md font-semibold tracking-tight whitespace-nowrap outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <span className="transition-opacity duration-200 group-data-[collapsible=icon]:opacity-0">
+            Fortuna
+          </span>
+          <span
+            aria-hidden
+            className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-0 transition-opacity duration-200 group-data-[collapsible=icon]:opacity-100"
           >
-            <span className="col-start-1 row-start-1 transition-opacity duration-200 group-data-[collapsible=icon]:opacity-0">
-              Fortuna
-            </span>
-            <span
-              aria-hidden
-              className="col-start-1 row-start-1 text-center opacity-0 transition-opacity duration-200 group-data-[collapsible=icon]:opacity-100"
-            >
-              F
-            </span>
-          </Link>
-        </div>
+            F
+          </span>
+        </Link>
         <IdentityPopover me={me} />
       </SidebarHeader>
       <SidebarContent>
@@ -156,7 +154,7 @@ function IdentityPopover({ me }: { me: CurrentUser }) {
               data-testid="sidebar-identity"
               aria-label="Account menu"
               tooltip={me.name}
-              className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground group-data-[collapsible=icon]:h-12! group-data-[collapsible=icon]:w-full! group-data-[collapsible=icon]:justify-center! group-data-[collapsible=icon]:gap-0! group-data-[collapsible=icon]:p-1!"
+              className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground group-data-[collapsible=icon]:h-12! group-data-[collapsible=icon]:w-full! group-data-[collapsible=icon]:gap-0! group-data-[collapsible=icon]:p-0.5!"
             >
               <UserAvatar
                 name={me.name}
