@@ -53,7 +53,7 @@ export class FxLookupService {
         unconvertible: false,
         rate: inverted,
         rateDate: leg.rateDate,
-        substituted: leg.rateDate !== input.date,
+        substituted: isStale(leg.rateDate, input.date),
       };
     }
 
@@ -64,7 +64,7 @@ export class FxLookupService {
         unconvertible: false,
         rate: leg.rate,
         rateDate: leg.rateDate,
-        substituted: leg.rateDate !== input.date,
+        substituted: isStale(leg.rateDate, input.date),
       };
     }
 
@@ -80,7 +80,7 @@ export class FxLookupService {
       unconvertible: false,
       rate,
       rateDate,
-      substituted: rateDate !== input.date,
+      substituted: isStale(rateDate, input.date),
     };
   }
 
@@ -144,6 +144,32 @@ function divide(numerator: string, denominator: string): string {
   const value = Number(numerator) / Number(denominator);
   if (!Number.isFinite(value)) return "0";
   return value.toFixed(6);
+}
+
+/**
+ * Treat "today's rate is yesterday's close" as normal market behaviour, not a
+ * substitution. We only flag the row when the gap exceeds normal market
+ * closure (weekend + a Monday holiday + buffer), which signals stale upstream
+ * data the user should know about.
+ */
+const STALENESS_GAP_DAYS = 5;
+
+function isStale(rateDate: string, transactionDate: string): boolean {
+  return calendarDayGap(rateDate, transactionDate) > STALENESS_GAP_DAYS;
+}
+
+function calendarDayGap(fromIso: string, toIso: string): number {
+  const from = Date.UTC(
+    Number(fromIso.slice(0, 4)),
+    Number(fromIso.slice(5, 7)) - 1,
+    Number(fromIso.slice(8, 10)),
+  );
+  const to = Date.UTC(
+    Number(toIso.slice(0, 4)),
+    Number(toIso.slice(5, 7)) - 1,
+    Number(toIso.slice(8, 10)),
+  );
+  return Math.max(0, Math.round((to - from) / 86_400_000));
 }
 
 function toIsoDate(value: Date): string {

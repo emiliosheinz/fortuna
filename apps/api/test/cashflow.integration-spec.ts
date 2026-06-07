@@ -1005,7 +1005,7 @@ describe("Cashflow integration", () => {
       expect(item.unconvertible).toBe(false);
     });
 
-    it("falls back to the nearest prior rate and flags substituted", async () => {
+    it("treats yesterday's close as today's rate without flagging substituted", async () => {
       const { cookie } = await signInUser({
         sub: "sub-a",
         name: "Alice",
@@ -1016,7 +1016,41 @@ describe("Cashflow integration", () => {
         .set("Cookie", cookie)
         .send({ baseCurrency: "USD" })
         .expect(200);
-      await seedRate("2026-06-05", "USD", "1.082000");
+      await seedRate("2026-06-06", "USD", "1.082000");
+
+      await request(app.getHttpServer())
+        .post("/transactions")
+        .set("Cookie", cookie)
+        .send({
+          date: "2026-06-07",
+          amount: "100.00",
+          currency: "EUR",
+          description: "Hotel",
+          kind: "expense",
+        })
+        .expect(201);
+
+      const list = await request(app.getHttpServer())
+        .get("/transactions")
+        .set("Cookie", cookie)
+        .expect(200);
+      expect(list.body.items[0].rateSubstituted).toBe(false);
+      expect(list.body.items[0].rateDate).toBe("2026-06-06");
+      expect(list.body.items[0].baseAmount).toBe("108.20");
+    });
+
+    it("flags substituted when the rate is genuinely stale (gap > 5 days)", async () => {
+      const { cookie } = await signInUser({
+        sub: "sub-a",
+        name: "Alice",
+        email: "alice@example.com",
+      });
+      await request(app.getHttpServer())
+        .put("/users/me/base-currency")
+        .set("Cookie", cookie)
+        .send({ baseCurrency: "USD" })
+        .expect(200);
+      await seedRate("2026-05-30", "USD", "1.082000");
 
       await request(app.getHttpServer())
         .post("/transactions")
@@ -1035,8 +1069,7 @@ describe("Cashflow integration", () => {
         .set("Cookie", cookie)
         .expect(200);
       expect(list.body.items[0].rateSubstituted).toBe(true);
-      expect(list.body.items[0].rateDate).toBe("2026-06-05");
-      expect(list.body.items[0].baseAmount).toBe("108.20");
+      expect(list.body.items[0].rateDate).toBe("2026-05-30");
     });
 
     it("marks rows as unconvertible when no rate path exists", async () => {
@@ -1136,6 +1169,88 @@ describe("Cashflow integration", () => {
         .get(`/transactions/${created.body.transaction.id}`)
         .set("Cookie", bobC)
         .expect(404);
+    });
+  });
+
+  describe("POST /internal/fx/fetch trigger", () => {
+    it("with no body, pulls today's EUR-anchored rates", async () => {
+      fxClientStub.fetchLatestEurAnchored.mockResolvedValue({
+        rateDate: "2026-06-07",
+        baseCurrency: "EUR" as const,
+        rates: { USD: "1.083000" },
+      });
+
+      const res = await request(app.getHttpServer())
+        .post("/internal/fx/fetch")
+        .send({})
+        .expect(200);
+
+      expect(res.body).toEqual({ mode: "latest", persisted: 1 });
+      expect(fxClientStub.fetchLatestEurAnchored).toHaveBeenCalledTimes(1);
+      expect(fxClientStub.fetchHistoricalEurAnchored).not.toHaveBeenCalled();
+    });
+
+    it("with from and to, backfills the explicit range", async () => {
+      fxClientStub.fetchHistoricalEurAnchored.mockResolvedValue([
+        { rateDate: "2026-06-01", rates: { USD: "1.080000" } },
+        { rateDate: "2026-06-02", rates: { USD: "1.081000" } },
+      ]);
+
+      const res = await request(app.getHttpServer())
+        .post("/internal/fx/fetch")
+        .send({ from: "2026-06-01", to: "2026-06-02" })
+        .expect(200);
+
+      expect(res.body).toMatchObject({
+        mode: "range",
+        persisted: 2,
+        from: "2026-06-01",
+        to: "2026-06-02",
+      });
+      expect(fxClientStub.fetchHistoricalEurAnchored).toHaveBeenCalledWith({
+        from: "2026-06-01",
+        to: "2026-06-02",
+      });
+    });
+
+    it("with only from, defaults to to=today", async () => {
+      fxClientStub.fetchHistoricalEurAnchored.mockResolvedValue([
+        { rateDate: "2026-06-01", rates: { USD: "1.080000" } },
+      ]);
+
+      const res = await request(app.getHttpServer())
+        .post("/internal/fx/fetch")
+        .send({ from: "2026-06-01" })
+        .expect(200);
+
+      expect(res.body.mode).toBe("range");
+      expect(res.body.from).toBe("2026-06-01");
+      expect(res.body.to).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+      const callArg =
+        fxClientStub.fetchHistoricalEurAnchored.mock.calls[0]?.[0];
+      expect(callArg).toMatchObject({ from: "2026-06-01" });
+      expect(callArg.to).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    });
+
+    it("rejects to without from", async () => {
+      await request(app.getHttpServer())
+        .post("/internal/fx/fetch")
+        .send({ to: "2026-06-07" })
+        .expect(400);
+    });
+
+    it("rejects a malformed date", async () => {
+      await request(app.getHttpServer())
+        .post("/internal/fx/fetch")
+        .send({ from: "not-a-date" })
+        .expect(400);
+    });
+
+    it("rejects to before from", async () => {
+      await request(app.getHttpServer())
+        .post("/internal/fx/fetch")
+        .send({ from: "2026-06-07", to: "2026-06-01" })
+        .expect(400);
     });
   });
 

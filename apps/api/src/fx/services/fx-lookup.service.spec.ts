@@ -139,10 +139,10 @@ describe("FxLookupService.resolve", () => {
     expect(result.substituted).toBe(false);
   });
 
-  it("falls back to the nearest prior rate and flags substituted", async () => {
+  it("does not flag substituted when yesterday's close is used for today (market norm)", async () => {
     const service = await build([
       {
-        rate_date: "2026-06-05",
+        rate_date: "2026-06-06",
         base_currency: "EUR",
         quote_currency: "USD",
         rate: "1.082000",
@@ -154,7 +154,45 @@ describe("FxLookupService.resolve", () => {
       baseCurrency: "USD",
     });
     if (result.unconvertible) throw new Error("expected convertible");
+    expect(result.rateDate).toBe("2026-06-06");
+    expect(result.substituted).toBe(false);
+  });
+
+  it("does not flag substituted when a weekend gap (Fri close used Monday) is used", async () => {
+    const service = await build([
+      {
+        rate_date: "2026-06-05",
+        base_currency: "EUR",
+        quote_currency: "USD",
+        rate: "1.082000",
+      },
+    ]);
+    const result = await service.resolve({
+      date: "2026-06-08",
+      transactionCurrency: "EUR",
+      baseCurrency: "USD",
+    });
+    if (result.unconvertible) throw new Error("expected convertible");
     expect(result.rateDate).toBe("2026-06-05");
+    expect(result.substituted).toBe(false);
+  });
+
+  it("flags substituted when the rate is genuinely stale (gap > 5 days)", async () => {
+    const service = await build([
+      {
+        rate_date: "2026-05-30",
+        base_currency: "EUR",
+        quote_currency: "USD",
+        rate: "1.082000",
+      },
+    ]);
+    const result = await service.resolve({
+      date: "2026-06-07",
+      transactionCurrency: "EUR",
+      baseCurrency: "USD",
+    });
+    if (result.unconvertible) throw new Error("expected convertible");
+    expect(result.rateDate).toBe("2026-05-30");
     expect(result.substituted).toBe(true);
   });
 
@@ -194,7 +232,7 @@ describe("FxLookupService.resolve", () => {
     expect(result.unconvertible).toBe(true);
   });
 
-  it("flags substituted when only one triangulation leg falls back", async () => {
+  it("flags substituted in triangulation only when the stalest leg exceeds the staleness window", async () => {
     const service = await build([
       {
         rate_date: "2026-06-07",
@@ -203,7 +241,7 @@ describe("FxLookupService.resolve", () => {
         rate: "1.080000",
       },
       {
-        rate_date: "2026-06-04",
+        rate_date: "2026-05-30",
         base_currency: "EUR",
         quote_currency: "BRL",
         rate: "5.40",
@@ -216,7 +254,7 @@ describe("FxLookupService.resolve", () => {
     });
     if (result.unconvertible) throw new Error("expected convertible");
     expect(result.substituted).toBe(true);
-    expect(result.rateDate).toBe("2026-06-04");
+    expect(result.rateDate).toBe("2026-05-30");
   });
 });
 
