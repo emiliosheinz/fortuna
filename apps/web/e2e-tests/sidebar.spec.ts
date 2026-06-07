@@ -2,13 +2,26 @@ import { expect, test } from "@playwright/test";
 import { signInWithGoogle } from "./helpers/auth";
 
 test.describe("Authenticated sidebar", () => {
-  test("identity row navigates to the account page", async ({ page }) => {
+  test("identity popover exposes Account, Settings, Sessions, and Sign out", async ({
+    page,
+  }) => {
     await signInWithGoogle(page, "E2E User");
 
     await page.getByTestId("sidebar-identity").click();
 
+    await page.getByTestId("identity-menu-account").click();
     await expect(page).toHaveURL(/\/settings\/account$/);
     await expect(page.getByRole("heading", { name: "Account" })).toBeVisible();
+
+    await page.getByTestId("sidebar-identity").click();
+    await page.getByTestId("identity-menu-settings").click();
+    await expect(page).toHaveURL(/\/settings\/preferences$/);
+    await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
+
+    await page.getByTestId("sidebar-identity").click();
+    await page.getByTestId("identity-menu-sessions").click();
+    await expect(page).toHaveURL(/\/settings\/sessions$/);
+    await expect(page.getByRole("heading", { name: "Sessions" })).toBeVisible();
   });
 
   test("persists the chosen theme across navigation", async ({ page }) => {

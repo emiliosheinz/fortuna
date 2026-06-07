@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useCallback, useState } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -117,25 +116,6 @@ export default function TransactionsPage() {
           Review your recent transactions. Rolled up into {data.baseCurrency}.
         </p>
       </header>
-
-      <nav
-        aria-label="Cashflow views"
-        className="flex flex-wrap gap-2 text-sm"
-        data-testid="cashflow-nav"
-      >
-        <Link
-          href="/summary"
-          className="rounded-md border border-border px-3 py-1.5 transition hover:bg-accent/40"
-        >
-          Monthly summary
-        </Link>
-        <Link
-          href="/trend"
-          className="rounded-md border border-border px-3 py-1.5 transition hover:bg-accent/40"
-        >
-          Cash-flow trend
-        </Link>
-      </nav>
 
       <section
         aria-label="Recent transactions"

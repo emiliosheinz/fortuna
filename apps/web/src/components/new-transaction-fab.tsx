@@ -8,11 +8,12 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CaptureForm } from "@/lib/cashflow/components/capture-form";
 import { useBaseCurrency } from "@/lib/cashflow/hooks";
+
+const TOOLTIP_LABEL = "New transaction";
 
 export function NewTransactionFab() {
   const [open, setOpen] = useState(false);
@@ -20,16 +21,25 @@ export function NewTransactionFab() {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
+      <div className="group fixed right-6 bottom-6 z-40 sm:right-8 sm:bottom-8">
         <Button
           type="button"
           data-testid="open-capture-dialog"
-          aria-label="New transaction"
-          className="fixed right-6 bottom-6 z-40 size-14 rounded-full shadow-lg sm:right-8 sm:bottom-8"
+          aria-label={TOOLTIP_LABEL}
+          title={TOOLTIP_LABEL}
+          onClick={() => setOpen(true)}
+          className="size-12 rounded-full shadow-lg"
         >
-          <PlusIcon className="size-6" aria-hidden />
+          <PlusIcon className="size-5" aria-hidden />
         </Button>
-      </DialogTrigger>
+        <span
+          role="tooltip"
+          data-testid="fab-tooltip"
+          className="pointer-events-none absolute top-1/2 right-full mr-3 -translate-y-1/2 rounded-md bg-foreground px-2 py-1 text-xs font-medium whitespace-nowrap text-background opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100"
+        >
+          {TOOLTIP_LABEL}
+        </span>
+      </div>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>New transaction</DialogTitle>

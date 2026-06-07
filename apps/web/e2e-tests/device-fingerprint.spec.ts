@@ -20,7 +20,7 @@ test.describe("Device fingerprint cookie", () => {
     expect(afterSignIn?.domain ?? "").not.toMatch(/^\./);
 
     await page.getByTestId("sidebar-identity").click();
-    await page.getByTestId("sign-out-button").click();
+    await page.getByTestId("identity-menu-sign-out").click();
     await page.waitForURL(/\/auth\/sign-in$/);
 
     const afterSignOut = (await context.cookies()).find(

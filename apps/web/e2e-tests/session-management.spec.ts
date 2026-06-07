@@ -1,9 +1,9 @@
 import { expect, type Page, test } from "@playwright/test";
 import { signInWithGoogle } from "./helpers/auth";
 
-/** Read the principal's own session id from the account page. */
+/** Read the principal's own session id from the sessions page. */
 async function readCurrentSessionId(page: Page): Promise<string> {
-  await page.goto("/settings/account");
+  await page.goto("/settings/sessions");
   const current = page
     .locator('[data-testid="session-item"][data-is-current="true"]')
     .first();
@@ -23,7 +23,7 @@ test.describe("Session management", () => {
     ).toBeVisible();
 
     await page.getByTestId("sidebar-identity").click();
-    await page.getByTestId("sign-out-button").click();
+    await page.getByTestId("identity-menu-sign-out").click();
     await page.waitForURL(/\/auth\/sign-in$/);
 
     await page.goto("/");
@@ -46,7 +46,7 @@ test.describe("Session management", () => {
 
       const bSessionId = await readCurrentSessionId(pageB);
 
-      await pageA.goto("/settings/account");
+      await pageA.goto("/settings/sessions");
       const target = pageA.locator(
         `[data-testid="session-item"][data-session-id="${bSessionId}"]`,
       );

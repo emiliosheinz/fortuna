@@ -58,7 +58,8 @@ test.describe("Base currency setting", () => {
     await signInWithGoogle(page, "Base Currency User");
 
     await page.getByTestId("sidebar-identity").click();
-    await page.waitForURL(/\/settings\/account$/);
+    await page.getByTestId("identity-menu-settings").click();
+    await page.waitForURL(/\/settings\/preferences$/);
 
     // Pick whichever currency the user is not currently on, so the test is
     // idempotent across reruns of the persistent e2e Postgres volume.
