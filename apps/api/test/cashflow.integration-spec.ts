@@ -1512,15 +1512,36 @@ describe("Cashflow integration", () => {
       });
     });
 
-    it("defaults to a 12-month trailing window when neither bound is given", async () => {
+    it("defaults the from bound to the user's earliest transaction month", async () => {
+      const cookie = await aliceCookie();
+      await capture(cookie, "2026-04-15", "100.00", "expense");
+
+      const res = await request(app.getHttpServer())
+        .get("/trend")
+        .set("Cookie", cookie)
+        .expect(200);
+
+      expect(res.body.from).toBe("2026-04");
+      expect(res.body.to).toMatch(/^\d{4}-(0[1-9]|1[0-2])$/);
+      expect(res.body.points[0]).toMatchObject({
+        month: "2026-04",
+        expense: "100.00",
+      });
+    });
+
+    it("returns a single current-month point when the user has no transactions", async () => {
       const cookie = await aliceCookie();
       const res = await request(app.getHttpServer())
         .get("/trend")
         .set("Cookie", cookie)
         .expect(200);
-      expect(res.body.points).toHaveLength(12);
-      expect(res.body.from).toMatch(/^\d{4}-(0[1-9]|1[0-2])$/);
-      expect(res.body.to).toMatch(/^\d{4}-(0[1-9]|1[0-2])$/);
+      expect(res.body.points).toHaveLength(1);
+      expect(res.body.from).toBe(res.body.to);
+      expect(res.body.points[0]).toMatchObject({
+        income: "0.00",
+        expense: "0.00",
+        net: "0.00",
+      });
     });
 
     it("counts unconvertible rows separately and excludes them from points", async () => {

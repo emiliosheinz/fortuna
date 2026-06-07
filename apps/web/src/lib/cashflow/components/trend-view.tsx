@@ -2,11 +2,27 @@
 
 import { format, parseISO } from "date-fns";
 import { useId } from "react";
-import { Input } from "@/components/ui/input";
+import {
+  Area,
+  CartesianGrid,
+  ComposedChart,
+  Line,
+  XAxis,
+  YAxis,
+} from "recharts";
+import {
+  type ChartConfig,
+  ChartContainer,
+  ChartLegend,
+  ChartLegendContent,
+  ChartTooltip,
+  ChartTooltipContent,
+} from "@/components/ui/chart";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useTrend } from "../hooks";
 import type { MonthBucket } from "../types";
+import { MonthRangePicker } from "./month-range-picker";
 
 interface TrendViewProps {
   from: string | null;
@@ -15,8 +31,7 @@ interface TrendViewProps {
 }
 
 export function TrendView({ from, to, onWindowChange }: TrendViewProps) {
-  const fromId = useId();
-  const toId = useId();
+  const rangeId = useId();
   const query = useTrend({ from: from ?? undefined, to: to ?? undefined });
 
   return (
@@ -28,31 +43,14 @@ export function TrendView({ from, to, onWindowChange }: TrendViewProps) {
             Per-month income, expense, and net in your base currency.
           </p>
         </div>
-        <div className="flex gap-3">
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor={fromId}>From</Label>
-            <Input
-              id={fromId}
-              type="month"
-              data-testid="trend-from-input"
-              value={from ?? ""}
-              onChange={(e) =>
-                onWindowChange({ from: e.target.value || null, to })
-              }
-            />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor={toId}>To</Label>
-            <Input
-              id={toId}
-              type="month"
-              data-testid="trend-to-input"
-              value={to ?? ""}
-              onChange={(e) =>
-                onWindowChange({ from, to: e.target.value || null })
-              }
-            />
-          </div>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor={rangeId}>Window</Label>
+          <MonthRangePicker
+            id={rangeId}
+            value={{ from, to }}
+            data-testid="trend-range-input"
+            onChange={(next) => onWindowChange(next)}
+          />
         </div>
       </div>
 
@@ -100,6 +98,12 @@ function renderBody(query: ReturnType<typeof useTrend>): React.ReactElement {
   );
 }
 
+const TREND_CHART_CONFIG = {
+  income: { label: "Income", color: "var(--chart-2)" },
+  expense: { label: "Expense", color: "var(--chart-1)" },
+  net: { label: "Net", color: "var(--chart-3)" },
+} satisfies ChartConfig;
+
 function TrendChart({
   points,
   baseCurrency,
@@ -107,111 +111,124 @@ function TrendChart({
   points: MonthBucket[];
   baseCurrency: string;
 }) {
-  const max = points.reduce(
-    (acc, p) => Math.max(acc, Number(p.income), Number(p.expense)),
-    0,
-  );
+  const chartData = points.map((p) => ({
+    month: p.month,
+    income: Number(p.income),
+    expense: Number(p.expense),
+    net: Number(p.net),
+  }));
   return (
     <div
       data-testid="trend-chart"
-      className="flex flex-col gap-2 rounded-md border border-border"
+      className="flex flex-col gap-2 rounded-md border border-border p-3"
     >
-      <ul className="flex flex-col divide-y divide-border">
-        {points.map((point) => (
-          <TrendRow
-            key={point.month}
-            point={point}
-            max={max}
-            baseCurrency={baseCurrency}
-          />
-        ))}
-      </ul>
-    </div>
-  );
-}
-
-function TrendRow({
-  point,
-  max,
-  baseCurrency,
-}: {
-  point: MonthBucket;
-  max: number;
-  baseCurrency: string;
-}) {
-  const income = Number(point.income);
-  const expense = Number(point.expense);
-  const incomePct = max === 0 ? 0 : Math.round((income / max) * 100);
-  const expensePct = max === 0 ? 0 : Math.round((expense / max) * 100);
-  const net = Number(point.net);
-  const netClass =
-    net > 0
-      ? "text-emerald-600 dark:text-emerald-400"
-      : net < 0
-        ? "text-destructive"
-        : "text-muted-foreground";
-
-  return (
-    <li data-testid="trend-row" className="flex flex-col gap-2 p-3">
-      <div className="flex items-center justify-between text-sm">
-        <span className="font-medium">{formatMonthShort(point.month)}</span>
-        <span
-          data-testid="trend-row-net"
-          className={`font-semibold ${netClass}`}
+      <ChartContainer
+        config={TREND_CHART_CONFIG}
+        className="aspect-auto h-80 w-full"
+      >
+        <ComposedChart
+          accessibilityLayer
+          data={chartData}
+          margin={{ left: 12, right: 12, top: 12 }}
         >
-          {point.net} {baseCurrency}
-        </span>
-      </div>
-      <div className="flex flex-col gap-1">
-        <Bar
-          label="Income"
-          percent={incomePct}
-          tone="positive"
-          amount={point.income}
-        />
-        <Bar
-          label="Expense"
-          percent={expensePct}
-          tone="negative"
-          amount={point.expense}
-        />
-      </div>
-    </li>
-  );
-}
-
-function Bar({
-  label,
-  percent,
-  tone,
-  amount,
-}: {
-  label: string;
-  percent: number;
-  tone: "positive" | "negative";
-  amount: string;
-}) {
-  const colour =
-    tone === "positive"
-      ? "bg-emerald-500/70 dark:bg-emerald-400/60"
-      : "bg-destructive/70";
-  return (
-    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-      <span className="basis-16">{label}</span>
-      <div className="relative h-2 flex-1 overflow-hidden rounded-full bg-muted">
-        <div
-          aria-hidden="true"
-          className={`absolute inset-y-0 left-0 ${colour}`}
-          style={{ width: `${percent}%` }}
-        />
-      </div>
-      <span className="basis-20 text-right tabular-nums">{amount}</span>
+          <defs>
+            <linearGradient id="trend-income-fill" x1="0" y1="0" x2="0" y2="1">
+              <stop
+                offset="5%"
+                stopColor="var(--color-income)"
+                stopOpacity={0.7}
+              />
+              <stop
+                offset="95%"
+                stopColor="var(--color-income)"
+                stopOpacity={0.1}
+              />
+            </linearGradient>
+            <linearGradient id="trend-expense-fill" x1="0" y1="0" x2="0" y2="1">
+              <stop
+                offset="5%"
+                stopColor="var(--color-expense)"
+                stopOpacity={0.7}
+              />
+              <stop
+                offset="95%"
+                stopColor="var(--color-expense)"
+                stopOpacity={0.1}
+              />
+            </linearGradient>
+          </defs>
+          <CartesianGrid vertical={false} />
+          <XAxis
+            dataKey="month"
+            tickLine={false}
+            axisLine={false}
+            tickMargin={8}
+            tickFormatter={(month: string) => formatMonthShort(month)}
+          />
+          <YAxis
+            tickLine={false}
+            axisLine={false}
+            tickFormatter={(value: number) => formatChartTick(value)}
+          />
+          <ChartTooltip
+            cursor={false}
+            content={
+              <ChartTooltipContent
+                indicator="dot"
+                labelFormatter={(label) => formatMonthShort(String(label))}
+                formatter={(value, name) => (
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="text-muted-foreground">
+                      {TREND_CHART_CONFIG[
+                        name as keyof typeof TREND_CHART_CONFIG
+                      ]?.label ?? name}
+                    </span>
+                    <span className="font-mono font-medium tabular-nums">
+                      {Number(value).toFixed(2)} {baseCurrency}
+                    </span>
+                  </div>
+                )}
+              />
+            }
+          />
+          <Area
+            type="monotone"
+            dataKey="income"
+            stroke="var(--color-income)"
+            fill="url(#trend-income-fill)"
+            strokeWidth={2}
+          />
+          <Area
+            type="monotone"
+            dataKey="expense"
+            stroke="var(--color-expense)"
+            fill="url(#trend-expense-fill)"
+            strokeWidth={2}
+          />
+          <Line
+            type="monotone"
+            dataKey="net"
+            stroke="var(--color-net)"
+            strokeWidth={2}
+            dot={{ r: 3 }}
+            activeDot={{ r: 5 }}
+          />
+          <ChartLegend content={<ChartLegendContent />} />
+        </ComposedChart>
+      </ChartContainer>
     </div>
   );
 }
 
 function formatMonthShort(month: string): string {
   return format(parseISO(`${month}-01`), "LLL yyyy");
+}
+
+function formatChartTick(value: number): string {
+  if (Math.abs(value) >= 1000) {
+    return `${(value / 1000).toFixed(1)}k`;
+  }
+  return String(value);
 }
 
 function TrendSkeleton() {
@@ -221,9 +238,7 @@ function TrendSkeleton() {
       aria-busy="true"
       className="flex flex-col gap-2"
     >
-      {[0, 1, 2, 3].map((i) => (
-        <Skeleton key={i} className="h-16 w-full" />
-      ))}
+      <Skeleton className="h-80 w-full" />
     </div>
   );
 }

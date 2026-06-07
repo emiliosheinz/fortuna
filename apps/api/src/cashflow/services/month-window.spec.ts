@@ -1,8 +1,4 @@
-import {
-  defaultTrendWindow,
-  monthBounds,
-  monthRangeBounds,
-} from "./month-window";
+import { currentMonth, monthBounds, monthRangeBounds } from "./month-window";
 
 describe("monthBounds", () => {
   it("returns inclusive bounds for the month", () => {
@@ -36,14 +32,9 @@ describe("monthRangeBounds", () => {
   });
 });
 
-describe("defaultTrendWindow", () => {
-  it("returns the trailing twelve months ending in the current month", () => {
-    const window = defaultTrendWindow(new Date(Date.UTC(2026, 5, 7)));
-    expect(window).toEqual({ from: "2025-07", to: "2026-06" });
-  });
-
-  it("wraps year boundaries", () => {
-    const window = defaultTrendWindow(new Date(Date.UTC(2026, 0, 15)));
-    expect(window).toEqual({ from: "2025-02", to: "2026-01" });
+describe("currentMonth", () => {
+  it("returns the YYYY-MM key for the date's UTC month", () => {
+    expect(currentMonth(new Date(Date.UTC(2026, 5, 7)))).toBe("2026-06");
+    expect(currentMonth(new Date(Date.UTC(2026, 0, 15)))).toBe("2026-01");
   });
 });

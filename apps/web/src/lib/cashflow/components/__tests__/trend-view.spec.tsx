@@ -9,6 +9,27 @@ jest.mock("../../api-client", () => ({
   },
 }));
 
+jest.mock("../month-range-picker", () => ({
+  MonthRangePicker: ({
+    id,
+    value,
+    onChange,
+    "data-testid": testId,
+  }: {
+    id?: string;
+    value: { from: string | null; to: string | null };
+    onChange: (v: { from: string | null; to: string | null }) => void;
+    "data-testid"?: string;
+  }) => (
+    <input
+      id={id}
+      data-testid={testId}
+      value={value.from ?? ""}
+      onChange={(e) => onChange({ from: e.target.value || null, to: value.to })}
+    />
+  ),
+}));
+
 const getTrendMock = cashflowApi.getTrend as jest.MockedFunction<
   typeof cashflowApi.getTrend
 >;
@@ -39,7 +60,7 @@ describe("TrendView", () => {
     getTrendMock.mockReset();
   });
 
-  it("renders one row per month point with income, expense, and net", async () => {
+  it("renders the chart when the window contains non-zero points", async () => {
     getTrendMock.mockResolvedValue({
       from: "2026-04",
       to: "2026-06",
@@ -52,9 +73,7 @@ describe("TrendView", () => {
       excludedUnconvertibleCount: 0,
     });
     renderView({ from: "2026-04", to: "2026-06" });
-    const rows = await screen.findAllByTestId("trend-row");
-    expect(rows).toHaveLength(3);
-    expect(rows[2]).toHaveTextContent("150.00");
+    expect(await screen.findByTestId("trend-chart")).toBeInTheDocument();
   });
 
   it("shows the empty state when every point is zero", async () => {
@@ -87,7 +106,7 @@ describe("TrendView", () => {
     ).toHaveTextContent(/1 transaction is excluded/);
   });
 
-  it("notifies the parent when the from input changes", async () => {
+  it("notifies the parent when the range picker emits a new from bound", async () => {
     getTrendMock.mockResolvedValue({
       from: "2026-04",
       to: "2026-06",
@@ -98,7 +117,7 @@ describe("TrendView", () => {
     const onWindowChange = jest.fn();
     renderView({ from: "2026-04", to: "2026-06", onWindowChange });
     await screen.findByTestId("trend-empty");
-    fireEvent.change(screen.getByTestId("trend-from-input"), {
+    fireEvent.change(screen.getByTestId("trend-range-input"), {
       target: { value: "2026-03" },
     });
     expect(onWindowChange).toHaveBeenCalledWith({

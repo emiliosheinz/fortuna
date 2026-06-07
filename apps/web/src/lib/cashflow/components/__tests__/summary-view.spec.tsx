@@ -9,6 +9,27 @@ jest.mock("../../api-client", () => ({
   },
 }));
 
+jest.mock("../month-picker", () => ({
+  MonthPicker: ({
+    id,
+    value,
+    onChange,
+    "data-testid": testId,
+  }: {
+    id?: string;
+    value: string | null;
+    onChange: (v: string | null) => void;
+    "data-testid"?: string;
+  }) => (
+    <input
+      id={id}
+      data-testid={testId}
+      value={value ?? ""}
+      onChange={(e) => onChange(e.target.value || null)}
+    />
+  ),
+}));
+
 const getSummaryMock = cashflowApi.getSummary as jest.MockedFunction<
   typeof cashflowApi.getSummary
 >;
@@ -75,8 +96,10 @@ describe("SummaryView", () => {
       "300.00",
     );
     expect(screen.getByTestId("summary-total-net")).toHaveTextContent("700.00");
-    expect(screen.getByText("Food")).toBeInTheDocument();
-    expect(screen.getByText("Uncategorized")).toBeInTheDocument();
+    const rows = screen.getAllByTestId("summary-category-row");
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toHaveTextContent("Food");
+    expect(rows[1]).toHaveTextContent("Uncategorized");
   });
 
   it("warns when some rows are excluded as unconvertible", async () => {

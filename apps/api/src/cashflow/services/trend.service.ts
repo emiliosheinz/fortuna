@@ -5,7 +5,7 @@ import { FxLookupService } from "@/fx/services/fx-lookup.service";
 import { UserSettingsService } from "@/users/services/user-settings.service";
 import { Transaction } from "../entities/transaction.entity";
 import { aggregate, enumerateMonths, type MonthBucket } from "./aggregations";
-import { defaultTrendWindow, monthRangeBounds } from "./month-window";
+import { currentMonth, monthRangeBounds } from "./month-window";
 import { convertRows } from "./summary.service";
 
 export interface TrendQuery {
@@ -31,7 +31,7 @@ export class TrendService {
   ) {}
 
   async getForUser(userId: string, query: TrendQuery): Promise<TrendResponse> {
-    const { from, to } = resolveWindow(query);
+    const { from, to } = await this.resolveWindow(userId, query);
     const { firstDay, lastDay } = monthRangeBounds(from, to);
     const baseCurrency = await this.userSettings.getBaseCurrency(userId);
 
@@ -70,15 +70,41 @@ export class TrendService {
       excludedUnconvertibleCount: result.excludedUnconvertibleCount,
     };
   }
-}
 
-function resolveWindow(query: TrendQuery): { from: string; to: string } {
-  if (query.from && query.to) {
-    return { from: query.from, to: query.to };
+  /**
+   * When the caller supplies neither bound, anchor `from` on the user's earliest
+   * transaction so the window doesn't show empty months that pre-date their
+   * usage. The user with no transactions yet gets a single current-month point.
+   */
+  private async resolveWindow(
+    userId: string,
+    query: TrendQuery,
+  ): Promise<{ from: string; to: string }> {
+    const now = currentMonth(new Date());
+    if (query.from && query.to) {
+      return { from: query.from, to: query.to };
+    }
+    const earliest = await this.earliestTransactionMonth(userId);
+    return {
+      from: query.from ?? earliest ?? now,
+      to: query.to ?? now,
+    };
   }
-  const fallback = defaultTrendWindow(new Date());
-  return {
-    from: query.from ?? fallback.from,
-    to: query.to ?? fallback.to,
-  };
+
+  private async earliestTransactionMonth(
+    userId: string,
+  ): Promise<string | null> {
+    const row = await this.transactions
+      .createQueryBuilder("t")
+      .select("MIN(t.date)", "min")
+      .where("t.user_id = :userId", { userId })
+      .getRawOne<{ min: string | Date | null }>();
+    if (!row?.min) return null;
+    if (row.min instanceof Date) {
+      const year = row.min.getUTCFullYear();
+      const month = row.min.getUTCMonth() + 1;
+      return `${year}-${String(month).padStart(2, "0")}`;
+    }
+    return row.min.slice(0, 7);
+  }
 }

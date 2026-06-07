@@ -10,6 +10,26 @@ jest.mock("../../api-client", () => ({
   },
 }));
 
+jest.mock("../month-range-picker", () => ({
+  MonthRangePicker: ({
+    id,
+    value,
+    "data-testid": testId,
+  }: {
+    id?: string;
+    value: { from: string | null; to: string | null };
+    onChange: (v: { from: string | null; to: string | null }) => void;
+    "data-testid"?: string;
+  }) => (
+    <input
+      id={id}
+      data-testid={testId}
+      defaultValue={value.from ?? ""}
+      readOnly
+    />
+  ),
+}));
+
 const getTagDrillDownMock = cashflowApi.getTagDrillDown as jest.MockedFunction<
   typeof cashflowApi.getTagDrillDown
 >;

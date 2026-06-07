@@ -14,6 +14,7 @@ import {
 import { TRANSACTION_KINDS } from "../constants";
 import { useCategories, useTags } from "../hooks";
 import type { TransactionKind } from "../types";
+import { DateRangePicker } from "./date-range-picker";
 
 export interface TransactionFilterState {
   from: string | null;
@@ -35,8 +36,7 @@ export function TransactionFilterBar({
   value,
   onChange,
 }: TransactionFilterBarProps) {
-  const fromId = useId();
-  const toId = useId();
+  const rangeId = useId();
   const catId = useId();
   const tagId = useId();
   const kindId = useId();
@@ -65,23 +65,14 @@ export function TransactionFilterBar({
       className="grid grid-cols-1 gap-3 rounded-md border border-border p-3 sm:grid-cols-2 lg:grid-cols-3"
     >
       <div className="flex flex-col gap-1.5">
-        <Label htmlFor={fromId}>From</Label>
-        <Input
-          id={fromId}
-          type="date"
-          data-testid="transaction-filter-from"
-          value={value.from ?? ""}
-          onChange={(e) => update("from", e.target.value || null)}
-        />
-      </div>
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor={toId}>To</Label>
-        <Input
-          id={toId}
-          type="date"
-          data-testid="transaction-filter-to"
-          value={value.to ?? ""}
-          onChange={(e) => update("to", e.target.value || null)}
+        <Label htmlFor={rangeId}>Date range</Label>
+        <DateRangePicker
+          id={rangeId}
+          value={{ from: value.from, to: value.to }}
+          data-testid="transaction-filter-range"
+          onChange={(next) =>
+            onChange({ ...value, from: next.from, to: next.to })
+          }
         />
       </div>
       <div className="flex flex-col gap-1.5">

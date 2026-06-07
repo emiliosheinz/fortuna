@@ -2,11 +2,11 @@
 
 import { format, parseISO } from "date-fns";
 import { useId } from "react";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useTagDrillDown } from "../hooks";
 import type { CategoryBucket, MonthBucket, Transaction } from "../types";
+import { MonthRangePicker } from "./month-range-picker";
 
 interface TagDrillDownViewProps {
   tagId: string;
@@ -21,8 +21,7 @@ export function TagDrillDownView({
   to,
   onWindowChange,
 }: TagDrillDownViewProps) {
-  const fromId = useId();
-  const toId = useId();
+  const rangeId = useId();
   const query = useTagDrillDown(tagId, {
     from: from ?? undefined,
     to: to ?? undefined,
@@ -39,31 +38,14 @@ export function TagDrillDownView({
             Transactions tagged with this label, grouped by category and month.
           </p>
         </div>
-        <div className="flex gap-3">
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor={fromId}>From</Label>
-            <Input
-              id={fromId}
-              type="month"
-              data-testid="tag-drill-down-from-input"
-              value={from ?? ""}
-              onChange={(e) =>
-                onWindowChange({ from: e.target.value || null, to })
-              }
-            />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor={toId}>To</Label>
-            <Input
-              id={toId}
-              type="month"
-              data-testid="tag-drill-down-to-input"
-              value={to ?? ""}
-              onChange={(e) =>
-                onWindowChange({ from, to: e.target.value || null })
-              }
-            />
-          </div>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor={rangeId}>Window</Label>
+          <MonthRangePicker
+            id={rangeId}
+            value={{ from, to }}
+            data-testid="tag-drill-down-range-input"
+            onChange={(next) => onWindowChange(next)}
+          />
         </div>
       </div>
 

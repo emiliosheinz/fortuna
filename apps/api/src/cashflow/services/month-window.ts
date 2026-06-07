@@ -16,19 +16,11 @@ export function monthRangeBounds(from: string, to: string): MonthBounds {
   };
 }
 
-/**
- * Default trend window: the trailing 12 months ending in `now`'s month.
- * Both bounds inclusive.
- */
-export function defaultTrendWindow(now: Date): { from: string; to: string } {
-  const toYear = now.getUTCFullYear();
-  const toMonth = now.getUTCMonth() + 1;
-  const toKey = `${toYear}-${String(toMonth).padStart(2, "0")}`;
-  const totalMonths = toYear * 12 + (toMonth - 1) - 11;
-  const fromYear = Math.floor(totalMonths / 12);
-  const fromMonth = (totalMonths % 12) + 1;
-  const fromKey = `${fromYear}-${String(fromMonth).padStart(2, "0")}`;
-  return { from: fromKey, to: toKey };
+/** The `YYYY-MM` key for `now`'s UTC month. */
+export function currentMonth(now: Date): string {
+  const year = now.getUTCFullYear();
+  const month = now.getUTCMonth() + 1;
+  return `${year}-${String(month).padStart(2, "0")}`;
 }
 
 function lastDayIso(month: string): string {

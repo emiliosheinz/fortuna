@@ -2,11 +2,18 @@
 
 import { format, parseISO } from "date-fns";
 import { useId } from "react";
-import { Input } from "@/components/ui/input";
+import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
+import {
+  type ChartConfig,
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+} from "@/components/ui/chart";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useSummary } from "../hooks";
 import type { CategoryBucket } from "../types";
+import { MonthPicker } from "./month-picker";
 
 interface SummaryViewProps {
   month: string;
@@ -32,13 +39,12 @@ export function SummaryView({ month, onMonthChange }: SummaryViewProps) {
         </div>
         <div className="flex flex-col gap-1.5">
           <Label htmlFor={monthInputId}>Month</Label>
-          <Input
+          <MonthPicker
             id={monthInputId}
-            type="month"
             value={month}
             data-testid="summary-month-input"
-            onChange={(e) => {
-              if (e.target.value) onMonthChange(e.target.value);
+            onChange={(next) => {
+              if (next) onMonthChange(next);
             }}
           />
         </div>
@@ -177,6 +183,17 @@ function Total({
   );
 }
 
+const SUMMARY_CHART_CONFIG = {
+  expense: {
+    label: "Expense",
+    color: "var(--chart-1)",
+  },
+  income: {
+    label: "Income",
+    color: "var(--chart-2)",
+  },
+} satisfies ChartConfig;
+
 function CategoryBreakdown({
   buckets,
   baseCurrency,
@@ -184,7 +201,12 @@ function CategoryBreakdown({
   buckets: CategoryBucket[];
   baseCurrency: string;
 }) {
-  const max = buckets.reduce((acc, b) => Math.max(acc, magnitude(b)), 0) || 1;
+  const hasIncome = buckets.some((b) => Number(b.income) > 0);
+  const chartData = buckets.map((bucket) => ({
+    category: bucket.categoryName ?? "Uncategorized",
+    expense: Number(bucket.expense),
+    income: Number(bucket.income),
+  }));
   return (
     <div
       data-testid="summary-by-category"
@@ -193,12 +215,70 @@ function CategoryBreakdown({
       <h2 className="border-b border-border px-3 py-2 text-sm font-medium">
         By category
       </h2>
-      <ul className="flex flex-col divide-y divide-border">
+      <ChartContainer
+        config={SUMMARY_CHART_CONFIG}
+        className="aspect-auto h-72 w-full px-2 sm:px-4"
+      >
+        <BarChart
+          accessibilityLayer
+          data={chartData}
+          margin={{ left: 12, right: 12, top: 12 }}
+        >
+          <CartesianGrid vertical={false} />
+          <XAxis
+            dataKey="category"
+            tickLine={false}
+            tickMargin={8}
+            axisLine={false}
+            interval={0}
+            tickFormatter={(label: string) =>
+              label.length > 12 ? `${label.slice(0, 12)}…` : label
+            }
+          />
+          <YAxis
+            tickLine={false}
+            axisLine={false}
+            tickFormatter={(value: number) => formatChartTick(value)}
+          />
+          <ChartTooltip
+            cursor={false}
+            content={
+              <ChartTooltipContent
+                indicator="dot"
+                formatter={(value, name) => (
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="text-muted-foreground">
+                      {SUMMARY_CHART_CONFIG[
+                        name as keyof typeof SUMMARY_CHART_CONFIG
+                      ]?.label ?? name}
+                    </span>
+                    <span className="font-mono font-medium tabular-nums">
+                      {Number(value).toFixed(2)} {baseCurrency}
+                    </span>
+                  </div>
+                )}
+              />
+            }
+          />
+          <Bar
+            dataKey="expense"
+            fill="var(--color-expense)"
+            radius={[4, 4, 0, 0]}
+          />
+          {hasIncome ? (
+            <Bar
+              dataKey="income"
+              fill="var(--color-income)"
+              radius={[4, 4, 0, 0]}
+            />
+          ) : null}
+        </BarChart>
+      </ChartContainer>
+      <ul className="flex flex-col divide-y divide-border border-t border-border">
         {buckets.map((bucket) => (
           <CategoryRow
             key={bucket.categoryId ?? "__uncategorized__"}
             bucket={bucket}
-            max={max}
             baseCurrency={baseCurrency}
           />
         ))}
@@ -209,34 +289,21 @@ function CategoryBreakdown({
 
 function CategoryRow({
   bucket,
-  max,
   baseCurrency,
 }: {
   bucket: CategoryBucket;
-  max: number;
   baseCurrency: string;
 }) {
-  const value = magnitude(bucket);
-  const percent = max === 0 ? 0 : Math.round((value / max) * 100);
   return (
     <li
       data-testid="summary-category-row"
-      className="flex flex-col gap-1 p-3 sm:flex-row sm:items-center sm:gap-4"
+      className="flex items-center justify-between gap-4 px-3 py-2"
     >
-      <span className="text-sm font-medium sm:basis-40">
-        {bucket.categoryName ?? "Uncategorized"}
-      </span>
-      <div className="relative h-2 flex-1 overflow-hidden rounded-full bg-muted">
-        <div
-          aria-hidden="true"
-          className="absolute inset-y-0 left-0 bg-foreground/70"
-          style={{ width: `${percent}%` }}
-        />
-      </div>
-      <div className="flex flex-col text-right text-xs text-muted-foreground sm:basis-40">
+      <span className="text-sm">{bucket.categoryName ?? "Uncategorized"}</span>
+      <div className="flex flex-col text-right text-xs text-muted-foreground">
         <span
           data-testid="summary-category-net"
-          className="text-sm font-semibold text-foreground"
+          className="text-sm font-semibold text-foreground tabular-nums"
         >
           {bucket.net} {baseCurrency}
         </span>
@@ -248,8 +315,11 @@ function CategoryRow({
   );
 }
 
-function magnitude(bucket: CategoryBucket): number {
-  return Math.abs(Number(bucket.net));
+function formatChartTick(value: number): string {
+  if (Math.abs(value) >= 1000) {
+    return `${(value / 1000).toFixed(1)}k`;
+  }
+  return String(value);
 }
 
 function SummarySkeleton() {

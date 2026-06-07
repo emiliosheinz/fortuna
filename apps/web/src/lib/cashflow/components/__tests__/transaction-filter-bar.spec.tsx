@@ -13,6 +13,27 @@ jest.mock("../../api-client", () => ({
   },
 }));
 
+jest.mock("../date-range-picker", () => ({
+  DateRangePicker: ({
+    id,
+    value,
+    onChange,
+    "data-testid": testId,
+  }: {
+    id?: string;
+    value: { from: string | null; to: string | null };
+    onChange: (v: { from: string | null; to: string | null }) => void;
+    "data-testid"?: string;
+  }) => (
+    <input
+      id={id}
+      data-testid={testId}
+      value={value.from ?? ""}
+      onChange={(e) => onChange({ from: e.target.value || null, to: value.to })}
+    />
+  ),
+}));
+
 const listCategoriesMock = cashflowApi.listCategories as jest.MockedFunction<
   typeof cashflowApi.listCategories
 >;
@@ -54,10 +75,10 @@ describe("TransactionFilterBar", () => {
     listTagsMock.mockResolvedValue({ items: [] });
   });
 
-  it("fires onChange with updated from when the date input changes", () => {
+  it("fires onChange with the new from bound when the range picker updates", () => {
     const onChange = jest.fn();
     renderBar({ onChange });
-    fireEvent.change(screen.getByTestId("transaction-filter-from"), {
+    fireEvent.change(screen.getByTestId("transaction-filter-range"), {
       target: { value: "2026-06-01" },
     });
     expect(onChange).toHaveBeenCalledWith({
