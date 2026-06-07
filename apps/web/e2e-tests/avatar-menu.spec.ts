@@ -15,15 +15,22 @@ test.describe("Authenticated header avatar menu", () => {
     await expect(page).toHaveURL(/\/settings\/account$/);
     await expect(page.getByRole("heading", { name: "Account" })).toBeVisible();
 
-    await trigger.click();
+    // Radix DropdownMenu + next/link can leave a stale 'open' state after a
+    // menu-item-triggered navigation; reopen via keyboard (the same path the
+    // sibling "via keyboard alone" test uses successfully).
+    await trigger.focus();
+    await page.keyboard.press("Enter");
     await page.getByRole("menuitem", { name: "Sessions" }).click();
     await expect(page).toHaveURL(/\/settings\/sessions$/);
     await expect(
       page.getByRole("heading", { name: "Active sessions" }),
     ).toBeVisible();
 
-    await trigger.click();
-    await page.getByRole("menuitem", { name: "Sign out" }).click();
+    await trigger.focus();
+    await page.keyboard.press("Enter");
+    const signOut = page.getByRole("menuitem", { name: "Sign out" });
+    await expect(signOut).toBeVisible();
+    await signOut.click();
     await expect(page).toHaveURL(/\/auth\/sign-in$/);
   });
 

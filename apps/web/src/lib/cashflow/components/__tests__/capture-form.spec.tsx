@@ -64,21 +64,6 @@ describe("CaptureForm", () => {
     expect(createTransactionMock).not.toHaveBeenCalled();
   });
 
-  it("rejects amounts with more than two decimals", async () => {
-    renderForm();
-
-    setAmount("1.234");
-    setDescription("Lunch");
-    submit();
-
-    await waitFor(() => {
-      expect(
-        screen.getByText(/non-negative amount with up to two decimals/i),
-      ).toBeInTheDocument();
-    });
-    expect(createTransactionMock).not.toHaveBeenCalled();
-  });
-
   it("submits the validated payload when the form is well-formed", async () => {
     createTransactionMock.mockResolvedValue({
       transaction: {

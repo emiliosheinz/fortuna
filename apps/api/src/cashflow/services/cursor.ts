@@ -15,11 +15,10 @@ export function encodeCursor(cursor: TransactionCursor): string {
 
 export function decodeCursor(value: string): TransactionCursor {
   const raw = Buffer.from(value, "base64url").toString("utf8");
-  const parts = raw.split("|");
-  if (parts.length !== 2) {
+  const [date, id, ...rest] = raw.split("|");
+  if (!date || !id || rest.length > 0) {
     throw new Error("Invalid cursor");
   }
-  const [date, id] = parts;
   if (!DATE_RE.test(date) || !UUID_RE.test(id)) {
     throw new Error("Invalid cursor");
   }

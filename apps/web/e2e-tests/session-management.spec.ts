@@ -18,7 +18,9 @@ test.describe("Session management", () => {
     page,
   }) => {
     await signInWithGoogle(page, "E2E User");
-    await expect(page.getByText("Welcome, E2E User")).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Cashflow", level: 1 }),
+    ).toBeVisible();
 
     await page.getByRole("button", { name: "Account menu" }).click();
     await page.getByRole("menuitem", { name: "Sign out" }).click();

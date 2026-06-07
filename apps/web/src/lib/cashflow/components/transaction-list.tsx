@@ -72,17 +72,15 @@ export function TransactionList() {
       {rows.map((row) => (
         <TransactionRow key={row.id} row={row} />
       ))}
-      <li
-        ref={sentinelRef}
-        data-testid="transaction-list-sentinel"
-        className="p-2 text-center text-xs text-muted-foreground"
-      >
-        {hasNextPage
-          ? isFetchingNextPage
-            ? "Loading more…"
-            : "Scroll to load more"
-          : null}
-      </li>
+      {hasNextPage ? (
+        <li
+          ref={sentinelRef}
+          data-testid="transaction-list-sentinel"
+          className="p-2 text-center text-xs text-muted-foreground"
+        >
+          {isFetchingNextPage ? "Loading more…" : "Scroll to load more"}
+        </li>
+      ) : null}
     </ul>
   );
 }
