@@ -431,19 +431,15 @@ function DateRangeCalendar({
   );
 }
 
+// Keep shadcn's defaults for `day` and `day_button` (so a single selected day
+// renders as a fully rounded primary marker). Only override the range
+// modifiers to flatten the inner corners and shade the middle days, so a
+// completed range connects edge-to-edge instead of rendering as three pills.
 const DATE_RANGE_CALENDAR_CLASSNAMES = {
-  // Drop the per-day rounded corners and primary background; range modifiers
-  // own the colour and shape.
-  day: "relative p-0 text-center text-sm focus-within:relative focus-within:z-20",
-  day_button:
-    "size-10 p-0 font-normal hover:bg-accent hover:text-accent-foreground inline-flex items-center justify-center",
-  range_start:
-    "rounded-l-md bg-primary [&>button]:bg-primary [&>button]:text-primary-foreground [&>button]:rounded-l-md",
+  range_start: "[&>button]:rounded-r-none",
   range_middle:
-    "bg-accent text-accent-foreground [&>button]:bg-accent [&>button]:text-accent-foreground [&>button]:rounded-none",
-  range_end:
-    "rounded-r-md bg-primary [&>button]:bg-primary [&>button]:text-primary-foreground [&>button]:rounded-r-md",
-  selected: "",
+    "[&>button]:!bg-accent [&>button]:!text-accent-foreground [&>button]:rounded-none",
+  range_end: "[&>button]:rounded-l-none",
 };
 
 function CategoryEditor({
