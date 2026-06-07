@@ -1201,6 +1201,749 @@ describe("Cashflow integration", () => {
     });
   });
 
+  describe("GET /summary", () => {
+    async function seedRate(
+      rateDate: string,
+      quote: string,
+      rate: string,
+    ): Promise<void> {
+      await dataSource.getRepository(FxRate).insert({
+        rateDate,
+        baseCurrency: "EUR",
+        quoteCurrency: quote,
+        rate,
+        fetchedAt: new Date(),
+      });
+    }
+
+    async function aliceCookie(): Promise<string> {
+      const { cookie } = await signInUser({
+        sub: "sub-a",
+        name: "Alice",
+        email: "alice@example.com",
+      });
+      await request(app.getHttpServer())
+        .put("/users/me/base-currency")
+        .set("Cookie", cookie)
+        .send({ baseCurrency: "USD" })
+        .expect(200);
+      return cookie;
+    }
+
+    async function capture(
+      cookie: string,
+      overrides: Partial<{
+        date: string;
+        amount: string;
+        currency: string;
+        description: string;
+        kind: "income" | "expense";
+        categoryId: string;
+        tagNames: string[];
+      }> = {},
+    ): Promise<{ id: string }> {
+      const body = {
+        date: "2026-06-07",
+        amount: "10.00",
+        currency: "USD",
+        description: "row",
+        kind: "expense" as const,
+        ...overrides,
+      };
+      const res = await request(app.getHttpServer())
+        .post("/transactions")
+        .set("Cookie", cookie)
+        .send(body)
+        .expect(201);
+      return { id: res.body.transaction.id as string };
+    }
+
+    it("returns income, expense, net, and byCategory in base currency for the chosen month", async () => {
+      const cookie = await aliceCookie();
+      const food = await request(app.getHttpServer())
+        .post("/categories")
+        .set("Cookie", cookie)
+        .send({ name: "Food" })
+        .expect(201);
+      const transport = await request(app.getHttpServer())
+        .post("/categories")
+        .set("Cookie", cookie)
+        .send({ name: "Transport" })
+        .expect(201);
+
+      await capture(cookie, {
+        date: "2026-06-03",
+        amount: "30.00",
+        kind: "expense",
+        categoryId: food.body.category.id,
+        description: "groceries",
+      });
+      await capture(cookie, {
+        date: "2026-06-20",
+        amount: "20.00",
+        kind: "expense",
+        categoryId: food.body.category.id,
+        description: "lunch",
+      });
+      await capture(cookie, {
+        date: "2026-06-15",
+        amount: "15.00",
+        kind: "expense",
+        categoryId: transport.body.category.id,
+        description: "bus",
+      });
+      await capture(cookie, {
+        date: "2026-06-30",
+        amount: "1000.00",
+        kind: "income",
+        description: "salary",
+      });
+      await capture(cookie, {
+        date: "2026-05-15",
+        amount: "999.00",
+        kind: "expense",
+        description: "out-of-window",
+      });
+
+      const res = await request(app.getHttpServer())
+        .get("/summary?month=2026-06")
+        .set("Cookie", cookie)
+        .expect(200);
+
+      expect(res.body).toEqual({
+        month: "2026-06",
+        baseCurrency: "USD",
+        income: "1000.00",
+        expense: "65.00",
+        net: "935.00",
+        byCategory: [
+          {
+            categoryId: food.body.category.id,
+            categoryName: "Food",
+            income: "0.00",
+            expense: "50.00",
+            net: "-50.00",
+          },
+          {
+            categoryId: transport.body.category.id,
+            categoryName: "Transport",
+            income: "0.00",
+            expense: "15.00",
+            net: "-15.00",
+          },
+          {
+            categoryId: null,
+            categoryName: null,
+            income: "1000.00",
+            expense: "0.00",
+            net: "1000.00",
+          },
+        ],
+        excludedUnconvertibleCount: 0,
+      });
+    });
+
+    it("converts foreign-currency rows at the transaction date's rate", async () => {
+      const cookie = await aliceCookie();
+      await seedRate("2026-06-07", "USD", "1.080000");
+      await seedRate("2026-06-10", "USD", "1.100000");
+      await capture(cookie, {
+        date: "2026-06-07",
+        amount: "100.00",
+        currency: "EUR",
+        description: "Hotel night 1",
+        kind: "expense",
+      });
+      await capture(cookie, {
+        date: "2026-06-10",
+        amount: "200.00",
+        currency: "EUR",
+        description: "Hotel night 2",
+        kind: "expense",
+      });
+
+      const res = await request(app.getHttpServer())
+        .get("/summary?month=2026-06")
+        .set("Cookie", cookie)
+        .expect(200);
+
+      expect(res.body.expense).toBe("328.00");
+      expect(res.body.income).toBe("0.00");
+      expect(res.body.net).toBe("-328.00");
+    });
+
+    it("excludes unconvertible rows from totals and reports the count", async () => {
+      const cookie = await aliceCookie();
+      // No EUR<->BRL leg seeded → BRL row is unconvertible against USD base.
+      await capture(cookie, {
+        date: "2026-06-07",
+        amount: "100.00",
+        currency: "USD",
+        description: "USD row",
+        kind: "expense",
+      });
+      await capture(cookie, {
+        date: "2026-06-09",
+        amount: "500.00",
+        currency: "BRL",
+        description: "BRL row",
+        kind: "expense",
+      });
+
+      const res = await request(app.getHttpServer())
+        .get("/summary?month=2026-06")
+        .set("Cookie", cookie)
+        .expect(200);
+
+      expect(res.body.expense).toBe("100.00");
+      expect(res.body.excludedUnconvertibleCount).toBe(1);
+    });
+
+    it("rejects an invalid month with 400", async () => {
+      const cookie = await aliceCookie();
+      await request(app.getHttpServer())
+        .get("/summary?month=2026-13")
+        .set("Cookie", cookie)
+        .expect(400);
+      await request(app.getHttpServer())
+        .get("/summary?month=June")
+        .set("Cookie", cookie)
+        .expect(400);
+      await request(app.getHttpServer())
+        .get("/summary")
+        .set("Cookie", cookie)
+        .expect(400);
+    });
+
+    it("never leaks another user's transactions", async () => {
+      const aliceC = await aliceCookie();
+      const { cookie: bobC } = await signInUser({
+        sub: "sub-b",
+        name: "Bob",
+        email: "bob@example.com",
+      });
+      await request(app.getHttpServer())
+        .put("/users/me/base-currency")
+        .set("Cookie", bobC)
+        .send({ baseCurrency: "USD" })
+        .expect(200);
+      await capture(aliceC, { description: "alice-row", amount: "10.00" });
+      await capture(bobC, { description: "bob-row", amount: "20.00" });
+
+      const aliceRes = await request(app.getHttpServer())
+        .get("/summary?month=2026-06")
+        .set("Cookie", aliceC)
+        .expect(200);
+      const bobRes = await request(app.getHttpServer())
+        .get("/summary?month=2026-06")
+        .set("Cookie", bobC)
+        .expect(200);
+
+      expect(aliceRes.body.expense).toBe("10.00");
+      expect(bobRes.body.expense).toBe("20.00");
+    });
+  });
+
+  describe("GET /trend", () => {
+    async function aliceCookie(): Promise<string> {
+      const { cookie } = await signInUser({
+        sub: "sub-a",
+        name: "Alice",
+        email: "alice@example.com",
+      });
+      await request(app.getHttpServer())
+        .put("/users/me/base-currency")
+        .set("Cookie", cookie)
+        .send({ baseCurrency: "USD" })
+        .expect(200);
+      return cookie;
+    }
+
+    async function capture(
+      cookie: string,
+      date: string,
+      amount: string,
+      kind: "income" | "expense",
+    ): Promise<void> {
+      await request(app.getHttpServer())
+        .post("/transactions")
+        .set("Cookie", cookie)
+        .send({
+          date,
+          amount,
+          currency: "USD",
+          description: `row-${date}-${kind}`,
+          kind,
+        })
+        .expect(201);
+    }
+
+    it("returns one point per month in the window, zero-filling empty months", async () => {
+      const cookie = await aliceCookie();
+      await capture(cookie, "2026-04-15", "100.00", "expense");
+      await capture(cookie, "2026-06-01", "200.00", "income");
+      await capture(cookie, "2026-06-30", "50.00", "expense");
+
+      const res = await request(app.getHttpServer())
+        .get("/trend?from=2026-04&to=2026-06")
+        .set("Cookie", cookie)
+        .expect(200);
+
+      expect(res.body).toEqual({
+        from: "2026-04",
+        to: "2026-06",
+        baseCurrency: "USD",
+        points: [
+          {
+            month: "2026-04",
+            income: "0.00",
+            expense: "100.00",
+            net: "-100.00",
+          },
+          { month: "2026-05", income: "0.00", expense: "0.00", net: "0.00" },
+          {
+            month: "2026-06",
+            income: "200.00",
+            expense: "50.00",
+            net: "150.00",
+          },
+        ],
+        excludedUnconvertibleCount: 0,
+      });
+    });
+
+    it("defaults to a 12-month trailing window when neither bound is given", async () => {
+      const cookie = await aliceCookie();
+      const res = await request(app.getHttpServer())
+        .get("/trend")
+        .set("Cookie", cookie)
+        .expect(200);
+      expect(res.body.points).toHaveLength(12);
+      expect(res.body.from).toMatch(/^\d{4}-(0[1-9]|1[0-2])$/);
+      expect(res.body.to).toMatch(/^\d{4}-(0[1-9]|1[0-2])$/);
+    });
+
+    it("counts unconvertible rows separately and excludes them from points", async () => {
+      const cookie = await aliceCookie();
+      await capture(cookie, "2026-06-07", "100.00", "expense");
+      await request(app.getHttpServer())
+        .post("/transactions")
+        .set("Cookie", cookie)
+        .send({
+          date: "2026-06-09",
+          amount: "500.00",
+          currency: "BRL",
+          description: "unconvertible",
+          kind: "expense",
+        })
+        .expect(201);
+
+      const res = await request(app.getHttpServer())
+        .get("/trend?from=2026-06&to=2026-06")
+        .set("Cookie", cookie)
+        .expect(200);
+      expect(res.body.points).toEqual([
+        { month: "2026-06", income: "0.00", expense: "100.00", net: "-100.00" },
+      ]);
+      expect(res.body.excludedUnconvertibleCount).toBe(1);
+    });
+
+    it("rejects an invalid bound with 400", async () => {
+      const cookie = await aliceCookie();
+      await request(app.getHttpServer())
+        .get("/trend?from=2026-13")
+        .set("Cookie", cookie)
+        .expect(400);
+      await request(app.getHttpServer())
+        .get("/trend?to=2026-aa")
+        .set("Cookie", cookie)
+        .expect(400);
+    });
+  });
+
+  describe("GET /tags/:id/drill-down", () => {
+    async function aliceCookie(): Promise<string> {
+      const { cookie } = await signInUser({
+        sub: "sub-a",
+        name: "Alice",
+        email: "alice@example.com",
+      });
+      await request(app.getHttpServer())
+        .put("/users/me/base-currency")
+        .set("Cookie", cookie)
+        .send({ baseCurrency: "USD" })
+        .expect(200);
+      return cookie;
+    }
+
+    async function capture(
+      cookie: string,
+      overrides: Partial<{
+        date: string;
+        amount: string;
+        currency: string;
+        description: string;
+        kind: "income" | "expense";
+        categoryId: string;
+        tagNames: string[];
+      }> = {},
+    ): Promise<{ id: string }> {
+      const body = {
+        date: "2026-06-07",
+        amount: "10.00",
+        currency: "USD",
+        description: "row",
+        kind: "expense" as const,
+        ...overrides,
+      };
+      const res = await request(app.getHttpServer())
+        .post("/transactions")
+        .set("Cookie", cookie)
+        .send(body)
+        .expect(201);
+      return { id: res.body.transaction.id as string };
+    }
+
+    async function createTag(cookie: string, name: string): Promise<string> {
+      const res = await request(app.getHttpServer())
+        .post("/tags")
+        .set("Cookie", cookie)
+        .send({ name })
+        .expect(201);
+      return res.body.tag.id as string;
+    }
+
+    it("returns linked transactions plus by-category and by-month breakdowns", async () => {
+      const cookie = await aliceCookie();
+      const food = await request(app.getHttpServer())
+        .post("/categories")
+        .set("Cookie", cookie)
+        .send({ name: "Food" })
+        .expect(201);
+      const travelTagId = await createTag(cookie, "travel");
+
+      await capture(cookie, {
+        date: "2026-05-15",
+        amount: "100.00",
+        description: "Linked-1",
+        categoryId: food.body.category.id,
+        tagNames: ["travel"],
+      });
+      await capture(cookie, {
+        date: "2026-06-10",
+        amount: "50.00",
+        description: "Linked-2",
+        tagNames: ["travel"],
+      });
+      await capture(cookie, {
+        date: "2026-06-15",
+        amount: "9999.00",
+        description: "Untagged",
+      });
+
+      const res = await request(app.getHttpServer())
+        .get(`/tags/${travelTagId}/drill-down`)
+        .set("Cookie", cookie)
+        .expect(200);
+
+      expect(res.body.tag).toEqual({ id: travelTagId, name: "travel" });
+      expect(res.body.baseCurrency).toBe("USD");
+      expect(res.body.transactions).toHaveLength(2);
+      expect(
+        res.body.transactions.map(
+          (t: { description: string }) => t.description,
+        ),
+      ).toEqual(["Linked-2", "Linked-1"]);
+      expect(res.body.byCategory).toEqual([
+        {
+          categoryId: food.body.category.id,
+          categoryName: "Food",
+          income: "0.00",
+          expense: "100.00",
+          net: "-100.00",
+        },
+        {
+          categoryId: null,
+          categoryName: null,
+          income: "0.00",
+          expense: "50.00",
+          net: "-50.00",
+        },
+      ]);
+      expect(res.body.byMonth).toEqual([
+        { month: "2026-05", income: "0.00", expense: "100.00", net: "-100.00" },
+        { month: "2026-06", income: "0.00", expense: "50.00", net: "-50.00" },
+      ]);
+      expect(res.body.excludedUnconvertibleCount).toBe(0);
+    });
+
+    it("respects the optional from/to month window", async () => {
+      const cookie = await aliceCookie();
+      const travelTagId = await createTag(cookie, "travel");
+      await capture(cookie, {
+        date: "2026-05-15",
+        amount: "100.00",
+        description: "May",
+        tagNames: ["travel"],
+      });
+      await capture(cookie, {
+        date: "2026-06-15",
+        amount: "200.00",
+        description: "June",
+        tagNames: ["travel"],
+      });
+
+      const res = await request(app.getHttpServer())
+        .get(`/tags/${travelTagId}/drill-down?from=2026-06&to=2026-06`)
+        .set("Cookie", cookie)
+        .expect(200);
+      expect(res.body.transactions).toHaveLength(1);
+      expect(res.body.transactions[0].description).toBe("June");
+      expect(res.body.byMonth).toEqual([
+        { month: "2026-06", income: "0.00", expense: "200.00", net: "-200.00" },
+      ]);
+    });
+
+    it("counts unconvertible rows separately", async () => {
+      const cookie = await aliceCookie();
+      const travelTagId = await createTag(cookie, "travel");
+      await capture(cookie, {
+        date: "2026-06-07",
+        amount: "100.00",
+        currency: "USD",
+        description: "USD row",
+        tagNames: ["travel"],
+      });
+      await capture(cookie, {
+        date: "2026-06-09",
+        amount: "500.00",
+        currency: "BRL",
+        description: "BRL row",
+        tagNames: ["travel"],
+      });
+
+      const res = await request(app.getHttpServer())
+        .get(`/tags/${travelTagId}/drill-down`)
+        .set("Cookie", cookie)
+        .expect(200);
+      expect(res.body.transactions).toHaveLength(2);
+      expect(res.body.byMonth).toEqual([
+        { month: "2026-06", income: "0.00", expense: "100.00", net: "-100.00" },
+      ]);
+      expect(res.body.excludedUnconvertibleCount).toBe(1);
+    });
+
+    it("returns 404 when the tag does not exist or belongs to another user", async () => {
+      const aliceC = await aliceCookie();
+      const { cookie: bobC } = await signInUser({
+        sub: "sub-b",
+        name: "Bob",
+        email: "bob@example.com",
+      });
+      const bobTagId = await createTag(bobC, "bob-tag");
+
+      await request(app.getHttpServer())
+        .get(`/tags/${bobTagId}/drill-down`)
+        .set("Cookie", aliceC)
+        .expect(404);
+
+      await request(app.getHttpServer())
+        .get("/tags/00000000-0000-0000-0000-000000000000/drill-down")
+        .set("Cookie", aliceC)
+        .expect(404);
+    });
+  });
+
+  describe("GET /transactions filter set", () => {
+    async function aliceCookie(): Promise<string> {
+      const { cookie } = await signInUser({
+        sub: "sub-a",
+        name: "Alice",
+        email: "alice@example.com",
+      });
+      await request(app.getHttpServer())
+        .put("/users/me/base-currency")
+        .set("Cookie", cookie)
+        .send({ baseCurrency: "USD" })
+        .expect(200);
+      return cookie;
+    }
+
+    async function capture(
+      cookie: string,
+      overrides: Partial<{
+        date: string;
+        amount: string;
+        description: string;
+        kind: "income" | "expense";
+        categoryId: string;
+        tagNames: string[];
+      }> = {},
+    ): Promise<{ id: string }> {
+      const body = {
+        date: "2026-06-07",
+        amount: "10.00",
+        currency: "USD",
+        description: "row",
+        kind: "expense" as const,
+        ...overrides,
+      };
+      const res = await request(app.getHttpServer())
+        .post("/transactions")
+        .set("Cookie", cookie)
+        .send(body)
+        .expect(201);
+      return { id: res.body.transaction.id as string };
+    }
+
+    it("filters by from/to date range, inclusive", async () => {
+      const cookie = await aliceCookie();
+      await capture(cookie, { date: "2026-04-30", description: "Apr-30" });
+      await capture(cookie, { date: "2026-05-01", description: "May-01" });
+      await capture(cookie, { date: "2026-05-31", description: "May-31" });
+      await capture(cookie, { date: "2026-06-01", description: "Jun-01" });
+
+      const res = await request(app.getHttpServer())
+        .get("/transactions?from=2026-05-01&to=2026-05-31")
+        .set("Cookie", cookie)
+        .expect(200);
+      expect(
+        res.body.items.map((t: { description: string }) => t.description),
+      ).toEqual(["May-31", "May-01"]);
+    });
+
+    it("filters by categoryId", async () => {
+      const cookie = await aliceCookie();
+      const food = await request(app.getHttpServer())
+        .post("/categories")
+        .set("Cookie", cookie)
+        .send({ name: "Food" })
+        .expect(201);
+      const transport = await request(app.getHttpServer())
+        .post("/categories")
+        .set("Cookie", cookie)
+        .send({ name: "Transport" })
+        .expect(201);
+      await capture(cookie, {
+        description: "lunch",
+        categoryId: food.body.category.id,
+      });
+      await capture(cookie, {
+        description: "bus",
+        categoryId: transport.body.category.id,
+      });
+
+      const res = await request(app.getHttpServer())
+        .get(`/transactions?categoryId=${food.body.category.id}`)
+        .set("Cookie", cookie)
+        .expect(200);
+      expect(
+        res.body.items.map((t: { description: string }) => t.description),
+      ).toEqual(["lunch"]);
+    });
+
+    it("filters by tagId via the join table", async () => {
+      const cookie = await aliceCookie();
+      await capture(cookie, { description: "tagged", tagNames: ["travel"] });
+      await capture(cookie, { description: "untagged" });
+      const tagsList = await request(app.getHttpServer())
+        .get("/tags")
+        .set("Cookie", cookie)
+        .expect(200);
+      const tagId = tagsList.body.items.find(
+        (t: { name: string }) => t.name === "travel",
+      ).id;
+
+      const res = await request(app.getHttpServer())
+        .get(`/transactions?tagId=${tagId}`)
+        .set("Cookie", cookie)
+        .expect(200);
+      expect(
+        res.body.items.map((t: { description: string }) => t.description),
+      ).toEqual(["tagged"]);
+    });
+
+    it("filters by kind", async () => {
+      const cookie = await aliceCookie();
+      await capture(cookie, { description: "salary", kind: "income" });
+      await capture(cookie, { description: "lunch", kind: "expense" });
+
+      const res = await request(app.getHttpServer())
+        .get("/transactions?kind=income")
+        .set("Cookie", cookie)
+        .expect(200);
+      expect(
+        res.body.items.map((t: { description: string }) => t.description),
+      ).toEqual(["salary"]);
+    });
+
+    it("filters by free-text q with case-insensitive ILIKE", async () => {
+      const cookie = await aliceCookie();
+      await capture(cookie, { description: "Coffee on Friday" });
+      await capture(cookie, { description: "Tea" });
+      await capture(cookie, { description: "Espresso" });
+
+      const res = await request(app.getHttpServer())
+        .get("/transactions?q=coffee")
+        .set("Cookie", cookie)
+        .expect(200);
+      expect(
+        res.body.items.map((t: { description: string }) => t.description),
+      ).toEqual(["Coffee on Friday"]);
+    });
+
+    it("combines filters and still paginates by keyset", async () => {
+      const cookie = await aliceCookie();
+      const food = await request(app.getHttpServer())
+        .post("/categories")
+        .set("Cookie", cookie)
+        .send({ name: "Food" })
+        .expect(201);
+      for (let day = 1; day <= 6; day += 1) {
+        await capture(cookie, {
+          date: `2026-06-0${day}`,
+          description: `food-${day}`,
+          categoryId: food.body.category.id,
+        });
+      }
+      await capture(cookie, { description: "other", date: "2026-06-07" });
+
+      const first = await request(app.getHttpServer())
+        .get(
+          `/transactions?categoryId=${food.body.category.id}&kind=expense&limit=4`,
+        )
+        .set("Cookie", cookie)
+        .expect(200);
+      expect(first.body.items).toHaveLength(4);
+      expect(first.body.nextCursor).toEqual(expect.any(String));
+
+      const second = await request(app.getHttpServer())
+        .get(
+          `/transactions?categoryId=${food.body.category.id}&kind=expense&limit=4&cursor=${first.body.nextCursor}`,
+        )
+        .set("Cookie", cookie)
+        .expect(200);
+      expect(second.body.items).toHaveLength(2);
+      expect(second.body.nextCursor).toBeNull();
+    });
+
+    it("rejects an invalid filter shape with 400", async () => {
+      const cookie = await aliceCookie();
+      await request(app.getHttpServer())
+        .get("/transactions?from=06/01/2026")
+        .set("Cookie", cookie)
+        .expect(400);
+      await request(app.getHttpServer())
+        .get("/transactions?kind=transfer")
+        .set("Cookie", cookie)
+        .expect(400);
+      await request(app.getHttpServer())
+        .get("/transactions?categoryId=not-a-uuid")
+        .set("Cookie", cookie)
+        .expect(400);
+    });
+  });
+
   describe("erasure: deleting a user removes their cashflow rows", () => {
     it("cascades transactions, categories, tags, joins, and user_settings on user delete", async () => {
       const { cookie } = await signInUser({

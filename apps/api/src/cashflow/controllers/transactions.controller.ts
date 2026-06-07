@@ -59,6 +59,12 @@ export class TransactionsController {
       return await this.transactions.listForUser(principal.userId, {
         limit: query.resolvedLimit(),
         cursor: query.cursor,
+        from: query.from,
+        to: query.to,
+        categoryId: query.categoryId,
+        tagId: query.tagId,
+        kind: query.kind,
+        q: query.q,
       });
     } catch (err) {
       if (err instanceof Error && err.message === "Invalid cursor") {

@@ -5,8 +5,13 @@ import type {
   CreateTransactionInput,
   ListTransactionsPage,
   ListTransactionsParams,
+  SummaryResponse,
   Tag,
+  TagDrillDownParams,
+  TagDrillDownResponse,
   Transaction,
+  TrendParams,
+  TrendResponse,
   UpdateTransactionInput,
 } from "./types";
 
@@ -16,8 +21,30 @@ function buildListUrl(params: ListTransactionsParams): string {
   const query = new URLSearchParams();
   if (params.cursor) query.set("cursor", params.cursor);
   if (params.limit !== undefined) query.set("limit", String(params.limit));
+  if (params.from) query.set("from", params.from);
+  if (params.to) query.set("to", params.to);
+  if (params.categoryId) query.set("categoryId", params.categoryId);
+  if (params.tagId) query.set("tagId", params.tagId);
+  if (params.kind) query.set("kind", params.kind);
+  if (params.q) query.set("q", params.q);
   const qs = query.toString();
   return `${PREFIX}/transactions${qs ? `?${qs}` : ""}`;
+}
+
+function buildTrendUrl(params: TrendParams): string {
+  const query = new URLSearchParams();
+  if (params.from) query.set("from", params.from);
+  if (params.to) query.set("to", params.to);
+  const qs = query.toString();
+  return `${PREFIX}/trend${qs ? `?${qs}` : ""}`;
+}
+
+function buildDrillDownUrl(tagId: string, params: TagDrillDownParams): string {
+  const query = new URLSearchParams();
+  if (params.from) query.set("from", params.from);
+  if (params.to) query.set("to", params.to);
+  const qs = query.toString();
+  return `${PREFIX}/tags/${tagId}/drill-down${qs ? `?${qs}` : ""}`;
 }
 
 export const cashflowApi = {
@@ -77,4 +104,15 @@ export const cashflowApi = {
     }),
 
   deleteTag: (id: string) => apiClient.delete<void>(`${PREFIX}/tags/${id}`),
+
+  getSummary: (month: string) =>
+    apiClient.get<SummaryResponse>(
+      `${PREFIX}/summary?month=${encodeURIComponent(month)}`,
+    ),
+
+  getTrend: (params: TrendParams = {}) =>
+    apiClient.get<TrendResponse>(buildTrendUrl(params)),
+
+  getTagDrillDown: (tagId: string, params: TagDrillDownParams = {}) =>
+    apiClient.get<TagDrillDownResponse>(buildDrillDownUrl(tagId, params)),
 };

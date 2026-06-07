@@ -11,6 +11,9 @@ import { CASHFLOW_QUERY_KEYS } from "./query-keys";
 import type {
   CreateTransactionInput,
   ListTransactionsPage,
+  ListTransactionsParams,
+  TagDrillDownParams,
+  TrendParams,
   UpdateTransactionInput,
 } from "./types";
 
@@ -82,13 +85,19 @@ export function useDeleteTransaction() {
   });
 }
 
-export function useTransactions(limit = 50) {
+export type TransactionFilters = Omit<
+  ListTransactionsParams,
+  "cursor" | "limit"
+>;
+
+export function useTransactions(filters: TransactionFilters = {}, limit = 50) {
   return useInfiniteQuery<ListTransactionsPage>({
-    queryKey: [...CASHFLOW_QUERY_KEYS.transactions, { limit }],
+    queryKey: [...CASHFLOW_QUERY_KEYS.transactions, { ...filters, limit }],
     queryFn: ({ pageParam }) =>
       cashflowApi.listTransactions({
         cursor: pageParam as string | undefined,
         limit,
+        ...filters,
       }),
     initialPageParam: undefined,
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
@@ -183,5 +192,30 @@ export function useDeleteTag() {
         queryKey: CASHFLOW_QUERY_KEYS.transactions,
       });
     },
+  });
+}
+
+export function useSummary(month: string) {
+  return useQuery({
+    queryKey: [...CASHFLOW_QUERY_KEYS.summary, month],
+    queryFn: () => cashflowApi.getSummary(month),
+  });
+}
+
+export function useTrend(params: TrendParams = {}) {
+  return useQuery({
+    queryKey: [...CASHFLOW_QUERY_KEYS.trend, params],
+    queryFn: () => cashflowApi.getTrend(params),
+  });
+}
+
+export function useTagDrillDown(
+  tagId: string,
+  params: TagDrillDownParams = {},
+) {
+  return useQuery({
+    queryKey: [...CASHFLOW_QUERY_KEYS.tagDrillDown, tagId, params],
+    queryFn: () => cashflowApi.getTagDrillDown(tagId, params),
+    enabled: Boolean(tagId),
   });
 }

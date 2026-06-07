@@ -5,10 +5,7 @@ import {
 } from "@nestjs/common";
 import { InjectDataSource, InjectRepository } from "@nestjs/typeorm";
 import { DataSource, In, Repository } from "typeorm";
-import {
-  FxLookupService,
-  type FxResolution,
-} from "@/fx/services/fx-lookup.service";
+import { FxLookupService } from "@/fx/services/fx-lookup.service";
 import { UserSettingsService } from "@/users/services/user-settings.service";
 import type { CreateTransactionDto } from "../dto/create-transaction.dto";
 import type { UpdateTransactionDto } from "../dto/update-transaction.dto";
@@ -17,24 +14,12 @@ import { Transaction } from "../entities/transaction.entity";
 import { TransactionTag } from "../entities/transaction-tag.entity";
 import { decodeCursor, encodeCursor } from "./cursor";
 import { TagsService } from "./tags.service";
+import {
+  type TransactionResponse,
+  transactionToResponse,
+} from "./transaction-response";
 
-export interface TransactionResponse {
-  id: string;
-  date: string;
-  amount: string;
-  currency: string;
-  description: string;
-  kind: Transaction["kind"];
-  categoryId: string | null;
-  tagIds: string[];
-  baseAmount: string | null;
-  baseCurrency: string;
-  rateSubstituted: boolean;
-  rateDate: string | null;
-  unconvertible: boolean;
-  createdAt: string;
-  updatedAt: string;
-}
+export type { TransactionResponse } from "./transaction-response";
 
 export interface ListTransactionsResult {
   items: TransactionResponse[];
@@ -44,6 +29,12 @@ export interface ListTransactionsResult {
 export interface ListTransactionsOptions {
   limit: number;
   cursor?: string;
+  from?: string;
+  to?: string;
+  categoryId?: string;
+  tagId?: string;
+  kind?: "income" | "expense";
+  q?: string;
 }
 
 @Injectable()
@@ -114,6 +105,33 @@ export class TransactionsService {
         cursorDate: date,
         cursorId: id,
       });
+    }
+    if (options.from) {
+      qb.andWhere("t.date >= :from", { from: options.from });
+    }
+    if (options.to) {
+      qb.andWhere("t.date <= :to", { to: options.to });
+    }
+    if (options.categoryId) {
+      qb.andWhere("t.category_id = :categoryId", {
+        categoryId: options.categoryId,
+      });
+    }
+    if (options.kind) {
+      qb.andWhere("t.kind = :kind", { kind: options.kind });
+    }
+    if (options.q) {
+      qb.andWhere("t.description ILIKE :q", { q: `%${options.q}%` });
+    }
+    if (options.tagId) {
+      qb.andWhere(
+        `EXISTS (
+          SELECT 1
+          FROM "transaction_tags" tt
+          WHERE tt.transaction_id = t.id AND tt.tag_id = :tagId
+        )`,
+        { tagId: options.tagId },
+      );
     }
 
     const rows = await qb.getMany();
@@ -194,6 +212,13 @@ export class TransactionsService {
     return this.enrichForResponse(saved.row, saved.tagIds, baseCurrency);
   }
 
+  /** Group tag ids by transaction id for an arbitrary set of transactions. */
+  async loadTagIdsByTransaction(
+    transactionIds: string[],
+  ): Promise<Map<string, string[]>> {
+    return this.loadTagIds(transactionIds);
+  }
+
   async deleteForUser(userId: string, id: string): Promise<void> {
     const result = await this.transactions.delete({ id, userId });
     if (!result.affected) {
@@ -211,7 +236,7 @@ export class TransactionsService {
       transactionCurrency: row.currency,
       baseCurrency,
     });
-    return toResponse(row, tagIds, baseCurrency, resolution);
+    return transactionToResponse(row, tagIds, baseCurrency, resolution);
   }
 
   private async assertCategoryOwned(
@@ -275,39 +300,4 @@ async function reconcileJoin(
       toAdd.map((tagId) => repo.create({ transactionId, tagId })),
     );
   }
-}
-
-function toResponse(
-  row: Transaction,
-  tagIds: string[],
-  baseCurrency: string,
-  resolution: FxResolution,
-): TransactionResponse {
-  const unconvertible = resolution.unconvertible;
-  const baseAmount = unconvertible
-    ? null
-    : multiplyAndRound(row.amount, resolution.rate);
-  return {
-    id: row.id,
-    date: row.date,
-    amount: row.amount,
-    currency: row.currency,
-    description: row.description,
-    kind: row.kind,
-    categoryId: row.categoryId,
-    tagIds,
-    baseAmount,
-    baseCurrency,
-    rateSubstituted: unconvertible ? false : resolution.substituted,
-    rateDate: unconvertible ? null : resolution.rateDate,
-    unconvertible,
-    createdAt: row.createdAt.toISOString(),
-    updatedAt: row.updatedAt.toISOString(),
-  };
-}
-
-function multiplyAndRound(amount: string, rate: string): string {
-  const value = Number(amount) * Number(rate);
-  if (!Number.isFinite(value)) return "0.00";
-  return value.toFixed(2);
 }

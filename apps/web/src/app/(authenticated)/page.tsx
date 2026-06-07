@@ -1,7 +1,9 @@
 "use client";
 
 import { PlusIcon } from "lucide-react";
-import { useState } from "react";
+import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useCallback, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -12,12 +14,70 @@ import {
 } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CaptureForm } from "@/lib/cashflow/components/capture-form";
+import {
+  TransactionFilterBar,
+  type TransactionFilterState,
+} from "@/lib/cashflow/components/transaction-filter-bar";
 import { TransactionList } from "@/lib/cashflow/components/transaction-list";
+import type { TransactionFilters } from "@/lib/cashflow/hooks";
 import { useBaseCurrency } from "@/lib/cashflow/hooks";
+import type { TransactionKind } from "@/lib/cashflow/types";
+
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const UUID_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function parseFilters(params: URLSearchParams): TransactionFilterState {
+  const from = params.get("from");
+  const to = params.get("to");
+  const categoryId = params.get("categoryId");
+  const tagId = params.get("tagId");
+  const kindRaw = params.get("kind");
+  const q = params.get("q");
+  const kind: TransactionKind | null =
+    kindRaw === "income" || kindRaw === "expense" ? kindRaw : null;
+  return {
+    from: from && ISO_DATE_RE.test(from) ? from : null,
+    to: to && ISO_DATE_RE.test(to) ? to : null,
+    categoryId: categoryId && UUID_RE.test(categoryId) ? categoryId : null,
+    tagId: tagId && UUID_RE.test(tagId) ? tagId : null,
+    kind,
+    q: q && q.length > 0 ? q : null,
+  };
+}
+
+function toFilters(state: TransactionFilterState): TransactionFilters {
+  return {
+    from: state.from ?? undefined,
+    to: state.to ?? undefined,
+    categoryId: state.categoryId ?? undefined,
+    tagId: state.tagId ?? undefined,
+    kind: state.kind ?? undefined,
+    q: state.q ?? undefined,
+  };
+}
 
 export default function AuthenticatedRootPage() {
   const { data, isPending, isError } = useBaseCurrency();
   const [captureOpen, setCaptureOpen] = useState(false);
+  const router = useRouter();
+  const params = useSearchParams();
+  const filters = parseFilters(params);
+
+  const onFiltersChange = useCallback(
+    (next: TransactionFilterState) => {
+      const url = new URLSearchParams();
+      if (next.from) url.set("from", next.from);
+      if (next.to) url.set("to", next.to);
+      if (next.categoryId) url.set("categoryId", next.categoryId);
+      if (next.tagId) url.set("tagId", next.tagId);
+      if (next.kind) url.set("kind", next.kind);
+      if (next.q) url.set("q", next.q);
+      const qs = url.toString();
+      router.replace(qs ? `/?${qs}` : "/");
+    },
+    [router],
+  );
 
   if (isPending) {
     return (
@@ -66,8 +126,29 @@ export default function AuthenticatedRootPage() {
         </Dialog>
       </header>
 
+      <nav
+        aria-label="Cashflow views"
+        className="flex flex-wrap gap-2 text-sm"
+        data-testid="cashflow-nav"
+      >
+        <Link
+          href="/summary"
+          className="rounded-md border border-border px-3 py-1.5 transition hover:bg-accent/40"
+        >
+          Monthly summary
+        </Link>
+        <Link
+          href="/trend"
+          className="rounded-md border border-border px-3 py-1.5 transition hover:bg-accent/40"
+        >
+          Cash-flow trend
+        </Link>
+      </nav>
+
+      <TransactionFilterBar value={filters} onChange={onFiltersChange} />
+
       <section aria-label="Recent transactions">
-        <TransactionList />
+        <TransactionList filters={toFilters(filters)} />
       </section>
     </main>
   );

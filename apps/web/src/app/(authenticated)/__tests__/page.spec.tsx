@@ -12,8 +12,17 @@ jest.mock("@/lib/cashflow/components/transaction-list", () => ({
   TransactionList: () => <div data-testid="transaction-list-stub" />,
 }));
 
+jest.mock("@/lib/cashflow/components/transaction-filter-bar", () => ({
+  TransactionFilterBar: () => <div data-testid="filter-bar-stub" />,
+}));
+
 jest.mock("@/lib/cashflow/hooks", () => ({
   useBaseCurrency: jest.fn(),
+}));
+
+jest.mock("next/navigation", () => ({
+  useRouter: () => ({ replace: jest.fn(), push: jest.fn() }),
+  useSearchParams: () => new URLSearchParams(),
 }));
 
 import { useBaseCurrency } from "@/lib/cashflow/hooks";

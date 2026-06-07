@@ -4,11 +4,20 @@ import { format, parseISO } from "date-fns";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useCategories, useTags, useTransactions } from "../hooks";
+import {
+  type TransactionFilters,
+  useCategories,
+  useTags,
+  useTransactions,
+} from "../hooks";
 import type { Transaction } from "../types";
 import { TransactionEditDialog } from "./transaction-edit-dialog";
 
-export function TransactionList() {
+interface TransactionListProps {
+  filters?: TransactionFilters;
+}
+
+export function TransactionList({ filters }: TransactionListProps = {}) {
   const {
     data,
     isPending,
@@ -17,7 +26,7 @@ export function TransactionList() {
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
-  } = useTransactions();
+  } = useTransactions(filters);
   const categories = useCategories();
   const tags = useTags();
   const sentinelRef = useRef<HTMLLIElement | null>(null);

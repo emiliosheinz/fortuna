@@ -8,6 +8,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Query,
   Req,
   UnauthorizedException,
   UseGuards,
@@ -15,6 +16,11 @@ import {
 import type { Request } from "express";
 import { SessionGuard } from "@/auth/guards/session.guard";
 import { TagDto } from "../dto/tag.dto";
+import { TagDrillDownQueryDto } from "../dto/tag-drill-down-query.dto";
+import {
+  TagDrillDownResponse,
+  TagDrillDownService,
+} from "../services/tag-drill-down.service";
 import { type TagResponse, TagsService } from "../services/tags.service";
 
 interface AuthedRequest extends Request {
@@ -23,7 +29,10 @@ interface AuthedRequest extends Request {
 
 @Controller("tags")
 export class TagsController {
-  constructor(private readonly tags: TagsService) {}
+  constructor(
+    private readonly tags: TagsService,
+    private readonly drillDown: TagDrillDownService,
+  ) {}
 
   @UseGuards(SessionGuard)
   @Post()
@@ -66,6 +75,20 @@ export class TagsController {
   ): Promise<void> {
     const principal = requirePrincipal(req);
     await this.tags.remove(principal.userId, id);
+  }
+
+  @UseGuards(SessionGuard)
+  @Get(":id/drill-down")
+  async getDrillDown(
+    @Req() req: AuthedRequest,
+    @Param("id", new ParseUUIDPipe()) id: string,
+    @Query() query: TagDrillDownQueryDto,
+  ): Promise<TagDrillDownResponse> {
+    const principal = requirePrincipal(req);
+    return this.drillDown.getForUser(principal.userId, id, {
+      from: query.from,
+      to: query.to,
+    });
   }
 }
 
