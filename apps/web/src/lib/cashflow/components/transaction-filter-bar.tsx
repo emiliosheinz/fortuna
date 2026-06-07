@@ -361,8 +361,9 @@ function DateRangeCalendar({
     <div data-testid="transaction-filter-date-editor">
       <Calendar
         mode="range"
-        numberOfMonths={2}
+        numberOfMonths={1}
         selected={selected}
+        classNames={DATE_RANGE_CALENDAR_CLASSNAMES}
         onSelect={(next) =>
           onChange({
             from: next?.from ? format(next.from, "yyyy-MM-dd") : null,
@@ -374,6 +375,21 @@ function DateRangeCalendar({
     </div>
   );
 }
+
+const DATE_RANGE_CALENDAR_CLASSNAMES = {
+  // Drop the per-day rounded corners and primary background; range modifiers
+  // own the colour and shape.
+  day: "relative p-0 text-center text-sm focus-within:relative focus-within:z-20",
+  day_button:
+    "size-10 p-0 font-normal hover:bg-accent hover:text-accent-foreground inline-flex items-center justify-center",
+  range_start:
+    "rounded-l-md bg-primary [&>button]:bg-primary [&>button]:text-primary-foreground [&>button]:rounded-l-md",
+  range_middle:
+    "bg-accent text-accent-foreground [&>button]:bg-accent [&>button]:text-accent-foreground [&>button]:rounded-none",
+  range_end:
+    "rounded-r-md bg-primary [&>button]:bg-primary [&>button]:text-primary-foreground [&>button]:rounded-r-md",
+  selected: "",
+};
 
 function CategoryEditor({
   value,

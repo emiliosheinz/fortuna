@@ -2,7 +2,6 @@
 
 import { PlusIcon } from "lucide-react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -57,27 +56,50 @@ function toFilters(state: TransactionFilterState): TransactionFilters {
   };
 }
 
+function initialFilters(): TransactionFilterState {
+  if (typeof window === "undefined") {
+    return {
+      from: null,
+      to: null,
+      categoryId: null,
+      tagId: null,
+      kind: null,
+      q: null,
+    };
+  }
+  return parseFilters(new URLSearchParams(window.location.search));
+}
+
+/**
+ * Mirror the filter state into the URL bar without triggering a Next.js
+ * re-render. Using `router.replace` here would re-render the page tree on every
+ * keystroke / day click, collapsing any open popover or submenu.
+ */
+function syncFiltersToUrl(state: TransactionFilterState): void {
+  if (typeof window === "undefined") return;
+  const url = new URLSearchParams();
+  if (state.from) url.set("from", state.from);
+  if (state.to) url.set("to", state.to);
+  if (state.categoryId) url.set("categoryId", state.categoryId);
+  if (state.tagId) url.set("tagId", state.tagId);
+  if (state.kind) url.set("kind", state.kind);
+  if (state.q) url.set("q", state.q);
+  const qs = url.toString();
+  const next = `${window.location.pathname}${qs ? `?${qs}` : ""}`;
+  window.history.replaceState(window.history.state, "", next);
+}
+
 export default function AuthenticatedRootPage() {
   const { data, isPending, isError } = useBaseCurrency();
   const [captureOpen, setCaptureOpen] = useState(false);
-  const router = useRouter();
-  const params = useSearchParams();
-  const filters = parseFilters(params);
-
-  const onFiltersChange = useCallback(
-    (next: TransactionFilterState) => {
-      const url = new URLSearchParams();
-      if (next.from) url.set("from", next.from);
-      if (next.to) url.set("to", next.to);
-      if (next.categoryId) url.set("categoryId", next.categoryId);
-      if (next.tagId) url.set("tagId", next.tagId);
-      if (next.kind) url.set("kind", next.kind);
-      if (next.q) url.set("q", next.q);
-      const qs = url.toString();
-      router.replace(qs ? `/?${qs}` : "/");
-    },
-    [router],
+  const [filters, setFilters] = useState<TransactionFilterState>(() =>
+    initialFilters(),
   );
+
+  const onFiltersChange = useCallback((next: TransactionFilterState) => {
+    setFilters(next);
+    syncFiltersToUrl(next);
+  }, []);
 
   if (isPending) {
     return (
