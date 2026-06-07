@@ -1,3 +1,5 @@
+import { Dashboard } from "@/lib/cashflow/components/dashboard";
+
 export default function DashboardPage() {
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-8 sm:px-6">
@@ -7,6 +9,7 @@ export default function DashboardPage() {
           Your overview at a glance.
         </p>
       </header>
+      <Dashboard />
     </main>
   );
 }
