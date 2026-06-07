@@ -334,8 +334,8 @@ function FilterEditor({
         to={value.to}
         onChange={(next) => {
           onChange({ ...value, from: next.from, to: next.to });
-          if (next.from && next.to) onApplied?.();
         }}
+        onComplete={() => onApplied?.()}
       />
     );
   }
@@ -376,18 +376,28 @@ function DateRangeCalendar({
   from,
   to,
   onChange,
+  onComplete,
 }: {
   from: string | null;
   to: string | null;
   onChange: (next: { from: string | null; to: string | null }) => void;
+  onComplete?: () => void;
 }) {
-  const selected: DateRange | undefined =
-    from || to
-      ? {
-          from: from ? parseISO(from) : undefined,
-          to: to ? parseISO(to) : undefined,
-        }
-      : undefined;
+  const clickCount = useRef(0);
+
+  useEffect(() => {
+    if (!from && !to) clickCount.current = 0;
+  }, [from, to]);
+
+  // While the range is in progress (from set, to unset), hide `to` from
+  // react-day-picker so it only fires `range_start` on the start day — the
+  // visual stays a half-rounded marker instead of a fully rounded selection.
+  const selected: DateRange | undefined = from
+    ? to
+      ? { from: parseISO(from), to: parseISO(to) }
+      : { from: parseISO(from) }
+    : undefined;
+
   return (
     <div data-testid="transaction-filter-date-editor">
       <Calendar
@@ -395,12 +405,26 @@ function DateRangeCalendar({
         numberOfMonths={1}
         selected={selected}
         classNames={DATE_RANGE_CALENDAR_CLASSNAMES}
-        onSelect={(next) =>
-          onChange({
-            from: next?.from ? format(next.from, "yyyy-MM-dd") : null,
-            to: next?.to ? format(next.to, "yyyy-MM-dd") : null,
-          })
-        }
+        onSelect={(next) => {
+          if (!next?.from) {
+            clickCount.current = 0;
+            onChange({ from: null, to: null });
+            return;
+          }
+          clickCount.current += 1;
+          const fromIso = format(next.from, "yyyy-MM-dd");
+          if (clickCount.current === 1) {
+            onChange({ from: fromIso, to: null });
+            return;
+          }
+          const endDate = next.to ?? next.from;
+          const endIso = format(endDate, "yyyy-MM-dd");
+          const [orderedFrom, orderedTo] =
+            fromIso <= endIso ? [fromIso, endIso] : [endIso, fromIso];
+          clickCount.current = 0;
+          onChange({ from: orderedFrom, to: orderedTo });
+          onComplete?.();
+        }}
         autoFocus
       />
     </div>
