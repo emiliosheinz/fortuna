@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { cashflowApi } from "../../api-client";
 import {
   TransactionFilterBar,
@@ -11,27 +11,6 @@ jest.mock("../../api-client", () => ({
     listCategories: jest.fn(),
     listTags: jest.fn(),
   },
-}));
-
-jest.mock("../date-range-picker", () => ({
-  DateRangePicker: ({
-    id,
-    value,
-    onChange,
-    "data-testid": testId,
-  }: {
-    id?: string;
-    value: { from: string | null; to: string | null };
-    onChange: (v: { from: string | null; to: string | null }) => void;
-    "data-testid"?: string;
-  }) => (
-    <input
-      id={id}
-      data-testid={testId}
-      value={value.from ?? ""}
-      onChange={(e) => onChange({ from: e.target.value || null, to: value.to })}
-    />
-  ),
 }));
 
 const listCategoriesMock = cashflowApi.listCategories as jest.MockedFunction<
@@ -71,23 +50,18 @@ function renderBar(
 
 describe("TransactionFilterBar", () => {
   beforeEach(() => {
-    listCategoriesMock.mockResolvedValue({ items: [] });
-    listTagsMock.mockResolvedValue({ items: [] });
-  });
-
-  it("fires onChange with the new from bound when the range picker updates", () => {
-    const onChange = jest.fn();
-    renderBar({ onChange });
-    fireEvent.change(screen.getByTestId("transaction-filter-range"), {
-      target: { value: "2026-06-01" },
+    listCategoriesMock.mockResolvedValue({
+      items: [
+        { id: "cat-food", name: "Food" },
+        { id: "cat-transport", name: "Transport" },
+      ],
     });
-    expect(onChange).toHaveBeenCalledWith({
-      ...emptyState,
-      from: "2026-06-01",
+    listTagsMock.mockResolvedValue({
+      items: [{ id: "tag-travel", name: "travel" }],
     });
   });
 
-  it("fires onChange with updated q when the search input changes", () => {
+  it("fires onChange when the search input changes", () => {
     const onChange = jest.fn();
     renderBar({ onChange });
     fireEvent.change(screen.getByTestId("transaction-filter-q"), {
@@ -96,32 +70,31 @@ describe("TransactionFilterBar", () => {
     expect(onChange).toHaveBeenCalledWith({ ...emptyState, q: "coffee" });
   });
 
-  it("shows a clear button only when at least one filter is set", () => {
-    const { rerender } = renderBar({ value: emptyState });
+  it("hides Clear all when no filter is active", () => {
+    renderBar({ value: emptyState });
     expect(
       screen.queryByTestId("transaction-filter-clear"),
     ).not.toBeInTheDocument();
-    rerender(
-      <QueryClientProvider
-        client={
-          new QueryClient({
-            defaultOptions: {
-              queries: { retry: false },
-              mutations: { retry: false },
-            },
-          })
-        }
-      >
-        <TransactionFilterBar
-          value={{ ...emptyState, kind: "expense" }}
-          onChange={jest.fn()}
-        />
-      </QueryClientProvider>,
-    );
-    expect(screen.getByTestId("transaction-filter-clear")).toBeInTheDocument();
   });
 
-  it("clears every filter when the clear button is pressed", () => {
+  it("renders a chip for each active filter and resolves the category name", async () => {
+    renderBar({
+      value: { ...emptyState, categoryId: "cat-food", kind: "expense" },
+    });
+    expect(
+      screen.getByTestId("transaction-filter-chip-category"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByTestId("transaction-filter-chip-kind"),
+    ).toBeInTheDocument();
+    await waitFor(() => {
+      expect(
+        screen.getByTestId("transaction-filter-chip-category"),
+      ).toHaveTextContent("Food");
+    });
+  });
+
+  it("clears every filter when Clear all is pressed", () => {
     const onChange = jest.fn();
     renderBar({
       value: { ...emptyState, kind: "expense", q: "coffee" },
@@ -129,5 +102,18 @@ describe("TransactionFilterBar", () => {
     });
     fireEvent.click(screen.getByTestId("transaction-filter-clear"));
     expect(onChange).toHaveBeenCalledWith(emptyState);
+  });
+
+  it("removes only the targeted filter when its chip × is clicked", () => {
+    const onChange = jest.fn();
+    renderBar({
+      value: { ...emptyState, kind: "expense", categoryId: "cat-food" },
+      onChange,
+    });
+    fireEvent.click(screen.getByTestId("transaction-filter-chip-kind-remove"));
+    expect(onChange).toHaveBeenCalledWith({
+      ...emptyState,
+      categoryId: "cat-food",
+    });
   });
 });
