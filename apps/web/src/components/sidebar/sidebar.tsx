@@ -2,8 +2,6 @@
 
 import { useMutation } from "@tanstack/react-query";
 import {
-  ChevronLeftIcon,
-  ChevronRightIcon,
   CoinsIcon,
   FolderIcon,
   LaptopMinimalIcon,
@@ -13,6 +11,7 @@ import {
   PaletteIcon,
   SettingsIcon,
   ShieldIcon,
+  SidebarIcon,
   SunIcon,
   TagIcon,
   UserIcon,
@@ -21,7 +20,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTheme } from "next-themes";
 import type { ComponentType } from "react";
-import { useEffect, useState } from "react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -29,14 +27,22 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Sidebar as ShadcnSidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarHeader,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  useSidebar,
+} from "@/components/ui/sidebar";
 import { CLEAR_SESSION_PATH } from "@/lib/api-client";
 import { signOut } from "@/lib/auth/sign-out";
 import { navigateTo } from "@/lib/navigate";
 import type { CurrentUser } from "@/lib/users/api-client";
-import { cn } from "@/lib/utils";
 import { UserAvatar } from "../user-avatar";
-
-const COLLAPSE_STORAGE_KEY = "fortuna:sidebar:collapsed";
 
 type IconComponent = ComponentType<{
   className?: string;
@@ -56,187 +62,161 @@ const NAV_ITEMS: NavItem[] = [
   { label: "Tags", href: "/tags", icon: TagIcon },
 ];
 
-function sidebarItemClass({
-  collapsed,
-  active,
-}: {
-  collapsed: boolean;
-  active?: boolean;
-}): string {
-  return cn(
-    "flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm outline-none transition focus-visible:ring-2 focus-visible:ring-ring",
-    active ? "bg-accent text-accent-foreground" : "hover:bg-accent/40",
-    collapsed && "justify-center",
-  );
-}
-
 export function Sidebar({ me }: { me: CurrentUser }) {
-  const [collapsed, setCollapsed] = useState(false);
-
-  useEffect(() => {
-    if (window.localStorage.getItem(COLLAPSE_STORAGE_KEY) === "1") {
-      setCollapsed(true);
-    }
-  }, []);
-
-  const toggleCollapsed = () => {
-    setCollapsed((prev) => {
-      const next = !prev;
-      window.localStorage.setItem(COLLAPSE_STORAGE_KEY, next ? "1" : "0");
-      return next;
-    });
-  };
-
   return (
-    <aside
+    <ShadcnSidebar
+      collapsible="icon"
       data-testid="sidebar"
-      data-state={collapsed ? "collapsed" : "expanded"}
-      aria-label="Primary"
-      className={cn(
-        "sticky top-0 z-30 flex h-screen shrink-0 flex-col border-r border-border bg-background transition-[width] duration-200",
-        collapsed ? "w-16" : "w-64",
-      )}
+      className="border-r border-border"
     >
-      <div className="flex items-center px-4 py-4">
-        <Link
-          href="/"
-          aria-label="Fortuna home"
-          className="rounded-md font-semibold tracking-tight outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        >
-          {collapsed ? "F" : "Fortuna"}
-        </Link>
-      </div>
-
-      <div className="px-2">
-        <IdentityPopover me={me} collapsed={collapsed} />
-      </div>
-
-      <nav aria-label="Sections" className="flex flex-1 flex-col gap-1 p-2">
-        {NAV_ITEMS.map((item) => (
-          <SidebarNavLink key={item.href} item={item} collapsed={collapsed} />
-        ))}
-      </nav>
-
-      <div className="flex flex-col gap-1 p-2">
-        <ThemeToggle collapsed={collapsed} />
-        <CollapseToggle collapsed={collapsed} onToggle={toggleCollapsed} />
-      </div>
-    </aside>
+      <SidebarHeader>
+        <div className="flex h-8 items-center px-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
+          <Link
+            href="/"
+            aria-label="Fortuna home"
+            className="rounded-md font-semibold tracking-tight outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <span className="group-data-[collapsible=icon]:hidden">
+              Fortuna
+            </span>
+            <span className="hidden group-data-[collapsible=icon]:inline">
+              F
+            </span>
+          </Link>
+        </div>
+        <IdentityPopover me={me} />
+      </SidebarHeader>
+      <SidebarContent>
+        <SidebarGroup>
+          <SidebarMenu>
+            {NAV_ITEMS.map((item) => (
+              <SidebarNavItem key={item.href} item={item} />
+            ))}
+          </SidebarMenu>
+        </SidebarGroup>
+      </SidebarContent>
+      <SidebarFooter>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <ThemeToggle />
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <CollapseToggle />
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarFooter>
+    </ShadcnSidebar>
   );
 }
 
-function SidebarNavLink({
-  item,
-  collapsed,
-}: {
-  item: NavItem;
-  collapsed: boolean;
-}) {
+function SidebarNavItem({ item }: { item: NavItem }) {
   const pathname = usePathname();
   const isActive =
     pathname === item.href ||
     (item.href !== "/" && pathname?.startsWith(item.href));
   const Icon = item.icon;
   return (
-    <Link
-      href={item.href}
-      data-testid={`sidebar-nav-${item.label.toLowerCase()}`}
-      aria-current={isActive ? "page" : undefined}
-      title={collapsed ? item.label : undefined}
-      className={sidebarItemClass({ collapsed, active: Boolean(isActive) })}
-    >
-      <Icon className="size-4" aria-hidden />
-      {collapsed ? null : <span>{item.label}</span>}
-    </Link>
+    <SidebarMenuItem>
+      <SidebarMenuButton
+        asChild
+        isActive={Boolean(isActive)}
+        tooltip={item.label}
+      >
+        <Link
+          href={item.href}
+          data-testid={`sidebar-nav-${item.label.toLowerCase()}`}
+          aria-current={isActive ? "page" : undefined}
+        >
+          <Icon aria-hidden />
+          <span>{item.label}</span>
+        </Link>
+      </SidebarMenuButton>
+    </SidebarMenuItem>
   );
 }
 
-function IdentityPopover({
-  me,
-  collapsed,
-}: {
-  me: CurrentUser;
-  collapsed: boolean;
-}) {
+function IdentityPopover({ me }: { me: CurrentUser }) {
   const signOutMutation = useMutation({
     mutationFn: signOut,
     onSuccess: () => navigateTo(CLEAR_SESSION_PATH),
   });
 
   return (
-    <div className="flex flex-col gap-1">
-      <DropdownMenu modal={false}>
-        <DropdownMenuTrigger asChild>
-          <button
-            type="button"
-            data-testid="sidebar-identity"
-            aria-label="Account menu"
-            className={cn(
-              "flex items-center gap-3 rounded-md px-2 py-2 text-left outline-none transition hover:bg-accent/40 focus-visible:ring-2 focus-visible:ring-ring",
-              collapsed && "justify-center",
-            )}
-          >
-            <UserAvatar name={me.name} avatarUrl={me.avatarUrl} />
-            {collapsed ? null : (
-              <div className="flex min-w-0 flex-col">
+    <SidebarMenu>
+      <SidebarMenuItem>
+        <DropdownMenu modal={false}>
+          <DropdownMenuTrigger asChild>
+            <SidebarMenuButton
+              size="lg"
+              data-testid="sidebar-identity"
+              aria-label="Account menu"
+              tooltip={me.name}
+              className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+            >
+              <UserAvatar
+                name={me.name}
+                avatarUrl={me.avatarUrl}
+                className="size-7"
+              />
+              <div className="flex min-w-0 flex-col text-left">
                 <span className="truncate text-sm font-medium">{me.name}</span>
                 <span className="truncate text-xs text-muted-foreground">
                   {me.email}
                 </span>
               </div>
-            )}
-          </button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent
-          align="start"
-          side="right"
-          sideOffset={8}
-          className="w-48"
-          data-testid="sidebar-identity-menu"
-        >
-          <IdentityMenuLink
-            href="/settings/account"
-            label="Account"
-            icon={UserIcon}
-            testId="identity-menu-account"
-          />
-          <IdentityMenuLink
-            href="/settings/preferences"
-            label="Settings"
-            icon={SettingsIcon}
-            testId="identity-menu-settings"
-          />
-          <IdentityMenuLink
-            href="/settings/sessions"
-            label="Sessions"
-            icon={ShieldIcon}
-            testId="identity-menu-sessions"
-          />
-          <DropdownMenuSeparator />
-          <DropdownMenuItem
-            data-testid="identity-menu-sign-out"
-            disabled={signOutMutation.isPending}
-            onSelect={(event) => {
-              event.preventDefault();
-              signOutMutation.mutate();
-            }}
-            className="text-destructive focus:bg-destructive/10 focus:text-destructive data-[highlighted]:bg-destructive/10 data-[highlighted]:text-destructive"
+            </SidebarMenuButton>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent
+            align="start"
+            side="right"
+            sideOffset={8}
+            className="w-48"
+            data-testid="sidebar-identity-menu"
           >
-            <LogOutIcon className="mr-2 size-4" aria-hidden />
-            {signOutMutation.isPending ? "Signing out…" : "Sign out"}
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-      {signOutMutation.isError ? (
-        <p
-          role="alert"
-          data-testid="sign-out-error"
-          className="text-xs text-destructive"
-        >
-          Could not sign out. Please try again.
-        </p>
-      ) : null}
-    </div>
+            <IdentityMenuLink
+              href="/settings/account"
+              label="Account"
+              icon={UserIcon}
+              testId="identity-menu-account"
+            />
+            <IdentityMenuLink
+              href="/settings/preferences"
+              label="Settings"
+              icon={SettingsIcon}
+              testId="identity-menu-settings"
+            />
+            <IdentityMenuLink
+              href="/settings/sessions"
+              label="Sessions"
+              icon={ShieldIcon}
+              testId="identity-menu-sessions"
+            />
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              data-testid="identity-menu-sign-out"
+              disabled={signOutMutation.isPending}
+              onSelect={(event) => {
+                event.preventDefault();
+                signOutMutation.mutate();
+              }}
+              className="text-destructive focus:bg-destructive/10 focus:text-destructive data-[highlighted]:bg-destructive/10 data-[highlighted]:text-destructive"
+            >
+              <LogOutIcon className="mr-2 size-4" aria-hidden />
+              {signOutMutation.isPending ? "Signing out…" : "Sign out"}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+        {signOutMutation.isError ? (
+          <p
+            role="alert"
+            data-testid="sign-out-error"
+            className="px-2 pt-1 text-xs text-destructive"
+          >
+            Could not sign out. Please try again.
+          </p>
+        ) : null}
+      </SidebarMenuItem>
+    </SidebarMenu>
   );
 }
 
@@ -261,21 +241,19 @@ function IdentityMenuLink({
   );
 }
 
-function ThemeToggle({ collapsed }: { collapsed: boolean }) {
+function ThemeToggle() {
   const { setTheme } = useTheme();
   return (
     <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>
-        <button
-          type="button"
-          aria-label="Toggle theme"
+        <SidebarMenuButton
           data-testid="sidebar-theme-toggle"
-          title={collapsed ? "Theme" : undefined}
-          className={sidebarItemClass({ collapsed })}
+          aria-label="Toggle theme"
+          tooltip="Theme"
         >
-          <PaletteIcon className="size-4" aria-hidden />
-          {collapsed ? null : <span>Theme</span>}
-        </button>
+          <PaletteIcon aria-hidden />
+          <span>Theme</span>
+        </SidebarMenuButton>
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align="start"
@@ -306,29 +284,19 @@ function ThemeToggle({ collapsed }: { collapsed: boolean }) {
   );
 }
 
-function CollapseToggle({
-  collapsed,
-  onToggle,
-}: {
-  collapsed: boolean;
-  onToggle: () => void;
-}) {
+function CollapseToggle() {
+  const { toggleSidebar, state } = useSidebar();
+  const isCollapsed = state === "collapsed";
   return (
-    <button
-      type="button"
-      aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-      aria-pressed={collapsed}
+    <SidebarMenuButton
       data-testid="sidebar-collapse-toggle"
-      title={collapsed ? "Expand" : undefined}
-      onClick={onToggle}
-      className={sidebarItemClass({ collapsed })}
+      aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+      aria-pressed={isCollapsed}
+      tooltip={isCollapsed ? "Expand" : undefined}
+      onClick={toggleSidebar}
     >
-      {collapsed ? (
-        <ChevronRightIcon className="size-4" aria-hidden />
-      ) : (
-        <ChevronLeftIcon className="size-4" aria-hidden />
-      )}
-      {collapsed ? null : <span>Collapse</span>}
-    </button>
+      <SidebarIcon aria-hidden />
+      <span>Collapse</span>
+    </SidebarMenuButton>
   );
 }

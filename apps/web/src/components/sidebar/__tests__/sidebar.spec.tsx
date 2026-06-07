@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { SidebarProvider } from "@/components/ui/sidebar";
 import { CLEAR_SESSION_PATH } from "@/lib/api-client";
 import { signOut } from "@/lib/auth/sign-out";
 import { navigateTo } from "@/lib/navigate";
@@ -30,13 +31,17 @@ const me: CurrentUser = {
   avatarUrl: null,
 };
 
-function renderSidebar(): ReturnType<typeof render> {
+function renderSidebar(
+  options: { defaultOpen?: boolean } = {},
+): ReturnType<typeof render> {
   const client = new QueryClient({
     defaultOptions: { mutations: { retry: false } },
   });
   return render(
     <QueryClientProvider client={client}>
-      <Sidebar me={me} />
+      <SidebarProvider defaultOpen={options.defaultOpen ?? true}>
+        <Sidebar me={me} />
+      </SidebarProvider>
     </QueryClientProvider>,
   );
 }
@@ -185,26 +190,32 @@ describe("Sidebar", () => {
     expect(setThemeMock).toHaveBeenCalledWith("dark");
   });
 
-  it("collapses and persists the choice to localStorage", () => {
-    renderSidebar();
+  it("flips the collapse toggle's aria-pressed and label when clicked", async () => {
+    renderSidebar({ defaultOpen: true });
 
-    const sidebar = screen.getByTestId("sidebar");
-    expect(sidebar).toHaveAttribute("data-state", "expanded");
+    const toggle = screen.getByTestId("sidebar-collapse-toggle");
+    expect(toggle).toHaveAttribute("aria-pressed", "false");
+    expect(toggle).toHaveAttribute("aria-label", "Collapse sidebar");
 
-    fireEvent.click(screen.getByTestId("sidebar-collapse-toggle"));
+    fireEvent.click(toggle);
 
-    expect(sidebar).toHaveAttribute("data-state", "collapsed");
-    expect(window.localStorage.getItem("fortuna:sidebar:collapsed")).toBe("1");
+    await waitFor(() =>
+      expect(screen.getByTestId("sidebar-collapse-toggle")).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      ),
+    );
+    expect(screen.getByTestId("sidebar-collapse-toggle")).toHaveAttribute(
+      "aria-label",
+      "Expand sidebar",
+    );
   });
 
-  it("restores a collapsed preference from localStorage on mount", () => {
-    window.localStorage.setItem("fortuna:sidebar:collapsed", "1");
+  it("renders collapsed when defaultOpen is false", () => {
+    renderSidebar({ defaultOpen: false });
 
-    renderSidebar();
-
-    expect(screen.getByTestId("sidebar")).toHaveAttribute(
-      "data-state",
-      "collapsed",
-    );
+    const toggle = screen.getByTestId("sidebar-collapse-toggle");
+    expect(toggle).toHaveAttribute("aria-pressed", "true");
+    expect(toggle).toHaveAttribute("aria-label", "Expand sidebar");
   });
 });
