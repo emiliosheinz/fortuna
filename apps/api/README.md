@@ -46,6 +46,38 @@ bin/fortuna db migration:show
 
 Lists every migration with an `[X]` next to the ones that have been applied.
 
+## FX rates
+
+The cashflow domain converts foreign-currency transactions to the user's base currency at read time using EUR-anchored daily rates from [frankfurter.app](https://www.frankfurter.app/). A daily cron (`FxScheduledJob`) pulls the latest rates at 06:00 UTC; in dev you usually want to populate rates on demand.
+
+`bin/fortuna fx fetch` triggers the same job the cron runs, via a dev-only `POST /internal/fx/fetch` route on the API. The route returns 404 in production.
+
+### Pull today's rates (no args)
+
+```bash
+bin/fortuna fx fetch
+```
+
+Runs `FxFetchService.fetchAndPersistLatest()` — identical to the daily cron. Use this after a fresh `docker compose up -d` to seed today's row.
+
+### Backfill from a date until today
+
+```bash
+bin/fortuna fx fetch --from 2026-06-01
+```
+
+Useful when seeding a window of recent rates for the transactions you're about to capture.
+
+### Backfill an explicit range
+
+```bash
+bin/fortuna fx fetch --from 2026-05-01 --to 2026-05-31
+```
+
+Both bounds inclusive. Run before a historical cutover so older transactions resolve cleanly.
+
+All three modes upsert against the `(rate_date, base_currency, quote_currency)` primary key, so repeat invocations are idempotent.
+
 ## Local schema reset
 
 ```bash
