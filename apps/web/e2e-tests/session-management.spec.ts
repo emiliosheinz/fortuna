@@ -19,7 +19,7 @@ test.describe("Session management", () => {
   }) => {
     await signInWithGoogle(page, "E2E User");
     await expect(
-      page.getByRole("heading", { name: "Cashflow", level: 1 }),
+      page.getByRole("heading", { name: "Dashboard", level: 1 }),
     ).toBeVisible();
 
     await page.getByTestId("sidebar-identity").click();

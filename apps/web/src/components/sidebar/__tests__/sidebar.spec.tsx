@@ -41,23 +41,63 @@ describe("Sidebar", () => {
     expect(identity).toHaveTextContent("ada@example.com");
   });
 
-  it("renders the Cashflow nav link with the active state when on /", () => {
+  it("renders the four primary nav items pointing to the right routes", () => {
+    renderSidebar();
+
+    expect(screen.getByTestId("sidebar-nav-dashboard")).toHaveAttribute(
+      "href",
+      "/",
+    );
+    expect(screen.getByTestId("sidebar-nav-transactions")).toHaveAttribute(
+      "href",
+      "/transactions",
+    );
+    expect(screen.getByTestId("sidebar-nav-categories")).toHaveAttribute(
+      "href",
+      "/categories",
+    );
+    expect(screen.getByTestId("sidebar-nav-tags")).toHaveAttribute(
+      "href",
+      "/tags",
+    );
+  });
+
+  it("marks Dashboard active on /", () => {
     usePathnameMock.mockReturnValue("/");
 
     renderSidebar();
 
-    const link = screen.getByTestId("sidebar-nav-cashflow");
-    expect(link).toHaveAttribute("href", "/");
-    expect(link).toHaveAttribute("aria-current", "page");
+    expect(screen.getByTestId("sidebar-nav-dashboard")).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    expect(screen.getByTestId("sidebar-nav-transactions")).not.toHaveAttribute(
+      "aria-current",
+    );
   });
 
-  it("does not mark Cashflow as active on a different route", () => {
-    usePathnameMock.mockReturnValue("/settings/account");
+  it("marks Transactions active on /transactions and its sub-routes", () => {
+    usePathnameMock.mockReturnValue("/transactions");
 
     renderSidebar();
 
-    expect(screen.getByTestId("sidebar-nav-cashflow")).not.toHaveAttribute(
+    expect(screen.getByTestId("sidebar-nav-transactions")).toHaveAttribute(
       "aria-current",
+      "page",
+    );
+    expect(screen.getByTestId("sidebar-nav-dashboard")).not.toHaveAttribute(
+      "aria-current",
+    );
+  });
+
+  it("marks Tags active on a /tags/[id] drill-down route", () => {
+    usePathnameMock.mockReturnValue("/tags/abc");
+
+    renderSidebar();
+
+    expect(screen.getByTestId("sidebar-nav-tags")).toHaveAttribute(
+      "aria-current",
+      "page",
     );
   });
 

@@ -8,7 +8,7 @@ test.describe("Account deletion", () => {
   }) => {
     await signInWithGoogle(page, "Delete Me User");
     await expect(
-      page.getByRole("heading", { name: "Cashflow", level: 1 }),
+      page.getByRole("heading", { name: "Dashboard", level: 1 }),
     ).toBeVisible();
 
     // The session cookie should exist before deletion.

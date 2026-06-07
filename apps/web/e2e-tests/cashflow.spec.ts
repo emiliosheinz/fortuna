@@ -8,7 +8,7 @@ test.describe("Cashflow capture", () => {
     await signInWithGoogle(page, "Cashflow Capture User");
 
     await expect(
-      page.getByRole("heading", { name: "Cashflow", level: 1 }),
+      page.getByRole("heading", { name: "Dashboard", level: 1 }),
     ).toBeVisible();
 
     await page.getByTestId("open-capture-dialog").click();
@@ -70,7 +70,7 @@ test.describe("Base currency setting", () => {
     await page.getByRole("option", { name: next }).click();
     await expect(trigger).toContainText(next);
 
-    await page.goto("/");
+    await page.goto("/transactions");
     await expect(
       page.getByText(new RegExp(`Rolled up into ${next}`)),
     ).toBeVisible();

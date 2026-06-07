@@ -3,10 +3,13 @@
 import {
   ChevronLeftIcon,
   ChevronRightIcon,
+  FolderIcon,
   LaptopMinimalIcon,
+  LayoutDashboardIcon,
   MoonIcon,
+  ReceiptIcon,
   SunIcon,
-  WalletIcon,
+  TagIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -37,7 +40,10 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { label: "Cashflow", href: "/", icon: WalletIcon },
+  { label: "Dashboard", href: "/", icon: LayoutDashboardIcon },
+  { label: "Transactions", href: "/transactions", icon: ReceiptIcon },
+  { label: "Categories", href: "/categories", icon: FolderIcon },
+  { label: "Tags", href: "/tags", icon: TagIcon },
 ];
 
 export function Sidebar({ me }: SidebarProps) {

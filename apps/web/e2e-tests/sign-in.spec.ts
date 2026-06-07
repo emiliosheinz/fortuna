@@ -16,14 +16,14 @@ test.describe("Sign in with Google (mocked)", () => {
     ).toBeVisible();
   });
 
-  test("signs in and lands on the authenticated cashflow surface", async ({
+  test("signs in and lands on the authenticated dashboard", async ({
     page,
   }) => {
     await signInWithGoogle(page, "E2E User");
 
     await expect(page).toHaveURL(/\/$/);
     await expect(
-      page.getByRole("heading", { name: "Cashflow", level: 1 }),
+      page.getByRole("heading", { name: "Dashboard", level: 1 }),
     ).toBeVisible();
   });
 });
