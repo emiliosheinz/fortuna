@@ -72,9 +72,7 @@ export function TransactionFilterBar({
 }: TransactionFilterBarProps) {
   const [menuOpen, setMenuOpen] = useState(false);
   const active = activeFilters(value);
-  const unused = (Object.keys(FILTER_LABELS) as FilterKey[]).filter(
-    (key) => !active.includes(key),
-  );
+  const allFilters = Object.keys(FILTER_LABELS) as FilterKey[];
 
   function reset(key: FilterKey) {
     const next = { ...value };
@@ -104,7 +102,6 @@ export function TransactionFilterBar({
               variant="outline"
               size="sm"
               data-testid="transaction-filter-add"
-              disabled={unused.length === 0}
             >
               <ListFilterIcon className="size-4" />
               Add filter
@@ -112,7 +109,7 @@ export function TransactionFilterBar({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="start" className="w-48">
-            {unused.map((key) => {
+            {allFilters.map((key) => {
               const Icon = FILTER_ICONS[key];
               return (
                 <DropdownMenuSub key={key}>
