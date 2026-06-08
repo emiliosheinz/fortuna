@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/select";
 import { SUPPORTED_CURRENCIES } from "../constants";
 import { useSetBaseCurrency } from "../hooks";
+import { CurrencyOption } from "./currency-option";
 
 interface BaseCurrencyFormProps {
   initial: string;
@@ -57,7 +58,7 @@ export function BaseCurrencyForm({ initial, onSaved }: BaseCurrencyFormProps) {
         <SelectContent>
           {SUPPORTED_CURRENCIES.map((code) => (
             <SelectItem key={code} value={code}>
-              {code}
+              <CurrencyOption code={code} />
             </SelectItem>
           ))}
         </SelectContent>

@@ -2,7 +2,7 @@
 
 import { format, parseISO } from "date-fns";
 import { CalendarIcon, MinusIcon, PlusIcon } from "lucide-react";
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
@@ -23,9 +23,9 @@ import { ApiError } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 import { SUPPORTED_CURRENCIES, TRANSACTION_KINDS } from "../constants";
 import { useCreateTransaction } from "../hooks";
-import { generateInstallmentDates } from "../installment-dates";
 import type { CreateTransactionInput, TransactionKind } from "../types";
 import { CategoryCombobox } from "./category-combobox";
+import { CurrencyOption } from "./currency-option";
 import { MoneyInput } from "./money-input";
 import { TagInput } from "./tag-input";
 
@@ -157,7 +157,7 @@ export function CaptureForm({ baseCurrency, onCaptured }: CaptureFormProps) {
 
       <div className="flex flex-col gap-1.5">
         <Label>Amount</Label>
-        <div className="grid grid-cols-[6.5rem_1fr_auto] gap-2">
+        <div className="grid grid-cols-[7rem_1fr_7rem] gap-2">
           <Select
             value={form.currency}
             onValueChange={(value) => update("currency", value)}
@@ -167,13 +167,14 @@ export function CaptureForm({ baseCurrency, onCaptured }: CaptureFormProps) {
               data-testid="capture-form-currency-trigger"
               aria-label="Currency"
               aria-invalid={Boolean(errors.currency)}
+              className="w-full"
             >
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
               {SUPPORTED_CURRENCIES.map((code) => (
                 <SelectItem key={code} value={code}>
-                  {code}
+                  <CurrencyOption code={code} />
                 </SelectItem>
               ))}
             </SelectContent>
@@ -190,14 +191,11 @@ export function CaptureForm({ baseCurrency, onCaptured }: CaptureFormProps) {
             onChange={(next) => update("installmentsCount", next)}
           />
         </div>
-        {form.installmentsCount > 1 ? (
-          <InstallmentsSummary
-            count={form.installmentsCount}
-            amount={form.amount}
-            currency={form.currency}
-            startDate={form.date}
-          />
-        ) : null}
+        <InstallmentsSummary
+          count={form.installmentsCount}
+          amount={form.amount}
+          currency={form.currency}
+        />
         {errors.currency ? <FieldError message={errors.currency} /> : null}
         {errors.amount ? <FieldError message={errors.amount} /> : null}
       </div>
@@ -307,12 +305,37 @@ function InstallmentsStepper({
   count: number;
   onChange: (next: number) => void;
 }) {
+  const [draft, setDraft] = useState(String(count));
+  useEffect(() => {
+    setDraft(String(count));
+  }, [count]);
+
   const decDisabled = count <= 1;
   const incDisabled = count >= INSTALLMENTS_MAX;
+
+  function clamp(value: number): number {
+    if (!Number.isFinite(value)) return 1;
+    return Math.min(INSTALLMENTS_MAX, Math.max(1, Math.trunc(value)));
+  }
+
+  function handleChange(event: React.ChangeEvent<HTMLInputElement>) {
+    const digits = event.target.value.replace(/\D/g, "").slice(0, 3);
+    setDraft(digits);
+    if (digits === "") return;
+    const next = clamp(Number.parseInt(digits, 10));
+    if (next !== count) onChange(next);
+  }
+
+  function handleBlur() {
+    const next = draft === "" ? 1 : clamp(Number.parseInt(draft, 10));
+    setDraft(String(next));
+    if (next !== count) onChange(next);
+  }
+
   return (
     <div
       data-testid="capture-form-installments-stepper"
-      className="flex h-9 items-center rounded-md border border-input bg-transparent text-sm shadow-xs dark:bg-input/30"
+      className="flex h-9 w-full items-center rounded-md border border-input bg-transparent text-sm shadow-xs dark:bg-input/30"
     >
       <button
         type="button"
@@ -320,24 +343,28 @@ function InstallmentsStepper({
         aria-label="Decrease installments"
         disabled={decDisabled}
         onClick={() => onChange(Math.max(1, count - 1))}
-        className="flex size-9 items-center justify-center rounded-l-md text-muted-foreground transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
+        className="flex h-full flex-1 items-center justify-center rounded-l-md text-muted-foreground transition hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-muted-foreground"
       >
         <MinusIcon className="size-3.5" />
       </button>
-      <span
+      <input
         data-testid="capture-form-installments-count"
-        aria-live="polite"
-        className="min-w-10 px-2 text-center tabular-nums"
-      >
-        × {count}
-      </span>
+        aria-label="Number of installments"
+        type="text"
+        inputMode="numeric"
+        value={draft}
+        onChange={handleChange}
+        onBlur={handleBlur}
+        onFocus={(event) => event.currentTarget.select()}
+        className="h-full w-10 bg-transparent text-center text-sm tabular-nums outline-none"
+      />
       <button
         type="button"
         data-testid="capture-form-installments-inc"
         aria-label="Increase installments"
         disabled={incDisabled}
         onClick={() => onChange(Math.min(INSTALLMENTS_MAX, count + 1))}
-        className="flex size-9 items-center justify-center rounded-r-md text-muted-foreground transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
+        className="flex h-full flex-1 items-center justify-center rounded-r-md text-muted-foreground transition hover:bg-accent hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent disabled:hover:text-muted-foreground"
       >
         <PlusIcon className="size-3.5" />
       </button>
@@ -349,31 +376,19 @@ function InstallmentsSummary({
   count,
   amount,
   currency,
-  startDate,
 }: {
   count: number;
   amount: string;
   currency: string;
-  startDate: string;
 }) {
-  const dates = generateInstallmentDates(startDate, count);
-  const last = dates[dates.length - 1];
-  const total = AMOUNT_RE.test(amount)
-    ? (Number(amount) * count).toFixed(2)
-    : null;
+  const per = AMOUNT_RE.test(amount) ? amount : "0.00";
+  const total = (Number(per) * count).toFixed(2);
   return (
     <p
       data-testid="capture-form-installments-summary"
       className="text-xs text-muted-foreground"
     >
-      {count} × {amount || "0.00"} {currency}
-      {total ? (
-        <>
-          {" "}
-          · total {total} {currency}
-        </>
-      ) : null}
-      {last ? <> · last {format(parseISO(last), "MMM d, yyyy")}</> : null}
+      {count} x {per} {currency} = {total} {currency}
     </p>
   );
 }

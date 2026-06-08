@@ -5,4 +5,14 @@
  */
 export const SUPPORTED_CURRENCIES = ["USD", "EUR", "BRL", "GBP"] as const;
 
+export const CURRENCY_FLAGS: Record<
+  (typeof SUPPORTED_CURRENCIES)[number],
+  string
+> = {
+  USD: "🇺🇸",
+  EUR: "🇪🇺",
+  BRL: "🇧🇷",
+  GBP: "🇬🇧",
+};
+
 export const TRANSACTION_KINDS = ["expense", "income"] as const;

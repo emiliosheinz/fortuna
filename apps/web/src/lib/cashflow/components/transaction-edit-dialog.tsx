@@ -37,6 +37,7 @@ import type {
   UpdateTransactionInput,
 } from "../types";
 import { CategoryCombobox } from "./category-combobox";
+import { CurrencyOption } from "./currency-option";
 import { MoneyInput } from "./money-input";
 import { TagInput } from "./tag-input";
 
@@ -211,7 +212,7 @@ export function TransactionEditDialog({
               <SelectContent>
                 {SUPPORTED_CURRENCIES.map((code) => (
                   <SelectItem key={code} value={code}>
-                    {code}
+                    <CurrencyOption code={code} />
                   </SelectItem>
                 ))}
               </SelectContent>

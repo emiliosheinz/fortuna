@@ -188,7 +188,7 @@ describe("CaptureForm", () => {
     expect(payload?.installments).toEqual({ count: 4 });
   });
 
-  it("shows a one-line summary when count >= 2", () => {
+  it("shows a 'N x per = total' summary that updates with count and amount", () => {
     renderForm();
 
     setAmount("100.00");
@@ -197,18 +197,71 @@ describe("CaptureForm", () => {
     fireEvent.click(inc);
 
     const summary = screen.getByTestId("capture-form-installments-summary");
-    expect(summary).toHaveTextContent(/3\s*×\s*100\.00\s*USD/);
-    expect(summary).toHaveTextContent(/total\s+300\.00/i);
+    expect(summary).toHaveTextContent(
+      /3\s*x\s*100\.00\s*USD\s*=\s*300\.00\s*USD/,
+    );
   });
 
-  it("does not show the summary at count = 1 and the stepper cannot go below 1", () => {
+  it("renders the summary at count = 1 and the stepper cannot go below 1", () => {
     renderForm();
 
-    expect(
-      screen.queryByTestId("capture-form-installments-summary"),
-    ).not.toBeInTheDocument();
+    const summary = screen.getByTestId("capture-form-installments-summary");
+    expect(summary).toHaveTextContent(/1\s*x\s*0\.00\s*USD\s*=\s*0\.00\s*USD/);
     const dec = screen.getByTestId("capture-form-installments-dec");
     expect(dec).toBeDisabled();
+  });
+
+  it("accepts a typed count via the editable input and clamps to 1..360", async () => {
+    createTransactionMock.mockResolvedValue({
+      transactions: [
+        {
+          id: "tx_1",
+          date: "2026-01-31",
+          amount: "100.00",
+          currency: "USD",
+          description: "Phone",
+          kind: "expense",
+          categoryId: null,
+          tagIds: [],
+          baseAmount: "100.00",
+          baseCurrency: "USD",
+          rateSubstituted: false,
+          rateDate: "2026-01-31",
+          unconvertible: false,
+          group: { id: "grp_1", position: 1, size: 12 },
+          createdAt: "now",
+          updatedAt: "now",
+        },
+      ],
+    });
+    renderForm();
+    setAmount("100.00");
+    setDescription("Phone");
+
+    const countInput = screen.getByTestId("capture-form-installments-count");
+    fireEvent.change(countInput, { target: { value: "12" } });
+    expect(
+      screen.getByTestId("capture-form-installments-summary"),
+    ).toHaveTextContent(/12\s*x\s*100\.00\s*USD\s*=\s*1200\.00\s*USD/);
+
+    // Out-of-range high values clamp to the max on blur.
+    fireEvent.change(countInput, { target: { value: "9999" } });
+    fireEvent.blur(countInput);
+    expect((countInput as HTMLInputElement).value).toBe("360");
+
+    // Empty input on blur snaps back to 1.
+    fireEvent.change(countInput, { target: { value: "" } });
+    fireEvent.blur(countInput);
+    expect((countInput as HTMLInputElement).value).toBe("1");
+
+    fireEvent.change(countInput, { target: { value: "12" } });
+    submit();
+    await waitFor(() => {
+      expect(createTransactionMock).toHaveBeenCalledTimes(1);
+    });
+    expect(createTransactionMock.mock.calls[0]?.[0]?.installments).toEqual({
+      count: 12,
+    });
   });
 
   it("does not send an installments hint when the stepper stays at 1", async () => {
