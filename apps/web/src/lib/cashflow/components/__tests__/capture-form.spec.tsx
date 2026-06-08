@@ -148,7 +148,7 @@ describe("CaptureForm", () => {
     expect(trigger).toHaveTextContent(/USD/);
   });
 
-  it("sends an installments hint with the chosen count when the toggle is on", async () => {
+  it("sends an installments hint with the chosen count when the stepper is bumped above 1", async () => {
     createTransactionMock.mockResolvedValue({
       transactions: [
         {
@@ -175,10 +175,10 @@ describe("CaptureForm", () => {
 
     setAmount("100.00");
     setDescription("Phone");
-    fireEvent.click(screen.getByLabelText(/split into installments/i));
-    fireEvent.change(screen.getByLabelText(/number of installments/i), {
-      target: { value: "4" },
-    });
+    const inc = screen.getByTestId("capture-form-installments-inc");
+    fireEvent.click(inc);
+    fireEvent.click(inc);
+    fireEvent.click(inc);
     submit();
 
     await waitFor(() => {
@@ -188,19 +188,30 @@ describe("CaptureForm", () => {
     expect(payload?.installments).toEqual({ count: 4 });
   });
 
-  it("previews the generated dates when installments is on", () => {
+  it("shows a one-line summary when count >= 2", () => {
     renderForm();
 
-    fireEvent.click(screen.getByLabelText(/split into installments/i));
-    fireEvent.change(screen.getByLabelText(/number of installments/i), {
-      target: { value: "3" },
-    });
-    const preview = screen.getByTestId("capture-form-installment-preview");
-    const items = preview.querySelectorAll("li");
-    expect(items).toHaveLength(3);
+    setAmount("100.00");
+    const inc = screen.getByTestId("capture-form-installments-inc");
+    fireEvent.click(inc);
+    fireEvent.click(inc);
+
+    const summary = screen.getByTestId("capture-form-installments-summary");
+    expect(summary).toHaveTextContent(/3\s*×\s*100\.00\s*USD/);
+    expect(summary).toHaveTextContent(/total\s+300\.00/i);
   });
 
-  it("does not send an installments hint when the toggle is off", async () => {
+  it("does not show the summary at count = 1 and the stepper cannot go below 1", () => {
+    renderForm();
+
+    expect(
+      screen.queryByTestId("capture-form-installments-summary"),
+    ).not.toBeInTheDocument();
+    const dec = screen.getByTestId("capture-form-installments-dec");
+    expect(dec).toBeDisabled();
+  });
+
+  it("does not send an installments hint when the stepper stays at 1", async () => {
     createTransactionMock.mockResolvedValue({
       transactions: [
         {

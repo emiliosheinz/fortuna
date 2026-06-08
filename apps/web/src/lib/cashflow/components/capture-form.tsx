@@ -1,7 +1,7 @@
 "use client";
 
 import { format, parseISO } from "date-fns";
-import { CalendarIcon } from "lucide-react";
+import { CalendarIcon, MinusIcon, PlusIcon } from "lucide-react";
 import { useId, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -30,7 +30,6 @@ import { MoneyInput } from "./money-input";
 import { TagInput } from "./tag-input";
 
 const AMOUNT_RE = /^\d+(\.\d{1,2})?$/;
-const INSTALLMENTS_MIN = 2;
 const INSTALLMENTS_MAX = 360;
 
 interface CaptureFormProps {
@@ -46,7 +45,6 @@ interface FormState {
   currency: string;
   categoryId: string | null;
   tagNames: string[];
-  installmentsOn: boolean;
   installmentsCount: number;
 }
 
@@ -62,8 +60,6 @@ export function CaptureForm({ baseCurrency, onCaptured }: CaptureFormProps) {
   const currencyId = useId();
   const categoryId = useId();
   const tagsId = useId();
-  const installmentsToggleId = useId();
-  const installmentsCountId = useId();
   const [form, setForm] = useState<FormState>(() => ({
     description: "",
     amount: "",
@@ -72,8 +68,7 @@ export function CaptureForm({ baseCurrency, onCaptured }: CaptureFormProps) {
     currency: baseCurrency,
     categoryId: null,
     tagNames: [],
-    installmentsOn: false,
-    installmentsCount: 2,
+    installmentsCount: 1,
   }));
   const [errors, setErrors] = useState<
     Partial<Record<keyof FormState, string>>
@@ -116,7 +111,7 @@ export function CaptureForm({ baseCurrency, onCaptured }: CaptureFormProps) {
       categoryId: form.categoryId,
       tagNames: form.tagNames,
     };
-    if (form.installmentsOn && form.installmentsCount >= INSTALLMENTS_MIN) {
+    if (form.installmentsCount > 1) {
       payload.installments = { count: form.installmentsCount };
     }
 
@@ -128,8 +123,7 @@ export function CaptureForm({ baseCurrency, onCaptured }: CaptureFormProps) {
         amount: "",
         categoryId: null,
         tagNames: [],
-        installmentsOn: false,
-        installmentsCount: 2,
+        installmentsCount: 1,
       }));
       onCaptured?.();
     } catch (err) {
@@ -162,13 +156,49 @@ export function CaptureForm({ baseCurrency, onCaptured }: CaptureFormProps) {
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <Label htmlFor={amountId}>Amount</Label>
-        <MoneyInput
-          id={amountId}
-          value={form.amount}
-          aria-invalid={Boolean(errors.amount)}
-          onChange={(next) => update("amount", next)}
-        />
+        <Label>Amount</Label>
+        <div className="grid grid-cols-[6.5rem_1fr_auto] gap-2">
+          <Select
+            value={form.currency}
+            onValueChange={(value) => update("currency", value)}
+          >
+            <SelectTrigger
+              id={currencyId}
+              data-testid="capture-form-currency-trigger"
+              aria-label="Currency"
+              aria-invalid={Boolean(errors.currency)}
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {SUPPORTED_CURRENCIES.map((code) => (
+                <SelectItem key={code} value={code}>
+                  {code}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <MoneyInput
+            id={amountId}
+            value={form.amount}
+            aria-label="Amount"
+            aria-invalid={Boolean(errors.amount)}
+            onChange={(next) => update("amount", next)}
+          />
+          <InstallmentsStepper
+            count={form.installmentsCount}
+            onChange={(next) => update("installmentsCount", next)}
+          />
+        </div>
+        {form.installmentsCount > 1 ? (
+          <InstallmentsSummary
+            count={form.installmentsCount}
+            amount={form.amount}
+            currency={form.currency}
+            startDate={form.date}
+          />
+        ) : null}
+        {errors.currency ? <FieldError message={errors.currency} /> : null}
         {errors.amount ? <FieldError message={errors.amount} /> : null}
       </div>
 
@@ -232,31 +262,6 @@ export function CaptureForm({ baseCurrency, onCaptured }: CaptureFormProps) {
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <Label htmlFor={currencyId}>Currency</Label>
-        <Select
-          value={form.currency}
-          onValueChange={(value) => update("currency", value)}
-        >
-          <SelectTrigger
-            id={currencyId}
-            data-testid="capture-form-currency-trigger"
-            className="w-full"
-            aria-invalid={Boolean(errors.currency)}
-          >
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {SUPPORTED_CURRENCIES.map((code) => (
-              <SelectItem key={code} value={code}>
-                {code}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        {errors.currency ? <FieldError message={errors.currency} /> : null}
-      </div>
-
-      <div className="flex flex-col gap-1.5">
         <Label htmlFor={categoryId}>Category</Label>
         <CategoryCombobox
           id={categoryId}
@@ -272,54 +277,6 @@ export function CaptureForm({ baseCurrency, onCaptured }: CaptureFormProps) {
           value={form.tagNames}
           onChange={(next) => update("tagNames", next)}
         />
-      </div>
-
-      <div className="flex flex-col gap-3 rounded-md border border-border p-3">
-        <div className="flex items-center gap-2">
-          <input
-            id={installmentsToggleId}
-            type="checkbox"
-            checked={form.installmentsOn}
-            onChange={(e) => update("installmentsOn", e.target.checked)}
-            className="size-4 rounded border-border text-foreground focus-visible:ring-ring/50"
-          />
-          <Label htmlFor={installmentsToggleId} className="cursor-pointer">
-            Split into installments
-          </Label>
-        </div>
-        {form.installmentsOn ? (
-          <>
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor={installmentsCountId}>
-                Number of installments
-              </Label>
-              <Input
-                id={installmentsCountId}
-                type="number"
-                min={INSTALLMENTS_MIN}
-                max={INSTALLMENTS_MAX}
-                inputMode="numeric"
-                value={form.installmentsCount}
-                onChange={(e) => {
-                  const next = Number.parseInt(e.target.value, 10);
-                  if (Number.isInteger(next) && next > 0) {
-                    update(
-                      "installmentsCount",
-                      Math.min(INSTALLMENTS_MAX, Math.max(1, next)),
-                    );
-                  }
-                }}
-              />
-              <p className="text-xs text-muted-foreground">
-                One row per month, end-of-month dates clamp to the last day.
-              </p>
-            </div>
-            <InstallmentPreview
-              startDate={form.date}
-              count={form.installmentsCount}
-            />
-          </>
-        ) : null}
       </div>
 
       {submitError ? (
@@ -343,25 +300,80 @@ function FieldError({ message }: { message: string }) {
   return <p className="text-sm text-destructive">{message}</p>;
 }
 
-function InstallmentPreview({
-  startDate,
+function InstallmentsStepper({
   count,
+  onChange,
 }: {
-  startDate: string;
   count: number;
+  onChange: (next: number) => void;
+}) {
+  const decDisabled = count <= 1;
+  const incDisabled = count >= INSTALLMENTS_MAX;
+  return (
+    <div
+      data-testid="capture-form-installments-stepper"
+      className="flex h-9 items-center rounded-md border border-input bg-transparent text-sm shadow-xs dark:bg-input/30"
+    >
+      <button
+        type="button"
+        data-testid="capture-form-installments-dec"
+        aria-label="Decrease installments"
+        disabled={decDisabled}
+        onClick={() => onChange(Math.max(1, count - 1))}
+        className="flex size-9 items-center justify-center rounded-l-md text-muted-foreground transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
+      >
+        <MinusIcon className="size-3.5" />
+      </button>
+      <span
+        data-testid="capture-form-installments-count"
+        aria-live="polite"
+        className="min-w-10 px-2 text-center tabular-nums"
+      >
+        × {count}
+      </span>
+      <button
+        type="button"
+        data-testid="capture-form-installments-inc"
+        aria-label="Increase installments"
+        disabled={incDisabled}
+        onClick={() => onChange(Math.min(INSTALLMENTS_MAX, count + 1))}
+        className="flex size-9 items-center justify-center rounded-r-md text-muted-foreground transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
+      >
+        <PlusIcon className="size-3.5" />
+      </button>
+    </div>
+  );
+}
+
+function InstallmentsSummary({
+  count,
+  amount,
+  currency,
+  startDate,
+}: {
+  count: number;
+  amount: string;
+  currency: string;
+  startDate: string;
 }) {
   const dates = generateInstallmentDates(startDate, count);
-  if (dates.length === 0) return null;
+  const last = dates[dates.length - 1];
+  const total = AMOUNT_RE.test(amount)
+    ? (Number(amount) * count).toFixed(2)
+    : null;
   return (
-    <ul
-      data-testid="capture-form-installment-preview"
-      className="flex flex-wrap gap-1 text-xs text-muted-foreground"
+    <p
+      data-testid="capture-form-installments-summary"
+      className="text-xs text-muted-foreground"
     >
-      {dates.map((d, i) => (
-        <li key={d} className="rounded-full bg-accent px-2 py-0.5">
-          {i + 1}. {format(parseISO(d), "MMM d, yyyy")}
-        </li>
-      ))}
-    </ul>
+      {count} × {amount || "0.00"} {currency}
+      {total ? (
+        <>
+          {" "}
+          · total {total} {currency}
+        </>
+      ) : null}
+      {last ? <> · last {format(parseISO(last), "MMM d, yyyy")}</> : null}
+    </p>
   );
 }
