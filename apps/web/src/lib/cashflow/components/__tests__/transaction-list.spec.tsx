@@ -52,6 +52,7 @@ const baseRow = {
   rateSubstituted: false,
   rateDate: "2026-06-07",
   unconvertible: false,
+  group: null,
   createdAt: "2026-06-07T00:00:00Z",
   updatedAt: "2026-06-07T00:00:00Z",
 };
@@ -169,6 +170,35 @@ describe("TransactionList", () => {
     expect(
       await screen.findByTestId("transaction-row-unconvertible-badge"),
     ).toBeInTheDocument();
+  });
+
+  it("renders the i of N badge for an installment row and links to the group filter", async () => {
+    listMock.mockResolvedValue({
+      items: [
+        {
+          ...baseRow,
+          group: { id: "grp_1", position: 2, size: 4 },
+        },
+      ],
+      nextCursor: null,
+    });
+
+    renderList();
+
+    const badge = await screen.findByTestId("transaction-row-group-badge");
+    expect(badge).toHaveTextContent("2 of 4");
+    expect(badge).toHaveAttribute("href", "/transactions?groupId=grp_1");
+  });
+
+  it("does not render the group badge for a standalone row", async () => {
+    listMock.mockResolvedValue({ items: [baseRow], nextCursor: null });
+
+    renderList();
+
+    expect(await screen.findByText("Lunch")).toBeInTheDocument();
+    expect(
+      screen.queryByTestId("transaction-row-group-badge"),
+    ).not.toBeInTheDocument();
   });
 
   it("surfaces an error UI when the request fails", async () => {

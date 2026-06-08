@@ -1,5 +1,11 @@
 export type TransactionKind = "income" | "expense";
 
+export interface TransactionGroup {
+  id: string;
+  position: number;
+  size: number;
+}
+
 export interface Transaction {
   id: string;
   date: string;
@@ -14,6 +20,7 @@ export interface Transaction {
   rateSubstituted: boolean;
   rateDate: string | null;
   unconvertible: boolean;
+  group: TransactionGroup | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -40,6 +47,7 @@ export interface CreateTransactionInput {
   kind: TransactionKind;
   categoryId?: string | null;
   tagNames?: string[];
+  installments?: { count: number };
 }
 
 export interface UpdateTransactionInput {
@@ -64,6 +72,7 @@ export interface ListTransactionsParams {
   to?: string;
   categoryId?: string;
   tagId?: string;
+  groupId?: string;
   kind?: TransactionKind;
   q?: string;
 }

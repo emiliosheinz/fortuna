@@ -1,6 +1,7 @@
 "use client";
 
 import { format, parseISO } from "date-fns";
+import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -150,12 +151,12 @@ function TransactionRow({
   onSelect: (row: Transaction) => void;
 }) {
   return (
-    <li>
+    <li className="flex items-stretch">
       <button
         type="button"
         data-testid="transaction-row"
         onClick={() => onSelect(row)}
-        className="flex w-full flex-col gap-1 p-3 text-left transition hover:bg-accent/40 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
+        className="flex flex-1 flex-col gap-1 p-3 text-left transition hover:bg-accent/40 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
       >
         <div className="flex flex-col gap-0.5">
           <span className="text-sm font-medium">{row.description}</span>
@@ -214,6 +215,16 @@ function TransactionRow({
           ) : null}
         </div>
       </button>
+      {row.group ? (
+        <Link
+          href={`/transactions?groupId=${row.group.id}`}
+          data-testid="transaction-row-group-badge"
+          title={`Installment ${row.group.position} of ${row.group.size}. View the full group.`}
+          className="flex items-center justify-center self-stretch border-l border-border bg-indigo-50 px-2 text-[11px] font-medium text-indigo-900 transition hover:bg-indigo-100 dark:bg-indigo-900/30 dark:text-indigo-100 dark:hover:bg-indigo-900/60"
+        >
+          {row.group.position} of {row.group.size}
+        </Link>
+      ) : null}
     </li>
   );
 }

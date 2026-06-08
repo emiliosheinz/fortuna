@@ -255,7 +255,8 @@ describe("Cashflow integration", () => {
         })
         .expect(201);
 
-      expect(res.body.transaction).toEqual({
+      expect(res.body.transactions).toHaveLength(1);
+      expect(res.body.transactions[0]).toEqual({
         id: expect.any(String),
         date: "2026-06-07",
         amount: "12.34",
@@ -269,6 +270,7 @@ describe("Cashflow integration", () => {
         rateSubstituted: false,
         rateDate: "2026-06-07",
         unconvertible: false,
+        group: null,
         createdAt: expect.any(String),
         updatedAt: expect.any(String),
       });
@@ -538,7 +540,7 @@ describe("Cashflow integration", () => {
           categoryId: cat.body.category.id,
         })
         .expect(201);
-      expect(tx.body.transaction.categoryId).toBe(cat.body.category.id);
+      expect(tx.body.transactions[0].categoryId).toBe(cat.body.category.id);
 
       await request(app.getHttpServer())
         .delete(`/categories/${cat.body.category.id}`)
@@ -660,7 +662,7 @@ describe("Cashflow integration", () => {
           tagNames: ["travel", "lisbon"],
         })
         .expect(201);
-      expect(tx.body.transaction.tagIds).toHaveLength(2);
+      expect(tx.body.transactions[0].tagIds).toHaveLength(2);
 
       const tagsList = await request(app.getHttpServer())
         .get("/tags")
@@ -752,8 +754,8 @@ describe("Cashflow integration", () => {
           tagNames: ["travel", "lisbon"],
         })
         .expect(201);
-      expect(tx.body.transaction.categoryId).toBe(cat.body.category.id);
-      expect(tx.body.transaction.tagIds).toHaveLength(2);
+      expect(tx.body.transactions[0].categoryId).toBe(cat.body.category.id);
+      expect(tx.body.transactions[0].tagIds).toHaveLength(2);
 
       const tags = await dataSource.getRepository(Tag).find({
         order: { name: "ASC" },
@@ -815,7 +817,7 @@ describe("Cashflow integration", () => {
         .expect(201);
 
       const patched = await request(app.getHttpServer())
-        .patch(`/transactions/${tx.body.transaction.id}`)
+        .patch(`/transactions/${tx.body.transactions[0].id}`)
         .set("Cookie", cookie)
         .send({ tagNames: ["lisbon", "food"] })
         .expect(200);
@@ -823,7 +825,7 @@ describe("Cashflow integration", () => {
 
       const tagsForTx = await dataSource
         .getRepository(TransactionTag)
-        .count({ where: { transactionId: tx.body.transaction.id } });
+        .count({ where: { transactionId: tx.body.transactions[0].id } });
       expect(tagsForTx).toBe(2);
 
       const allTags = await dataSource.getRepository(Tag).find();
@@ -855,7 +857,7 @@ describe("Cashflow integration", () => {
         .expect(201);
 
       const patched = await request(app.getHttpServer())
-        .patch(`/transactions/${tx.body.transaction.id}`)
+        .patch(`/transactions/${tx.body.transactions[0].id}`)
         .set("Cookie", cookie)
         .send({ categoryId: null, kind: "income", amount: "20.00" })
         .expect(200);
@@ -884,7 +886,7 @@ describe("Cashflow integration", () => {
         .expect(201);
 
       await request(app.getHttpServer())
-        .patch(`/transactions/${tx.body.transaction.id}`)
+        .patch(`/transactions/${tx.body.transactions[0].id}`)
         .set("Cookie", aliceC)
         .send({ description: "hijack" })
         .expect(404);
@@ -917,7 +919,7 @@ describe("Cashflow integration", () => {
         .expect(201);
 
       await request(app.getHttpServer())
-        .delete(`/transactions/${tx.body.transaction.id}`)
+        .delete(`/transactions/${tx.body.transactions[0].id}`)
         .set("Cookie", cookie)
         .expect(204);
 
@@ -946,7 +948,7 @@ describe("Cashflow integration", () => {
         .expect(201);
 
       await request(app.getHttpServer())
-        .delete(`/transactions/${tx.body.transaction.id}`)
+        .delete(`/transactions/${tx.body.transactions[0].id}`)
         .set("Cookie", aliceC)
         .expect(404);
     });
@@ -1121,7 +1123,7 @@ describe("Cashflow integration", () => {
         })
         .expect(201);
 
-      const id = created.body.transaction.id;
+      const id = created.body.transactions[0].id;
       const res = await request(app.getHttpServer())
         .get(`/transactions/${id}`)
         .set("Cookie", cookie)
@@ -1155,7 +1157,7 @@ describe("Cashflow integration", () => {
         })
         .expect(201);
       await request(app.getHttpServer())
-        .get(`/transactions/${created.body.transaction.id}`)
+        .get(`/transactions/${created.body.transactions[0].id}`)
         .set("Cookie", bobC)
         .expect(404);
     });
@@ -1255,7 +1257,7 @@ describe("Cashflow integration", () => {
         .set("Cookie", cookie)
         .send(body)
         .expect(201);
-      return { id: res.body.transaction.id as string };
+      return { id: res.body.transactions[0].id as string };
     }
 
     it("returns income, expense, net, and byCategory in base currency for the chosen month", async () => {
@@ -1622,7 +1624,7 @@ describe("Cashflow integration", () => {
         .set("Cookie", cookie)
         .send(body)
         .expect(201);
-      return { id: res.body.transaction.id as string };
+      return { id: res.body.transactions[0].id as string };
     }
 
     async function createTag(cookie: string, name: string): Promise<string> {
@@ -1814,7 +1816,7 @@ describe("Cashflow integration", () => {
         .set("Cookie", cookie)
         .send(body)
         .expect(201);
-      return { id: res.body.transaction.id as string };
+      return { id: res.body.transactions[0].id as string };
     }
 
     it("filters by from/to date range, inclusive", async () => {
@@ -1962,6 +1964,162 @@ describe("Cashflow integration", () => {
         .get("/transactions?categoryId=not-a-uuid")
         .set("Cookie", cookie)
         .expect(400);
+    });
+  });
+
+  describe("POST /transactions installments", () => {
+    async function aliceCookie(): Promise<string> {
+      const { cookie } = await signInUser({
+        sub: "sub-a",
+        name: "Alice",
+        email: "alice@example.com",
+      });
+      await request(app.getHttpServer())
+        .put("/users/me/base-currency")
+        .set("Cookie", cookie)
+        .send({ baseCurrency: "USD" })
+        .expect(200);
+      return cookie;
+    }
+
+    it("collapses installments.count = 1 to a single standalone row", async () => {
+      const cookie = await aliceCookie();
+      const res = await request(app.getHttpServer())
+        .post("/transactions")
+        .set("Cookie", cookie)
+        .send({
+          date: "2026-06-07",
+          amount: "10.00",
+          currency: "USD",
+          description: "row",
+          kind: "expense",
+          installments: { count: 1 },
+        })
+        .expect(201);
+      expect(res.body.transactions).toHaveLength(1);
+      expect(res.body.transactions[0].group).toBeNull();
+    });
+
+    it("creates N rows one calendar month apart sharing a group id and exposes position/size", async () => {
+      const cookie = await aliceCookie();
+      const res = await request(app.getHttpServer())
+        .post("/transactions")
+        .set("Cookie", cookie)
+        .send({
+          date: "2026-01-31",
+          amount: "100.00",
+          currency: "USD",
+          description: "Phone",
+          kind: "expense",
+          installments: { count: 4 },
+        })
+        .expect(201);
+
+      expect(res.body.transactions).toHaveLength(4);
+      const dates = res.body.transactions.map((t: { date: string }) => t.date);
+      expect(dates).toEqual([
+        "2026-01-31",
+        "2026-02-28",
+        "2026-03-31",
+        "2026-04-30",
+      ]);
+      const groupIds = new Set(
+        res.body.transactions.map((t: { group: { id: string } }) => t.group.id),
+      );
+      expect(groupIds.size).toBe(1);
+      for (const [i, t] of res.body.transactions.entries()) {
+        expect(t.group.position).toBe(i + 1);
+        expect(t.group.size).toBe(4);
+      }
+    });
+
+    it("rejects an installments hint with count > 360 with 400", async () => {
+      const cookie = await aliceCookie();
+      await request(app.getHttpServer())
+        .post("/transactions")
+        .set("Cookie", cookie)
+        .send({
+          date: "2026-01-31",
+          amount: "10.00",
+          currency: "USD",
+          description: "row",
+          kind: "expense",
+          installments: { count: 999 },
+        })
+        .expect(400);
+    });
+
+    it("re-derives position and size after a middle-row delete", async () => {
+      const cookie = await aliceCookie();
+      const res = await request(app.getHttpServer())
+        .post("/transactions")
+        .set("Cookie", cookie)
+        .send({
+          date: "2026-06-07",
+          amount: "10.00",
+          currency: "USD",
+          description: "row",
+          kind: "expense",
+          installments: { count: 5 },
+        })
+        .expect(201);
+
+      const middle = res.body.transactions[2];
+      await request(app.getHttpServer())
+        .delete(`/transactions/${middle.id}`)
+        .set("Cookie", cookie)
+        .expect(204);
+
+      const list = await request(app.getHttpServer())
+        .get(`/transactions?groupId=${middle.group.id}`)
+        .set("Cookie", cookie)
+        .expect(200);
+      expect(list.body.items).toHaveLength(4);
+      const sizes = new Set(
+        list.body.items.map((t: { group: { size: number } }) => t.group.size),
+      );
+      expect(sizes).toEqual(new Set([4]));
+      const positions = list.body.items
+        .map((t: { group: { position: number } }) => t.group.position)
+        .sort();
+      expect(positions).toEqual([1, 2, 3, 4]);
+    });
+
+    it("filters transactions by groupId", async () => {
+      const cookie = await aliceCookie();
+      await request(app.getHttpServer())
+        .post("/transactions")
+        .set("Cookie", cookie)
+        .send({
+          date: "2026-06-07",
+          amount: "5.00",
+          currency: "USD",
+          description: "standalone",
+          kind: "expense",
+        })
+        .expect(201);
+      const grouped = await request(app.getHttpServer())
+        .post("/transactions")
+        .set("Cookie", cookie)
+        .send({
+          date: "2026-06-07",
+          amount: "10.00",
+          currency: "USD",
+          description: "grouped",
+          kind: "expense",
+          installments: { count: 3 },
+        })
+        .expect(201);
+      const groupId = grouped.body.transactions[0].group.id;
+
+      const filtered = await request(app.getHttpServer())
+        .get(`/transactions?groupId=${groupId}`)
+        .set("Cookie", cookie)
+        .expect(200);
+      expect(filtered.body.items).toHaveLength(3);
+      for (const item of filtered.body.items) {
+        expect(item.group.id).toBe(groupId);
+      }
     });
   });
 

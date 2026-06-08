@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import {
   BadRequestException,
   Injectable,
@@ -13,6 +14,8 @@ import { Category } from "../entities/category.entity";
 import { Transaction } from "../entities/transaction.entity";
 import { TransactionTag } from "../entities/transaction-tag.entity";
 import { decodeCursor, encodeCursor } from "./cursor";
+import { type GroupContext, loadGroupContext } from "./group-context";
+import { generateInstallmentDates } from "./installment-dates";
 import { TagsService } from "./tags.service";
 import {
   type TransactionResponse,
@@ -33,6 +36,7 @@ export interface ListTransactionsOptions {
   to?: string;
   categoryId?: string;
   tagId?: string;
+  groupId?: string;
   kind?: "income" | "expense";
   q?: string;
 }
@@ -51,21 +55,28 @@ export class TransactionsService {
   async createForUser(
     userId: string,
     dto: CreateTransactionDto,
-  ): Promise<TransactionResponse> {
+  ): Promise<TransactionResponse[]> {
+    const count = dto.installments?.count ?? 1;
+    const groupId = count > 1 ? randomUUID() : null;
+    const dates = generateInstallmentDates(dto.date, count);
+
     const saved = await this.dataSource.transaction(async (manager) => {
       await this.assertCategoryOwned(userId, dto.categoryId, manager);
 
       const transactionRepo = manager.getRepository(Transaction);
-      const row = await transactionRepo.save(
-        transactionRepo.create({
-          userId,
-          date: dto.date,
-          amount: dto.amount,
-          currency: dto.currency,
-          description: dto.description,
-          kind: dto.kind,
-          categoryId: dto.categoryId ?? null,
-        }),
+      const rows = await transactionRepo.save(
+        dates.map((date) =>
+          transactionRepo.create({
+            userId,
+            date,
+            amount: dto.amount,
+            currency: dto.currency,
+            description: dto.description,
+            kind: dto.kind,
+            categoryId: dto.categoryId ?? null,
+            groupId,
+          }),
+        ),
       );
 
       const tags = await this.tags.resolveOrCreateByName(
@@ -73,19 +84,36 @@ export class TransactionsService {
         userId,
         dto.tagNames ?? [],
       );
+      const tagIds = tags.map((t) => t.id);
       if (tags.length > 0) {
         const join = manager.getRepository(TransactionTag);
         await join.save(
-          tags.map((tag) =>
-            join.create({ transactionId: row.id, tagId: tag.id }),
+          rows.flatMap((row) =>
+            tags.map((tag) =>
+              join.create({ transactionId: row.id, tagId: tag.id }),
+            ),
           ),
         );
       }
-      return { row, tagIds: tags.map((t) => t.id) };
+      return { rows, tagIds };
     });
 
     const baseCurrency = await this.userSettings.getBaseCurrency(userId);
-    return this.enrichForResponse(saved.row, saved.tagIds, baseCurrency);
+    const groupContext = await loadGroupContext(
+      this.dataSource.manager,
+      userId,
+      saved.rows.map((r) => r.id),
+    );
+    return Promise.all(
+      saved.rows.map((row) =>
+        this.enrichForResponse(
+          row,
+          saved.tagIds,
+          baseCurrency,
+          groupContext.get(row.id) ?? null,
+        ),
+      ),
+    );
   }
 
   async listForUser(
@@ -133,6 +161,9 @@ export class TransactionsService {
         { tagId: options.tagId },
       );
     }
+    if (options.groupId) {
+      qb.andWhere("t.group_id = :groupId", { groupId: options.groupId });
+    }
 
     const rows = await qb.getMany();
     const hasMore = rows.length > options.limit;
@@ -143,12 +174,18 @@ export class TransactionsService {
 
     const tagsByTransaction = await this.loadTagIds(page.map((r) => r.id));
     const baseCurrency = await this.userSettings.getBaseCurrency(userId);
+    const groupContext = await loadGroupContext(
+      this.dataSource.manager,
+      userId,
+      page.map((r) => r.id),
+    );
     const items = await Promise.all(
       page.map((row) =>
         this.enrichForResponse(
           row,
           tagsByTransaction.get(row.id) ?? [],
           baseCurrency,
+          groupContext.get(row.id) ?? null,
         ),
       ),
     );
@@ -162,7 +199,17 @@ export class TransactionsService {
     }
     const tagIds = (await this.loadTagIds([row.id])).get(row.id) ?? [];
     const baseCurrency = await this.userSettings.getBaseCurrency(userId);
-    return this.enrichForResponse(row, tagIds, baseCurrency);
+    const groupContext = await loadGroupContext(
+      this.dataSource.manager,
+      userId,
+      [row.id],
+    );
+    return this.enrichForResponse(
+      row,
+      tagIds,
+      baseCurrency,
+      groupContext.get(row.id) ?? null,
+    );
   }
 
   async updateForUser(
@@ -209,7 +256,17 @@ export class TransactionsService {
     });
 
     const baseCurrency = await this.userSettings.getBaseCurrency(userId);
-    return this.enrichForResponse(saved.row, saved.tagIds, baseCurrency);
+    const groupContext = await loadGroupContext(
+      this.dataSource.manager,
+      userId,
+      [saved.row.id],
+    );
+    return this.enrichForResponse(
+      saved.row,
+      saved.tagIds,
+      baseCurrency,
+      groupContext.get(saved.row.id) ?? null,
+    );
   }
 
   /** Group tag ids by transaction id for an arbitrary set of transactions. */
@@ -230,13 +287,14 @@ export class TransactionsService {
     row: Transaction,
     tagIds: string[],
     baseCurrency: string,
+    group: GroupContext | null,
   ): Promise<TransactionResponse> {
     const resolution = await this.fxLookup.resolve({
       date: row.date,
       transactionCurrency: row.currency,
       baseCurrency,
     });
-    return transactionToResponse(row, tagIds, baseCurrency, resolution);
+    return transactionToResponse(row, tagIds, baseCurrency, resolution, group);
   }
 
   private async assertCategoryOwned(

@@ -39,13 +39,13 @@ export class TransactionsController {
   async create(
     @Req() req: AuthedRequest,
     @Body() body: CreateTransactionDto,
-  ): Promise<{ transaction: TransactionResponse }> {
+  ): Promise<{ transactions: TransactionResponse[] }> {
     const principal = requirePrincipal(req);
-    const transaction = await this.transactions.createForUser(
+    const transactions = await this.transactions.createForUser(
       principal.userId,
       body,
     );
-    return { transaction };
+    return { transactions };
   }
 
   @UseGuards(SessionGuard)
@@ -63,6 +63,7 @@ export class TransactionsController {
         to: query.to,
         categoryId: query.categoryId,
         tagId: query.tagId,
+        groupId: query.groupId,
         kind: query.kind,
         q: query.q,
       });

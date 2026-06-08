@@ -3,6 +3,7 @@ import type {
   Transaction,
   TransactionKind,
 } from "../entities/transaction.entity";
+import type { GroupContext } from "./group-context";
 
 export interface TransactionResponse {
   id: string;
@@ -18,6 +19,7 @@ export interface TransactionResponse {
   rateSubstituted: boolean;
   rateDate: string | null;
   unconvertible: boolean;
+  group: GroupContext | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -27,6 +29,7 @@ export function transactionToResponse(
   tagIds: string[],
   baseCurrency: string,
   resolution: FxResolution,
+  group: GroupContext | null = null,
 ): TransactionResponse {
   const unconvertible = resolution.unconvertible;
   const baseAmount = unconvertible
@@ -46,6 +49,7 @@ export function transactionToResponse(
     rateSubstituted: unconvertible ? false : resolution.substituted,
     rateDate: unconvertible ? null : resolution.rateDate,
     unconvertible,
+    group,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };

@@ -23,12 +23,15 @@ import { ApiError } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 import { SUPPORTED_CURRENCIES, TRANSACTION_KINDS } from "../constants";
 import { useCreateTransaction } from "../hooks";
+import { generateInstallmentDates } from "../installment-dates";
 import type { CreateTransactionInput, TransactionKind } from "../types";
 import { CategoryCombobox } from "./category-combobox";
 import { MoneyInput } from "./money-input";
 import { TagInput } from "./tag-input";
 
 const AMOUNT_RE = /^\d+(\.\d{1,2})?$/;
+const INSTALLMENTS_MIN = 2;
+const INSTALLMENTS_MAX = 360;
 
 interface CaptureFormProps {
   baseCurrency: string;
@@ -43,6 +46,8 @@ interface FormState {
   currency: string;
   categoryId: string | null;
   tagNames: string[];
+  installmentsOn: boolean;
+  installmentsCount: number;
 }
 
 function todayIso(): string {
@@ -57,6 +62,8 @@ export function CaptureForm({ baseCurrency, onCaptured }: CaptureFormProps) {
   const currencyId = useId();
   const categoryId = useId();
   const tagsId = useId();
+  const installmentsToggleId = useId();
+  const installmentsCountId = useId();
   const [form, setForm] = useState<FormState>(() => ({
     description: "",
     amount: "",
@@ -65,6 +72,8 @@ export function CaptureForm({ baseCurrency, onCaptured }: CaptureFormProps) {
     currency: baseCurrency,
     categoryId: null,
     tagNames: [],
+    installmentsOn: false,
+    installmentsCount: 2,
   }));
   const [errors, setErrors] = useState<
     Partial<Record<keyof FormState, string>>
@@ -107,6 +116,9 @@ export function CaptureForm({ baseCurrency, onCaptured }: CaptureFormProps) {
       categoryId: form.categoryId,
       tagNames: form.tagNames,
     };
+    if (form.installmentsOn && form.installmentsCount >= INSTALLMENTS_MIN) {
+      payload.installments = { count: form.installmentsCount };
+    }
 
     try {
       await mutation.mutateAsync(payload);
@@ -116,6 +128,8 @@ export function CaptureForm({ baseCurrency, onCaptured }: CaptureFormProps) {
         amount: "",
         categoryId: null,
         tagNames: [],
+        installmentsOn: false,
+        installmentsCount: 2,
       }));
       onCaptured?.();
     } catch (err) {
@@ -260,6 +274,54 @@ export function CaptureForm({ baseCurrency, onCaptured }: CaptureFormProps) {
         />
       </div>
 
+      <div className="flex flex-col gap-3 rounded-md border border-border p-3">
+        <div className="flex items-center gap-2">
+          <input
+            id={installmentsToggleId}
+            type="checkbox"
+            checked={form.installmentsOn}
+            onChange={(e) => update("installmentsOn", e.target.checked)}
+            className="size-4 rounded border-border text-foreground focus-visible:ring-ring/50"
+          />
+          <Label htmlFor={installmentsToggleId} className="cursor-pointer">
+            Split into installments
+          </Label>
+        </div>
+        {form.installmentsOn ? (
+          <>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor={installmentsCountId}>
+                Number of installments
+              </Label>
+              <Input
+                id={installmentsCountId}
+                type="number"
+                min={INSTALLMENTS_MIN}
+                max={INSTALLMENTS_MAX}
+                inputMode="numeric"
+                value={form.installmentsCount}
+                onChange={(e) => {
+                  const next = Number.parseInt(e.target.value, 10);
+                  if (Number.isInteger(next) && next > 0) {
+                    update(
+                      "installmentsCount",
+                      Math.min(INSTALLMENTS_MAX, Math.max(1, next)),
+                    );
+                  }
+                }}
+              />
+              <p className="text-xs text-muted-foreground">
+                One row per month, end-of-month dates clamp to the last day.
+              </p>
+            </div>
+            <InstallmentPreview
+              startDate={form.date}
+              count={form.installmentsCount}
+            />
+          </>
+        ) : null}
+      </div>
+
       {submitError ? (
         <p
           data-testid="capture-form-submit-error"
@@ -279,4 +341,27 @@ export function CaptureForm({ baseCurrency, onCaptured }: CaptureFormProps) {
 
 function FieldError({ message }: { message: string }) {
   return <p className="text-sm text-destructive">{message}</p>;
+}
+
+function InstallmentPreview({
+  startDate,
+  count,
+}: {
+  startDate: string;
+  count: number;
+}) {
+  const dates = generateInstallmentDates(startDate, count);
+  if (dates.length === 0) return null;
+  return (
+    <ul
+      data-testid="capture-form-installment-preview"
+      className="flex flex-wrap gap-1 text-xs text-muted-foreground"
+    >
+      {dates.map((d, i) => (
+        <li key={d} className="rounded-full bg-accent px-2 py-0.5">
+          {i + 1}. {format(parseISO(d), "MMM d, yyyy")}
+        </li>
+      ))}
+    </ul>
+  );
 }

@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
-import { InjectRepository } from "@nestjs/typeorm";
-import { Repository } from "typeorm";
+import { InjectDataSource, InjectRepository } from "@nestjs/typeorm";
+import { DataSource, Repository } from "typeorm";
 import { FxLookupService } from "@/fx/services/fx-lookup.service";
 import { UserSettingsService } from "@/users/services/user-settings.service";
 import { Category } from "../entities/category.entity";
@@ -12,6 +12,7 @@ import {
   type ConvertedRow,
   type MonthBucket,
 } from "./aggregations";
+import { loadGroupContext } from "./group-context";
 import { monthRangeBounds } from "./month-window";
 import {
   type TransactionResponse,
@@ -43,6 +44,7 @@ export class TagDrillDownService {
     private readonly transactions: Repository<Transaction>,
     @InjectRepository(Category)
     private readonly categories: Repository<Category>,
+    @InjectDataSource() private readonly dataSource: DataSource,
     private readonly fxLookup: FxLookupService,
     private readonly userSettings: UserSettingsService,
     private readonly transactionsService: TransactionsService,
@@ -70,6 +72,11 @@ export class TagDrillDownService {
         rows.map((r) => r.id),
       );
     const categoryNameById = await this.loadCategoryNames(userId);
+    const groupContext = await loadGroupContext(
+      this.dataSource.manager,
+      userId,
+      rows.map((r) => r.id),
+    );
 
     const transactions: TransactionResponse[] = [];
     const converted: ConvertedRow[] = [];
@@ -86,6 +93,7 @@ export class TagDrillDownService {
           tagIdsByTransaction.get(row.id) ?? [],
           baseCurrency,
           resolution,
+          groupContext.get(row.id) ?? null,
         ),
       );
       converted.push({

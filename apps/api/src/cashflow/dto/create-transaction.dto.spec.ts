@@ -1,3 +1,4 @@
+import "reflect-metadata";
 import { plainToInstance } from "class-transformer";
 import { validate } from "class-validator";
 import { CreateTransactionDto } from "./create-transaction.dto";
@@ -5,7 +6,12 @@ import { CreateTransactionDto } from "./create-transaction.dto";
 async function check(input: unknown): Promise<string[]> {
   const dto = plainToInstance(CreateTransactionDto, input);
   const errors = await validate(dto);
-  return errors.flatMap((e) => Object.keys(e.constraints ?? {}));
+  const collect = (list: Awaited<ReturnType<typeof validate>>): string[] =>
+    list.flatMap((e) => [
+      ...Object.keys(e.constraints ?? {}),
+      ...collect(e.children ?? []),
+    ]);
+  return collect(errors);
 }
 
 describe("CreateTransactionDto validation", () => {
@@ -90,5 +96,24 @@ describe("CreateTransactionDto validation", () => {
     expect(await check({ ...valid, tagNames: ["a".repeat(101)] })).toContain(
       "maxLength",
     );
+  });
+
+  it("accepts an installments hint with a positive count", async () => {
+    expect(await check({ ...valid, installments: { count: 12 } })).toEqual([]);
+  });
+
+  it("rejects an installments hint with a non-positive count", async () => {
+    const errors = await check({ ...valid, installments: { count: 0 } });
+    expect(errors.join(",")).toMatch(/nested|min/i);
+  });
+
+  it("rejects an installments hint with a non-integer count", async () => {
+    const errors = await check({ ...valid, installments: { count: 1.5 } });
+    expect(errors.join(",")).toMatch(/nested|int/i);
+  });
+
+  it("rejects an installments hint with no count at all", async () => {
+    const errors = await check({ ...valid, installments: {} });
+    expect(errors.join(",")).toMatch(/isInt/i);
   });
 });

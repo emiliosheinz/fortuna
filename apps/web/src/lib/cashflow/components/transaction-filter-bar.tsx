@@ -29,6 +29,7 @@ export interface TransactionFilterState {
   to: string | null;
   categoryId: string | null;
   tagId: string | null;
+  groupId: string | null;
   kind: TransactionKind | null;
   q: string | null;
 }
@@ -101,7 +102,7 @@ export function TransactionFilterBar({
           debounceMs={searchDebounceMs}
         />
 
-        {active.length > 0 ? (
+        {active.length > 0 || value.groupId ? (
           <Button
             type="button"
             variant="ghost"
@@ -113,6 +114,7 @@ export function TransactionFilterBar({
                 to: null,
                 categoryId: null,
                 tagId: null,
+                groupId: null,
                 kind: null,
                 q: null,
               })
@@ -123,8 +125,11 @@ export function TransactionFilterBar({
         ) : null}
       </div>
 
-      {active.length > 0 ? (
+      {active.length > 0 || value.groupId ? (
         <div className="flex flex-wrap items-center gap-1.5">
+          {value.groupId ? (
+            <GroupChip onRemove={() => onChange({ ...value, groupId: null })} />
+          ) : null}
           {active.map((key) => (
             <FilterChip
               key={key}
@@ -136,6 +141,26 @@ export function TransactionFilterBar({
           ))}
         </div>
       ) : null}
+    </div>
+  );
+}
+
+function GroupChip({ onRemove }: { onRemove: () => void }) {
+  return (
+    <div
+      data-testid="transaction-filter-chip-group"
+      className="inline-flex h-7 items-center gap-1 rounded-full border border-border bg-background pl-2.5 pr-1 text-xs"
+    >
+      <span className="font-medium">Installment group</span>
+      <button
+        type="button"
+        aria-label="Remove installment-group filter"
+        data-testid="transaction-filter-chip-group-remove"
+        onClick={onRemove}
+        className="ml-0.5 flex size-5 items-center justify-center rounded-full text-muted-foreground hover:bg-accent hover:text-foreground"
+      >
+        <XIcon className="size-3" />
+      </button>
     </div>
   );
 }

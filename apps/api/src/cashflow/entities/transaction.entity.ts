@@ -17,13 +17,17 @@ export type TransactionKind = "income" | "expense";
  * Single-entry transaction owned by a user.
  *
  * The recorded amount lives in the transaction's own currency; the
- * base-currency rollup is computed at read time from `fx_rates` (Phase 3),
- * so no stored base-currency amount is kept on this row. `group_id` lands
- * in a later phase.
+ * base-currency rollup is computed at read time from `fx_rates` (Phase 3).
+ * `group_id` links sibling rows produced together at capture (installments
+ * today, splits or refund-pairs later); per-row position and group size are
+ * derived at read time from window functions over the siblings.
  */
 @Entity({ name: "transactions" })
 @Index("transactions_user_date_id_idx", ["userId", "date", "id"])
 @Index("transactions_user_category_idx", ["userId", "categoryId"])
+@Index("transactions_user_group_idx", ["userId", "groupId"], {
+  where: '"group_id" IS NOT NULL',
+})
 export class Transaction {
   @PrimaryGeneratedColumn("uuid")
   declare id: string;
@@ -56,6 +60,9 @@ export class Transaction {
   @ManyToOne(() => Category, { onDelete: "SET NULL", nullable: true })
   @JoinColumn({ name: "category_id" })
   declare category: Category | null;
+
+  @Column({ name: "group_id", type: "uuid", nullable: true })
+  declare groupId: string | null;
 
   @CreateDateColumn({ name: "created_at", type: "timestamptz" })
   declare createdAt: Date;

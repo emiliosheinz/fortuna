@@ -314,6 +314,7 @@ function tx(
     rateSubstituted: false,
     rateDate: null,
     unconvertible: false,
+    group: null,
     createdAt: "2026-06-07T00:00:00.000Z",
     updatedAt: "2026-06-07T00:00:00.000Z",
   };

@@ -48,6 +48,7 @@ const tx: Transaction = {
   rateSubstituted: false,
   rateDate: "2026-06-07",
   unconvertible: false,
+  group: null,
   createdAt: "2026-06-07T00:00:00Z",
   updatedAt: "2026-06-07T00:00:00Z",
 };

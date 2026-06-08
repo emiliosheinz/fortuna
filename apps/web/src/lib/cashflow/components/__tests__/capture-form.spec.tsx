@@ -84,23 +84,26 @@ describe("CaptureForm", () => {
 
   it("submits the validated payload when the form is well-formed", async () => {
     createTransactionMock.mockResolvedValue({
-      transaction: {
-        id: "tx_1",
-        date: "2026-06-07",
-        amount: "12.34",
-        currency: "USD",
-        description: "Lunch",
-        kind: "expense",
-        categoryId: null,
-        tagIds: [],
-        baseAmount: "12.34",
-        baseCurrency: "USD",
-        rateSubstituted: false,
-        rateDate: "2026-06-07",
-        unconvertible: false,
-        createdAt: "now",
-        updatedAt: "now",
-      },
+      transactions: [
+        {
+          id: "tx_1",
+          date: "2026-06-07",
+          amount: "12.34",
+          currency: "USD",
+          description: "Lunch",
+          kind: "expense",
+          categoryId: null,
+          tagIds: [],
+          baseAmount: "12.34",
+          baseCurrency: "USD",
+          rateSubstituted: false,
+          rateDate: "2026-06-07",
+          unconvertible: false,
+          group: null,
+          createdAt: "now",
+          updatedAt: "now",
+        },
+      ],
     });
     renderForm();
 
@@ -145,25 +148,116 @@ describe("CaptureForm", () => {
     expect(trigger).toHaveTextContent(/USD/);
   });
 
+  it("sends an installments hint with the chosen count when the toggle is on", async () => {
+    createTransactionMock.mockResolvedValue({
+      transactions: [
+        {
+          id: "tx_1",
+          date: "2026-01-31",
+          amount: "100.00",
+          currency: "USD",
+          description: "Phone",
+          kind: "expense",
+          categoryId: null,
+          tagIds: [],
+          baseAmount: "100.00",
+          baseCurrency: "USD",
+          rateSubstituted: false,
+          rateDate: "2026-01-31",
+          unconvertible: false,
+          group: { id: "grp_1", position: 1, size: 4 },
+          createdAt: "now",
+          updatedAt: "now",
+        },
+      ],
+    });
+    renderForm();
+
+    setAmount("100.00");
+    setDescription("Phone");
+    fireEvent.click(screen.getByLabelText(/split into installments/i));
+    fireEvent.change(screen.getByLabelText(/number of installments/i), {
+      target: { value: "4" },
+    });
+    submit();
+
+    await waitFor(() => {
+      expect(createTransactionMock).toHaveBeenCalledTimes(1);
+    });
+    const payload = createTransactionMock.mock.calls[0]?.[0];
+    expect(payload?.installments).toEqual({ count: 4 });
+  });
+
+  it("previews the generated dates when installments is on", () => {
+    renderForm();
+
+    fireEvent.click(screen.getByLabelText(/split into installments/i));
+    fireEvent.change(screen.getByLabelText(/number of installments/i), {
+      target: { value: "3" },
+    });
+    const preview = screen.getByTestId("capture-form-installment-preview");
+    const items = preview.querySelectorAll("li");
+    expect(items).toHaveLength(3);
+  });
+
+  it("does not send an installments hint when the toggle is off", async () => {
+    createTransactionMock.mockResolvedValue({
+      transactions: [
+        {
+          id: "tx_1",
+          date: "2026-06-07",
+          amount: "12.34",
+          currency: "USD",
+          description: "Lunch",
+          kind: "expense",
+          categoryId: null,
+          tagIds: [],
+          baseAmount: "12.34",
+          baseCurrency: "USD",
+          rateSubstituted: false,
+          rateDate: "2026-06-07",
+          unconvertible: false,
+          group: null,
+          createdAt: "now",
+          updatedAt: "now",
+        },
+      ],
+    });
+    renderForm();
+
+    setAmount("12.34");
+    setDescription("Lunch");
+    submit();
+
+    await waitFor(() => {
+      expect(createTransactionMock).toHaveBeenCalledTimes(1);
+    });
+    const payload = createTransactionMock.mock.calls[0]?.[0];
+    expect(payload?.installments).toBeUndefined();
+  });
+
   it("sends typed tag names as part of the payload", async () => {
     createTransactionMock.mockResolvedValue({
-      transaction: {
-        id: "tx_1",
-        date: "2026-06-07",
-        amount: "12.34",
-        currency: "USD",
-        description: "Lunch",
-        kind: "expense",
-        categoryId: null,
-        tagIds: [],
-        baseAmount: "12.34",
-        baseCurrency: "USD",
-        rateSubstituted: false,
-        rateDate: "2026-06-07",
-        unconvertible: false,
-        createdAt: "now",
-        updatedAt: "now",
-      },
+      transactions: [
+        {
+          id: "tx_1",
+          date: "2026-06-07",
+          amount: "12.34",
+          currency: "USD",
+          description: "Lunch",
+          kind: "expense",
+          categoryId: null,
+          tagIds: [],
+          baseAmount: "12.34",
+          baseCurrency: "USD",
+          rateSubstituted: false,
+          rateDate: "2026-06-07",
+          unconvertible: false,
+          group: null,
+          createdAt: "now",
+          updatedAt: "now",
+        },
+      ],
     });
     renderForm();
 

@@ -20,6 +20,7 @@ function parseFilters(params: URLSearchParams): TransactionFilterState {
   const to = params.get("to");
   const categoryId = params.get("categoryId");
   const tagId = params.get("tagId");
+  const groupId = params.get("groupId");
   const kindRaw = params.get("kind");
   const q = params.get("q");
   const kind: TransactionKind | null =
@@ -29,6 +30,7 @@ function parseFilters(params: URLSearchParams): TransactionFilterState {
     to: to && ISO_DATE_RE.test(to) ? to : null,
     categoryId: categoryId && UUID_RE.test(categoryId) ? categoryId : null,
     tagId: tagId && UUID_RE.test(tagId) ? tagId : null,
+    groupId: groupId && groupId.length > 0 ? groupId : null,
     kind,
     q: q && q.length > 0 ? q : null,
   };
@@ -40,6 +42,7 @@ function toFilters(state: TransactionFilterState): TransactionFilters {
     to: state.to ?? undefined,
     categoryId: state.categoryId ?? undefined,
     tagId: state.tagId ?? undefined,
+    groupId: state.groupId ?? undefined,
     kind: state.kind ?? undefined,
     q: state.q ?? undefined,
   };
@@ -52,6 +55,7 @@ function initialFilters(): TransactionFilterState {
       to: null,
       categoryId: null,
       tagId: null,
+      groupId: null,
       kind: null,
       q: null,
     };
@@ -71,6 +75,7 @@ function syncFiltersToUrl(state: TransactionFilterState): void {
   if (state.to) url.set("to", state.to);
   if (state.categoryId) url.set("categoryId", state.categoryId);
   if (state.tagId) url.set("tagId", state.tagId);
+  if (state.groupId) url.set("groupId", state.groupId);
   if (state.kind) url.set("kind", state.kind);
   if (state.q) url.set("q", state.q);
   const qs = url.toString();

@@ -25,6 +25,7 @@ function buildListUrl(params: ListTransactionsParams): string {
   if (params.to) query.set("to", params.to);
   if (params.categoryId) query.set("categoryId", params.categoryId);
   if (params.tagId) query.set("tagId", params.tagId);
+  if (params.groupId) query.set("groupId", params.groupId);
   if (params.kind) query.set("kind", params.kind);
   if (params.q) query.set("q", params.q);
   const qs = query.toString();
@@ -57,7 +58,7 @@ export const cashflowApi = {
     }),
 
   createTransaction: (input: CreateTransactionInput) =>
-    apiClient.post<{ transaction: Transaction }>(`${PREFIX}/transactions`, {
+    apiClient.post<{ transactions: Transaction[] }>(`${PREFIX}/transactions`, {
       body: input,
     }),
 

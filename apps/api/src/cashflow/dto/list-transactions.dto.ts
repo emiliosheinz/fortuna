@@ -48,6 +48,10 @@ export class ListTransactionsDto {
   declare tagId?: string;
 
   @IsOptional()
+  @IsUUID()
+  declare groupId?: string;
+
+  @IsOptional()
   @IsIn(["income", "expense"])
   declare kind?: "income" | "expense";
 
