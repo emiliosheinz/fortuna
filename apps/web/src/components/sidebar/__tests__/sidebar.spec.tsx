@@ -1,10 +1,13 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { useState } from "react";
 import { SidebarProvider } from "@/components/ui/sidebar";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { CLEAR_SESSION_PATH } from "@/lib/api-client";
 import { signOut } from "@/lib/auth/sign-out";
 import { navigateTo } from "@/lib/navigate";
 import type { CurrentUser } from "@/lib/users/api-client";
+import { MobileHeader } from "../mobile-header";
 import { Sidebar } from "../sidebar";
 
 const setThemeMock = jest.fn();
@@ -20,6 +23,9 @@ jest.mock("next-themes", () => ({
 
 jest.mock("@/lib/auth/sign-out", () => ({ signOut: jest.fn() }));
 jest.mock("@/lib/navigate", () => ({ navigateTo: jest.fn() }));
+jest.mock("@/hooks/use-mobile", () => ({ useIsMobile: jest.fn() }));
+
+const useIsMobileMock = useIsMobile as jest.MockedFunction<typeof useIsMobile>;
 
 const signOutMock = signOut as jest.MockedFunction<typeof signOut>;
 const navigateToMock = navigateTo as jest.MockedFunction<typeof navigateTo>;
@@ -59,6 +65,8 @@ describe("Sidebar", () => {
     usePathnameMock.mockReturnValue("/");
     signOutMock.mockReset();
     navigateToMock.mockReset();
+    useIsMobileMock.mockReset();
+    useIsMobileMock.mockReturnValue(false);
     window.localStorage.clear();
   });
 
@@ -217,5 +225,52 @@ describe("Sidebar", () => {
     const toggle = screen.getByTestId("sidebar-collapse-toggle");
     expect(toggle).toHaveAttribute("aria-pressed", "true");
     expect(toggle).toHaveAttribute("aria-label", "Expand sidebar");
+  });
+
+  it("dismisses the mobile sheet after navigating to a new route", async () => {
+    useIsMobileMock.mockReturnValue(true);
+
+    let currentPath = "/";
+    usePathnameMock.mockImplementation(() => currentPath);
+
+    const client = new QueryClient({
+      defaultOptions: { mutations: { retry: false } },
+    });
+
+    function TestApp() {
+      const [, force] = useState(0);
+      return (
+        <QueryClientProvider client={client}>
+          <SidebarProvider>
+            <MobileHeader />
+            <Sidebar me={me} />
+          </SidebarProvider>
+          <button
+            type="button"
+            data-testid="simulate-navigate"
+            onClick={() => {
+              currentPath = "/transactions";
+              force((n) => n + 1);
+            }}
+          >
+            navigate
+          </button>
+        </QueryClientProvider>
+      );
+    }
+
+    render(<TestApp />);
+
+    fireEvent.click(screen.getByTestId("mobile-sidebar-trigger"));
+
+    expect(await screen.findByTestId("sidebar-nav-transactions")).toBeVisible();
+
+    fireEvent.click(screen.getByTestId("simulate-navigate"));
+
+    await waitFor(() =>
+      expect(
+        screen.queryByTestId("sidebar-nav-transactions"),
+      ).not.toBeInTheDocument(),
+    );
   });
 });

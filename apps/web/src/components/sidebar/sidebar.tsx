@@ -19,7 +19,7 @@ import {
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTheme } from "next-themes";
-import type { ComponentType } from "react";
+import { type ComponentType, useEffect, useRef } from "react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -63,6 +63,7 @@ const NAV_ITEMS: NavItem[] = [
 ];
 
 export function Sidebar({ me }: { me: CurrentUser }) {
+  useCloseMobileSidebarOnNavigate();
   return (
     <ShadcnSidebar
       collapsible="icon"
@@ -93,6 +94,18 @@ export function Sidebar({ me }: { me: CurrentUser }) {
       </SidebarFooter>
     </ShadcnSidebar>
   );
+}
+
+function useCloseMobileSidebarOnNavigate() {
+  const { isMobile, setOpenMobile } = useSidebar();
+  const pathname = usePathname();
+  const previousPathname = useRef(pathname);
+  useEffect(() => {
+    if (isMobile && pathname !== previousPathname.current) {
+      setOpenMobile(false);
+    }
+    previousPathname.current = pathname;
+  }, [pathname, isMobile, setOpenMobile]);
 }
 
 function SidebarNavItem({ item }: { item: NavItem }) {
