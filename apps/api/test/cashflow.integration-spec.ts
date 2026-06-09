@@ -2124,7 +2124,7 @@ describe("Cashflow integration", () => {
   });
 
   describe("erasure: deleting a user removes their cashflow rows", () => {
-    it("cascades transactions, categories, tags, joins, and user_settings on user delete", async () => {
+    it("cascades transactions, installment groups, categories, tags, joins, and user_settings on user delete", async () => {
       const { cookie } = await signInUser({
         sub: "sub-a",
         name: "Alice",
@@ -2153,6 +2153,20 @@ describe("Cashflow integration", () => {
           tagNames: ["travel"],
         })
         .expect(201);
+      const installment = await request(app.getHttpServer())
+        .post("/transactions")
+        .set("Cookie", cookie)
+        .send({
+          date: "2026-01-31",
+          amount: "100.00",
+          currency: "USD",
+          description: "Phone",
+          kind: "expense",
+          tagNames: ["electronics"],
+          installments: { count: 3 },
+        })
+        .expect(201);
+      expect(installment.body.transactions).toHaveLength(3);
 
       await request(app.getHttpServer())
         .delete("/users/me")
@@ -2168,6 +2182,10 @@ describe("Cashflow integration", () => {
         'SELECT COUNT(*)::int AS c FROM "user_settings"',
       );
       expect(settingsCount[0].c).toBe(0);
+      const groupCount = await dataSource.query(
+        'SELECT COUNT(*)::int AS c FROM "transactions" WHERE "group_id" IS NOT NULL',
+      );
+      expect(groupCount[0].c).toBe(0);
     });
   });
 });
