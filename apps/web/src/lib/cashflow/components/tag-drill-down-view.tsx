@@ -4,6 +4,7 @@ import { format, parseISO } from "date-fns";
 import { useId } from "react";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import { formatMoney } from "../format-money";
 import { useTagDrillDown } from "../hooks";
 import type { CategoryBucket, MonthBucket, Transaction } from "../types";
 import { MonthRangePicker } from "./month-range-picker";
@@ -119,7 +120,7 @@ function CategoryBreakdown({
           >
             <span>{bucket.categoryName ?? "Uncategorized"}</span>
             <span className="tabular-nums">
-              {bucket.net} {baseCurrency}
+              {formatMoney(bucket.net, baseCurrency)}
             </span>
           </li>
         ))}
@@ -151,7 +152,7 @@ function MonthBreakdown({
           >
             <span>{format(parseISO(`${point.month}-01`), "LLL yyyy")}</span>
             <span className="tabular-nums">
-              {point.net} {baseCurrency}
+              {formatMoney(point.net, baseCurrency)}
             </span>
           </li>
         ))}
@@ -189,7 +190,7 @@ function TransactionsList({ transactions }: { transactions: Transaction[] }) {
               }
             >
               {row.kind === "expense" ? "-" : "+"}
-              {row.amount} {row.currency}
+              {formatMoney(row.amount, row.currency)}
             </span>
           </li>
         ))}

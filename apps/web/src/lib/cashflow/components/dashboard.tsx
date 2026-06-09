@@ -1,6 +1,12 @@
 "use client";
 
-import { format, parseISO, subMonths } from "date-fns";
+import {
+  endOfMonth,
+  format,
+  parseISO,
+  startOfMonth,
+  subMonths,
+} from "date-fns";
 import { ArrowRightIcon } from "lucide-react";
 import Link from "next/link";
 import { Area, CartesianGrid, ComposedChart, Line, XAxis } from "recharts";
@@ -12,17 +18,19 @@ import {
 } from "@/components/ui/chart";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { formatMoney } from "../format-money";
 import {
   useBaseCurrency,
   useSummary,
   useTransactions,
   useTrend,
 } from "../hooks";
-import type { MonthBucket } from "../types";
+import type { MonthBucket, Transaction } from "../types";
+import { CategoryPie } from "./category-pie";
 
-const TOP_CATEGORIES = 5;
-const RECENT_LIMIT = 5;
+const TOP_EXPENSES = 5;
 const TREND_MONTHS = 6;
+const TOP_EXPENSES_FETCH_LIMIT = 100;
 
 const TREND_CHART_CONFIG = {
   income: { label: "Income", color: "var(--chart-2)" },
@@ -39,6 +47,14 @@ function trendWindow(): { from: string; to: string } {
   return {
     from: format(subMonths(now, TREND_MONTHS - 1), "yyyy-MM"),
     to: format(now, "yyyy-MM"),
+  };
+}
+
+function monthDateRange(month: string): { from: string; to: string } {
+  const anchor = parseISO(`${month}-01`);
+  return {
+    from: format(startOfMonth(anchor), "yyyy-MM-dd"),
+    to: format(endOfMonth(anchor), "yyyy-MM-dd"),
   };
 }
 
@@ -77,8 +93,7 @@ export function Dashboard() {
     >
       <ThisMonthCard month={month} baseCurrency={baseCurrency} />
       <SixMonthTrendCard window={window} baseCurrency={baseCurrency} />
-      <WhereItWentCard month={month} baseCurrency={baseCurrency} />
-      <RecentActivityCard baseCurrency={baseCurrency} />
+      <WhereItWentCard month={month} />
     </div>
   );
 }
@@ -90,9 +105,9 @@ function DashboardSkeleton() {
       aria-busy="true"
       className="grid grid-cols-1 gap-4 lg:grid-cols-2"
     >
-      {[0, 1, 2, 3].map((index) => (
-        <Skeleton key={index} className="h-56 w-full" />
-      ))}
+      <Skeleton className="h-72 w-full lg:col-span-2" />
+      <Skeleton className="h-56 w-full" />
+      <Skeleton className="h-56 w-full" />
     </div>
   );
 }
@@ -103,6 +118,7 @@ interface CardShellProps {
   href: string;
   hrefLabel: string;
   testId: string;
+  className?: string;
   children: React.ReactNode;
 }
 
@@ -112,12 +128,16 @@ function CardShell({
   href,
   hrefLabel,
   testId,
+  className,
   children,
 }: CardShellProps) {
   return (
     <section
       data-testid={testId}
-      className="flex flex-col gap-3 rounded-md border border-border p-4"
+      className={cn(
+        "flex flex-col gap-3 rounded-md border border-border p-4",
+        className,
+      )}
     >
       <header className="flex items-start justify-between gap-3">
         <div className="flex flex-col gap-0.5">
@@ -179,6 +199,7 @@ function ThisMonthCard({
       href="/summary"
       hrefLabel="View summary"
       testId="dashboard-this-month"
+      className="lg:col-span-2"
     >
       {renderThisMonth(query, baseCurrency)}
     </CardShell>
@@ -189,41 +210,62 @@ function renderThisMonth(
   query: ReturnType<typeof useSummary>,
   baseCurrency: string,
 ): React.ReactNode {
-  if (query.isPending) return <CardSkeleton lines={3} />;
+  if (query.isPending) return <CardSkeleton lines={4} />;
   if (query.isError || !query.data) return <CardError />;
+
+  const expenseBuckets = query.data.byCategory.filter(
+    (bucket) => Number(bucket.expense) > 0,
+  );
+
   return (
-    <dl className="grid grid-cols-3 gap-2">
-      <Stat
-        label="Income"
-        value={query.data.income}
-        unit={baseCurrency}
-        tone="positive"
-      />
-      <Stat
-        label="Expense"
-        value={query.data.expense}
-        unit={baseCurrency}
-        tone="negative"
-      />
-      <Stat
-        label="Net"
-        value={query.data.net}
-        unit={baseCurrency}
-        tone="neutral"
-      />
-    </dl>
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:items-center">
+      <dl className="flex flex-col gap-2">
+        <Stat
+          label="Income"
+          value={query.data.income}
+          currency={baseCurrency}
+          tone="positive"
+        />
+        <Stat
+          label="Expense"
+          value={query.data.expense}
+          currency={baseCurrency}
+          tone="negative"
+        />
+        <Stat
+          label="Net"
+          value={query.data.net}
+          currency={baseCurrency}
+          tone="neutral"
+        />
+      </dl>
+      <div className="flex items-center justify-center">
+        {expenseBuckets.length === 0 ? (
+          <CardEmpty>No expenses this month yet.</CardEmpty>
+        ) : (
+          <CategoryPie
+            buckets={expenseBuckets}
+            baseCurrency={baseCurrency}
+            className="mx-auto h-60 w-full"
+            innerRadius={60}
+            outerRadius={100}
+            labels="leader"
+          />
+        )}
+      </div>
+    </div>
   );
 }
 
 function Stat({
   label,
   value,
-  unit,
+  currency,
   tone,
 }: {
   label: string;
   value: string;
-  unit: string;
+  currency: string;
   tone: "positive" | "negative" | "neutral";
 }) {
   const valueClass =
@@ -233,12 +275,12 @@ function Stat({
         ? "text-destructive"
         : "text-foreground";
   return (
-    <div className="flex flex-col gap-1 rounded-md border border-border p-2">
-      <dt className="text-[0.65rem] font-medium uppercase tracking-wide text-muted-foreground">
+    <div className="flex flex-col gap-1 rounded-md border border-border p-3">
+      <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
         {label}
       </dt>
-      <dd className={cn("text-lg font-semibold tabular-nums", valueClass)}>
-        {value} <span className="text-xs font-normal">{unit}</span>
+      <dd className={cn("text-xl font-semibold tabular-nums", valueClass)}>
+        {formatMoney(value, currency)}
       </dd>
     </div>
   );
@@ -329,7 +371,7 @@ function CompactTrendChart({
                       ?.label ?? name}
                   </span>
                   <span className="font-mono font-medium tabular-nums">
-                    {Number(value).toFixed(2)} {baseCurrency}
+                    {formatMoney(Number(value), baseCurrency)}
                   </span>
                 </div>
               )}
@@ -364,38 +406,36 @@ function CompactTrendChart({
   );
 }
 
-function WhereItWentCard({
-  month,
-  baseCurrency,
-}: {
-  month: string;
-  baseCurrency: string;
-}) {
-  const query = useSummary(month);
+function WhereItWentCard({ month }: { month: string }) {
+  const range = monthDateRange(month);
+  const query = useTransactions(
+    { from: range.from, to: range.to, kind: "expense" },
+    TOP_EXPENSES_FETCH_LIMIT,
+  );
   return (
     <CardShell
       title="Where it went"
       subtitle={formatMonthLong(month)}
-      href="/summary"
+      href="/transactions"
       hrefLabel="View breakdown"
       testId="dashboard-where-it-went"
     >
-      {renderWhereItWent(query, baseCurrency)}
+      {renderWhereItWent(query)}
     </CardShell>
   );
 }
 
 function renderWhereItWent(
-  query: ReturnType<typeof useSummary>,
-  baseCurrency: string,
+  query: ReturnType<typeof useTransactions>,
 ): React.ReactNode {
   if (query.isPending) return <CardSkeleton lines={5} />;
-  if (query.isError || !query.data) return <CardError />;
+  if (query.isError) return <CardError />;
 
-  const top = query.data.byCategory
-    .filter((bucket) => Number(bucket.expense) > 0)
-    .sort((a, b) => Number(b.expense) - Number(a.expense))
-    .slice(0, TOP_CATEGORIES);
+  const items = query.data?.pages.flatMap((page) => page.items) ?? [];
+  const top = items
+    .slice()
+    .sort((a, b) => rankAmount(b) - rankAmount(a))
+    .slice(0, TOP_EXPENSES);
 
   if (top.length === 0) {
     return <CardEmpty>No spending this month yet.</CardEmpty>;
@@ -403,85 +443,25 @@ function renderWhereItWent(
 
   return (
     <ul
-      data-testid="dashboard-top-categories"
+      data-testid="dashboard-top-expenses"
       className="flex flex-col divide-y divide-border"
     >
-      {top.map((bucket) => (
-        <li
-          key={bucket.categoryId ?? "__uncategorized__"}
-          className="flex items-center justify-between gap-3 py-1.5 text-sm"
-        >
-          <span className="min-w-0 truncate">
-            {bucket.categoryName ?? "Uncategorized"}
-          </span>
-          <span className="whitespace-nowrap font-medium tabular-nums">
-            {bucket.expense}{" "}
-            <span className="text-xs font-normal text-muted-foreground">
-              {baseCurrency}
-            </span>
-          </span>
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-function RecentActivityCard({
-  baseCurrency: _baseCurrency,
-}: {
-  baseCurrency: string;
-}) {
-  const query = useTransactions({}, RECENT_LIMIT);
-  return (
-    <CardShell
-      title="Recent activity"
-      href="/transactions"
-      hrefLabel="View all"
-      testId="dashboard-recent-activity"
-    >
-      {renderRecent(query)}
-    </CardShell>
-  );
-}
-
-function renderRecent(
-  query: ReturnType<typeof useTransactions>,
-): React.ReactNode {
-  if (query.isPending) return <CardSkeleton lines={5} />;
-  if (query.isError) return <CardError />;
-  const items =
-    query.data?.pages.flatMap((page) => page.items).slice(0, RECENT_LIMIT) ??
-    [];
-  if (items.length === 0) {
-    return <CardEmpty>No transactions yet.</CardEmpty>;
-  }
-  return (
-    <ul
-      data-testid="dashboard-recent-list"
-      className="flex flex-col divide-y divide-border"
-    >
-      {items.map((tx) => (
+      {top.map((tx) => (
         <li
           key={tx.id}
           className="flex items-center justify-between gap-3 py-1.5 text-sm"
         >
           <span className="min-w-0 truncate">{tx.description}</span>
-          <span
-            className={cn(
-              "whitespace-nowrap font-medium tabular-nums",
-              tx.kind === "income"
-                ? "text-emerald-600 dark:text-emerald-400"
-                : "text-destructive",
-            )}
-          >
-            {tx.kind === "income" ? "+" : "-"}
-            {tx.amount}{" "}
-            <span className="text-xs font-normal text-muted-foreground">
-              {tx.currency}
-            </span>
+          <span className="whitespace-nowrap font-medium tabular-nums text-destructive">
+            {formatMoney(tx.amount, tx.currency)}
           </span>
         </li>
       ))}
     </ul>
   );
+}
+
+function rankAmount(tx: Transaction): number {
+  const value = Number(tx.baseAmount ?? tx.amount);
+  return Number.isFinite(value) ? value : 0;
 }

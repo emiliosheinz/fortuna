@@ -40,8 +40,9 @@ interface MonthRangePickerProps {
 }
 
 /**
- * Trigger + popover with year/month grid for picking a YYYY-MM range. First
- * click sets the anchor; second click closes the range and emits both bounds.
+ * Trigger + popover with year/month grid for picking a YYYY-MM range. The
+ * popover keeps the in-progress selection local: the parent only sees a
+ * complete range, so opening the picker doesn't reset downstream queries.
  */
 export function MonthRangePicker({
   id,
@@ -62,13 +63,12 @@ export function MonthRangePicker({
   function handlePick(month: string) {
     if (!anchor) {
       setAnchor(month);
-      onChange({ from: month, to: null });
       return;
     }
     const [from, to] = anchor <= month ? [anchor, month] : [month, anchor];
-    onChange({ from, to });
     setAnchor(null);
     setOpen(false);
+    onChange({ from, to });
   }
 
   const hasValue = Boolean(value.from || value.to);
@@ -100,7 +100,7 @@ export function MonthRangePicker({
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-auto p-3" align="start">
-          <div className="flex flex-col gap-2">
+          <div className="flex w-60 flex-col gap-2">
             <div className="flex items-center justify-between gap-2">
               <Button
                 type="button"
@@ -129,7 +129,8 @@ export function MonthRangePicker({
                 const key = `${year}-${String(index + 1).padStart(2, "0")}`;
                 const inRange = isInRange(key, value, anchor);
                 const isEdge =
-                  key === value.from || key === value.to || key === anchor;
+                  key === anchor ||
+                  (!anchor && (key === value.from || key === value.to));
                 return (
                   <Button
                     key={label}
@@ -148,11 +149,9 @@ export function MonthRangePicker({
                 );
               })}
             </div>
-            {anchor ? (
-              <p className="text-xs text-muted-foreground">
-                Pick the second month to close the range.
-              </p>
-            ) : null}
+            <p className="min-h-4 text-xs text-muted-foreground">
+              {anchor ? "Pick the second month to close the range." : ""}
+            </p>
           </div>
         </PopoverContent>
       </Popover>
@@ -176,9 +175,7 @@ function isInRange(
   value: MonthRangeValue,
   anchor: string | null,
 ): boolean {
-  if (anchor && !value.to) {
-    return false;
-  }
+  if (anchor) return false;
   if (!value.from || !value.to) return false;
   return candidate >= value.from && candidate <= value.to;
 }

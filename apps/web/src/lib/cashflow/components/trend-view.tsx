@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/chart";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import { formatMoney } from "../format-money";
 import { useTrend } from "../hooks";
 import type { MonthBucket } from "../types";
 import { MonthRangePicker } from "./month-range-picker";
@@ -184,7 +185,7 @@ function TrendChart({
                       ]?.label ?? name}
                     </span>
                     <span className="font-mono font-medium tabular-nums">
-                      {Number(value).toFixed(2)} {baseCurrency}
+                      {formatMoney(Number(value), baseCurrency)}
                     </span>
                   </div>
                 )}

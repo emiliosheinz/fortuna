@@ -10,6 +10,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Skeleton } from "@/components/ui/skeleton";
+import { formatMoney } from "../format-money";
 import {
   type TransactionFilters,
   useCategories,
@@ -218,7 +219,7 @@ function TransactionRow({
             }
           >
             {row.kind === "expense" ? "-" : "+"}
-            {row.amount} {row.currency}
+            {formatMoney(row.amount, row.currency)}
           </span>
           {row.unconvertible ? (
             <span
@@ -233,7 +234,7 @@ function TransactionRow({
               data-testid="transaction-row-base-amount"
               className="text-xs text-muted-foreground"
             >
-              ≈ {row.baseAmount} {row.baseCurrency}
+              ≈ {formatMoney(row.baseAmount, row.baseCurrency)}
               {row.rateSubstituted && row.rateDate ? (
                 <span
                   data-testid="transaction-row-substituted-badge"
@@ -390,7 +391,7 @@ function InstallmentScheduleContent({
                 </span>
                 <span className="font-medium tabular-nums">
                   {sign}
-                  {tx.amount} {tx.currency}
+                  {formatMoney(tx.amount, tx.currency)}
                 </span>
               </li>
             );

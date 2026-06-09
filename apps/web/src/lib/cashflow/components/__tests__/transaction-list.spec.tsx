@@ -106,7 +106,7 @@ describe("TransactionList", () => {
     renderList();
 
     expect(await screen.findByText("Lunch")).toBeInTheDocument();
-    expect(screen.getByText(/-12\.34 USD/)).toBeInTheDocument();
+    expect(screen.getByText(/-\$12\.34/)).toBeInTheDocument();
   });
 
   it("shows the base-currency rollup for a foreign-currency row", async () => {
@@ -126,7 +126,7 @@ describe("TransactionList", () => {
 
     expect(
       await screen.findByTestId("transaction-row-base-amount"),
-    ).toHaveTextContent(/13\.33 USD/);
+    ).toHaveTextContent(/\$13\.33/);
   });
 
   it("renders the rate-substituted badge with the rate date in the title", async () => {

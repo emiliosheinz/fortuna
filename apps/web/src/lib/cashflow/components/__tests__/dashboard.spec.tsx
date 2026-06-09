@@ -116,7 +116,7 @@ beforeEach(() => {
 });
 
 describe("Dashboard", () => {
-  it("renders four cards each pointing at its deep-dive route", () => {
+  it("renders the three remaining cards each pointing at its deep-dive route", () => {
     renderDashboard();
 
     const thisMonth = screen.getByTestId("dashboard-this-month");
@@ -129,10 +129,7 @@ describe("Dashboard", () => {
     expect(within(trend).getByRole("link")).toHaveAttribute("href", "/trend");
 
     const where = screen.getByTestId("dashboard-where-it-went");
-    expect(within(where).getByRole("link")).toHaveAttribute("href", "/summary");
-
-    const recent = screen.getByTestId("dashboard-recent-activity");
-    expect(within(recent).getByRole("link")).toHaveAttribute(
+    expect(within(where).getByRole("link")).toHaveAttribute(
       "href",
       "/transactions",
     );
@@ -176,29 +173,22 @@ describe("Dashboard", () => {
       renderDashboard();
 
       const card = screen.getByTestId("dashboard-this-month");
-      expect(within(card).getByText("50000.00")).toBeInTheDocument();
-      expect(within(card).getByText("4177.00")).toBeInTheDocument();
-      expect(within(card).getByText("45823.00")).toBeInTheDocument();
+      expect(card).toHaveTextContent("R$ 50.000,00");
+      expect(card).toHaveTextContent("R$ 4.177,00");
+      expect(card).toHaveTextContent("R$ 45.823,00");
     });
-  });
 
-  describe("Where it went card", () => {
-    it("lists the top expense categories sorted descending, capped at five", () => {
+    it("renders the expense pie when there are expense buckets", () => {
       useSummaryMock.mockReturnValue(
         summarySuccess({
           month: "2026-06",
           baseCurrency: "BRL",
           income: "0.00",
-          expense: "0.00",
-          net: "0.00",
+          expense: "300.00",
+          net: "-300.00",
           byCategory: [
-            cat("c1", "Lazer", "127.00"),
-            cat("c2", "Moradia", "4000.00"),
-            cat("c3", "Alimentação", "50.00"),
-            cat("c4", "Saúde", "200.00"),
-            cat("c5", "Transporte", "300.00"),
-            cat("c6", "Educação", "75.00"),
-            cat(null, "Uncategorized", "20.00"),
+            cat("c1", "Moradia", "200.00"),
+            cat("c2", "Lazer", "100.00"),
           ],
           excludedUnconvertibleCount: 0,
         }),
@@ -206,17 +196,38 @@ describe("Dashboard", () => {
 
       renderDashboard();
 
+      const card = screen.getByTestId("dashboard-this-month");
+      expect(within(card).queryByText(/No expenses this month/i)).toBeNull();
+    });
+  });
+
+  describe("Where it went card", () => {
+    it("lists the largest expense transactions of the month, capped at five", () => {
+      useTransactionsMock.mockReturnValue(
+        transactionsSuccess([
+          tx("t1", "Aluguel", "4000.00", "BRL"),
+          tx("t2", "Ingresso", "320.00", "BRL"),
+          tx("t3", "Compras IFD", "250.00", "BRL"),
+          tx("t4", "Netflix", "50.00", "BRL"),
+          tx("t5", "Uber", "35.00", "BRL"),
+          tx("t6", "Cafe", "12.00", "BRL"),
+        ]),
+      );
+
+      renderDashboard();
+
       const card = screen.getByTestId("dashboard-where-it-went");
       const items = within(card).getAllByRole("listitem");
       expect(items).toHaveLength(5);
-      expect(items[0]).toHaveTextContent("Moradia");
-      expect(items[1]).toHaveTextContent("Transporte");
-      expect(items[2]).toHaveTextContent("Saúde");
-      expect(items[3]).toHaveTextContent("Lazer");
-      expect(items[4]).toHaveTextContent("Educação");
+      expect(items[0]).toHaveTextContent("Aluguel");
+      expect(items[0]).toHaveTextContent("R$ 4.000,00");
+      expect(items[1]).toHaveTextContent("Ingresso");
+      expect(items[2]).toHaveTextContent("Compras IFD");
+      expect(items[3]).toHaveTextContent("Netflix");
+      expect(items[4]).toHaveTextContent("Uber");
     });
 
-    it("shows an empty state when there is no spending", () => {
+    it("shows an empty state when there are no expenses this month", () => {
       renderDashboard();
 
       const card = screen.getByTestId("dashboard-where-it-went");
@@ -249,34 +260,6 @@ describe("Dashboard", () => {
       expect(card).toHaveTextContent(/No transactions in the last 6 months/i);
     });
   });
-
-  describe("Recent activity card", () => {
-    it("renders one row per recent transaction with the kind sign", () => {
-      useTransactionsMock.mockReturnValue(
-        transactionsSuccess([
-          tx("t1", "Aluguel", "4000.00", "BRL", "expense"),
-          tx("t2", "Salário", "50000.00", "BRL", "income"),
-        ]),
-      );
-
-      renderDashboard();
-
-      const card = screen.getByTestId("dashboard-recent-activity");
-      const items = within(card).getAllByRole("listitem");
-      expect(items).toHaveLength(2);
-      expect(items[0]).toHaveTextContent("Aluguel");
-      expect(items[0]).toHaveTextContent("-4000.00");
-      expect(items[1]).toHaveTextContent("Salário");
-      expect(items[1]).toHaveTextContent("+50000.00");
-    });
-
-    it("shows an empty state when there are no recent transactions", () => {
-      renderDashboard();
-
-      const card = screen.getByTestId("dashboard-recent-activity");
-      expect(card).toHaveTextContent(/No transactions yet/i);
-    });
-  });
 });
 
 function cat(id: string | null, name: string, expense: string) {
@@ -298,7 +281,6 @@ function tx(
   description: string,
   amount: string,
   currency: string,
-  kind: "income" | "expense",
 ): ListTransactionsPage["items"][number] {
   return {
     id,
@@ -306,7 +288,7 @@ function tx(
     amount,
     currency,
     description,
-    kind,
+    kind: "expense",
     categoryId: null,
     tagIds: [],
     baseAmount: amount,

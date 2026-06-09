@@ -1,18 +1,13 @@
 "use client";
 
 import { format, parseISO } from "date-fns";
-import { useId } from "react";
-import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
-import {
-  type ChartConfig,
-  ChartContainer,
-  ChartTooltip,
-  ChartTooltipContent,
-} from "@/components/ui/chart";
+import { useId, useMemo } from "react";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
+import { formatMoney } from "../format-money";
 import { useSummary } from "../hooks";
 import type { CategoryBucket } from "../types";
+import { CategoryPie, categoryColor } from "./category-pie";
 import { MonthPicker } from "./month-picker";
 
 interface SummaryViewProps {
@@ -137,16 +132,16 @@ function Totals({
       <Total
         label="Income"
         value={income}
-        unit={baseCurrency}
+        currency={baseCurrency}
         tone="positive"
       />
       <Total
         label="Expense"
         value={expense}
-        unit={baseCurrency}
+        currency={baseCurrency}
         tone="negative"
       />
-      <Total label="Net" value={net} unit={baseCurrency} tone="neutral" />
+      <Total label="Net" value={net} currency={baseCurrency} tone="neutral" />
     </dl>
   );
 }
@@ -154,12 +149,12 @@ function Totals({
 function Total({
   label,
   value,
-  unit,
+  currency,
   tone,
 }: {
   label: string;
   value: string;
-  unit: string;
+  currency: string;
   tone: "positive" | "negative" | "neutral";
 }) {
   const valueClass =
@@ -177,22 +172,11 @@ function Total({
         {label}
       </dt>
       <dd className={`text-xl font-semibold ${valueClass}`}>
-        {value} <span className="text-sm font-normal">{unit}</span>
+        {formatMoney(value, currency)}
       </dd>
     </div>
   );
 }
-
-const SUMMARY_CHART_CONFIG = {
-  expense: {
-    label: "Expense",
-    color: "var(--chart-1)",
-  },
-  income: {
-    label: "Income",
-    color: "var(--chart-2)",
-  },
-} satisfies ChartConfig;
 
 function CategoryBreakdown({
   buckets,
@@ -201,12 +185,11 @@ function CategoryBreakdown({
   buckets: CategoryBucket[];
   baseCurrency: string;
 }) {
-  const hasIncome = buckets.some((b) => Number(b.income) > 0);
-  const chartData = buckets.map((bucket) => ({
-    category: bucket.categoryName ?? "Uncategorized",
-    expense: Number(bucket.expense),
-    income: Number(bucket.income),
-  }));
+  const expenseBuckets = useMemo(
+    () => buckets.filter((b) => Number(b.expense) > 0),
+    [buckets],
+  );
+
   return (
     <div
       data-testid="summary-by-category"
@@ -215,71 +198,23 @@ function CategoryBreakdown({
       <h2 className="border-b border-border px-3 py-2 text-sm font-medium">
         By category
       </h2>
-      <ChartContainer
-        config={SUMMARY_CHART_CONFIG}
-        className="aspect-auto h-72 w-full px-2 sm:px-4"
-      >
-        <BarChart
-          accessibilityLayer
-          data={chartData}
-          margin={{ left: 12, right: 12, top: 12 }}
+      {expenseBuckets.length === 0 ? (
+        <p
+          data-testid="summary-by-category-empty"
+          className="px-3 py-6 text-center text-sm text-muted-foreground"
         >
-          <CartesianGrid vertical={false} />
-          <XAxis
-            dataKey="category"
-            tickLine={false}
-            tickMargin={8}
-            axisLine={false}
-            interval={0}
-            tickFormatter={(label: string) =>
-              label.length > 12 ? `${label.slice(0, 12)}…` : label
-            }
-          />
-          <YAxis
-            tickLine={false}
-            axisLine={false}
-            tickFormatter={(value: number) => formatChartTick(value)}
-          />
-          <ChartTooltip
-            cursor={false}
-            content={
-              <ChartTooltipContent
-                indicator="dot"
-                formatter={(value, name) => (
-                  <div className="flex items-center justify-between gap-4">
-                    <span className="text-muted-foreground">
-                      {SUMMARY_CHART_CONFIG[
-                        name as keyof typeof SUMMARY_CHART_CONFIG
-                      ]?.label ?? name}
-                    </span>
-                    <span className="font-mono font-medium tabular-nums">
-                      {Number(value).toFixed(2)} {baseCurrency}
-                    </span>
-                  </div>
-                )}
-              />
-            }
-          />
-          <Bar
-            dataKey="expense"
-            fill="var(--color-expense)"
-            radius={[4, 4, 0, 0]}
-          />
-          {hasIncome ? (
-            <Bar
-              dataKey="income"
-              fill="var(--color-income)"
-              radius={[4, 4, 0, 0]}
-            />
-          ) : null}
-        </BarChart>
-      </ChartContainer>
+          No expenses this month.
+        </p>
+      ) : (
+        <CategoryPie buckets={expenseBuckets} baseCurrency={baseCurrency} />
+      )}
       <ul className="flex flex-col divide-y divide-border border-t border-border">
-        {buckets.map((bucket) => (
+        {expenseBuckets.map((bucket, index) => (
           <CategoryRow
             key={bucket.categoryId ?? "__uncategorized__"}
             bucket={bucket}
             baseCurrency={baseCurrency}
+            color={categoryColor(index)}
           />
         ))}
       </ul>
@@ -290,36 +225,33 @@ function CategoryBreakdown({
 function CategoryRow({
   bucket,
   baseCurrency,
+  color,
 }: {
   bucket: CategoryBucket;
   baseCurrency: string;
+  color: string;
 }) {
   return (
     <li
       data-testid="summary-category-row"
       className="flex items-center justify-between gap-4 px-3 py-2"
     >
-      <span className="text-sm">{bucket.categoryName ?? "Uncategorized"}</span>
-      <div className="flex flex-col text-right text-xs text-muted-foreground">
+      <span className="flex items-center gap-2 text-sm">
         <span
-          data-testid="summary-category-net"
-          className="text-sm font-semibold text-foreground tabular-nums"
-        >
-          {bucket.net} {baseCurrency}
-        </span>
-        <span>
-          +{bucket.income} / -{bucket.expense}
-        </span>
-      </div>
+          aria-hidden
+          className="size-2.5 rounded-full"
+          style={{ background: color }}
+        />
+        {bucket.categoryName ?? "Uncategorized"}
+      </span>
+      <span
+        data-testid="summary-category-net"
+        className="text-sm font-semibold text-foreground tabular-nums"
+      >
+        {formatMoney(`-${bucket.expense}`, baseCurrency)}
+      </span>
     </li>
   );
-}
-
-function formatChartTick(value: number): string {
-  if (Math.abs(value) >= 1000) {
-    return `${(value / 1000).toFixed(1)}k`;
-  }
-  return String(value);
 }
 
 function SummarySkeleton() {

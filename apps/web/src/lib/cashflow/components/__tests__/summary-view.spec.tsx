@@ -90,16 +90,53 @@ describe("SummaryView", () => {
     renderView();
 
     expect(await screen.findByTestId("summary-total-income")).toHaveTextContent(
-      "1000.00",
+      "$1,000.00",
     );
     expect(screen.getByTestId("summary-total-expense")).toHaveTextContent(
-      "300.00",
+      "$300.00",
     );
-    expect(screen.getByTestId("summary-total-net")).toHaveTextContent("700.00");
+    expect(screen.getByTestId("summary-total-net")).toHaveTextContent(
+      "$700.00",
+    );
     const rows = screen.getAllByTestId("summary-category-row");
     expect(rows).toHaveLength(2);
     expect(rows[0]).toHaveTextContent("Food");
+    expect(rows[0]).toHaveTextContent("-$200.00");
     expect(rows[1]).toHaveTextContent("Uncategorized");
+    expect(rows[1]).toHaveTextContent("-$100.00");
+  });
+
+  it("hides income-only buckets from the per-category breakdown", async () => {
+    getSummaryMock.mockResolvedValue({
+      month: "2026-06",
+      baseCurrency: "USD",
+      income: "5000.00",
+      expense: "200.00",
+      net: "4800.00",
+      byCategory: [
+        {
+          categoryId: "cat-1",
+          categoryName: "Food",
+          income: "0.00",
+          expense: "200.00",
+          net: "-200.00",
+        },
+        {
+          categoryId: null,
+          categoryName: null,
+          income: "5000.00",
+          expense: "0.00",
+          net: "5000.00",
+        },
+      ],
+      excludedUnconvertibleCount: 0,
+    });
+
+    renderView();
+
+    const rows = await screen.findAllByTestId("summary-category-row");
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toHaveTextContent("Food");
   });
 
   it("warns when some rows are excluded as unconvertible", async () => {
