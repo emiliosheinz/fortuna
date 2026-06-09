@@ -25,7 +25,6 @@ const emptyState: TransactionFilterState = {
   to: null,
   categoryId: null,
   tagId: null,
-  groupId: null,
   kind: null,
   q: null,
 };

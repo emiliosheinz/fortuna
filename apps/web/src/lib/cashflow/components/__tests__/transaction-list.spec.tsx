@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { cashflowApi } from "../../api-client";
 import type { ListTransactionsPage } from "../../types";
 import { TransactionList } from "../transaction-list";
@@ -172,7 +172,7 @@ describe("TransactionList", () => {
     ).toBeInTheDocument();
   });
 
-  it("renders the i of N badge for an installment row and links to the group filter", async () => {
+  it("shows the position/size marker on an installment row", async () => {
     listMock.mockResolvedValue({
       items: [
         {
@@ -185,20 +185,54 @@ describe("TransactionList", () => {
 
     renderList();
 
-    const badge = await screen.findByTestId("transaction-row-group-badge");
-    expect(badge).toHaveTextContent("2 of 4");
-    expect(badge).toHaveAttribute("href", "/transactions?groupId=grp_1");
+    expect(
+      await screen.findByTestId("transaction-row-installment-trigger"),
+    ).toHaveTextContent("2/4");
   });
 
-  it("does not render the group badge for a standalone row", async () => {
-    listMock.mockResolvedValue({ items: [baseRow], nextCursor: null });
+  it("opens the installment schedule and marks the current row", async () => {
+    const currentRow = {
+      ...baseRow,
+      id: "tx_2",
+      date: "2026-07-07",
+      group: { id: "grp_1", position: 2, size: 3 },
+    };
+    const installments = [
+      {
+        ...baseRow,
+        id: "tx_1",
+        date: "2026-06-07",
+        group: { id: "grp_1", position: 1, size: 3 },
+      },
+      currentRow,
+      {
+        ...baseRow,
+        id: "tx_3",
+        date: "2026-08-07",
+        group: { id: "grp_1", position: 3, size: 3 },
+      },
+    ];
+    listMock.mockImplementation(async (params) => {
+      if (params?.groupId === "grp_1") {
+        return { items: installments, nextCursor: null };
+      }
+      return { items: [currentRow], nextCursor: null };
+    });
 
     renderList();
 
-    expect(await screen.findByText("Lunch")).toBeInTheDocument();
-    expect(
-      screen.queryByTestId("transaction-row-group-badge"),
-    ).not.toBeInTheDocument();
+    const trigger = await screen.findByTestId(
+      "transaction-row-installment-trigger",
+    );
+    await act(async () => {
+      fireEvent.click(trigger);
+    });
+
+    const items = await screen.findAllByTestId(
+      "transaction-row-installment-schedule-item",
+    );
+    expect(items).toHaveLength(3);
+    expect(items[1]).toHaveAttribute("data-current", "true");
   });
 
   it("surfaces an error UI when the request fails", async () => {
