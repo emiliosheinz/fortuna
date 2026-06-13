@@ -157,7 +157,7 @@ export function CaptureForm({ baseCurrency, onCaptured }: CaptureFormProps) {
 
       <div className="flex flex-col gap-1.5">
         <Label>Amount</Label>
-        <div className="grid grid-cols-[7rem_1fr_7rem] gap-2">
+        <div className="grid grid-cols-[6rem_1fr_5rem] gap-2 sm:grid-cols-[7rem_1fr_7rem]">
           <Select
             value={form.currency}
             onValueChange={(value) => update("currency", value)}
@@ -356,7 +356,7 @@ function InstallmentsStepper({
         onChange={handleChange}
         onBlur={handleBlur}
         onFocus={(event) => event.currentTarget.select()}
-        className="h-full w-10 bg-transparent text-center text-sm tabular-nums outline-none"
+        className="h-full w-8 bg-transparent text-center text-sm tabular-nums outline-none sm:w-10"
       />
       <button
         type="button"
