@@ -55,8 +55,8 @@ export function transactionToResponse(
   };
 }
 
-function multiplyAndRound(amount: string, rate: string): string {
+function multiplyAndRound(amount: string, rate: string): string | null {
   const value = Number(amount) * Number(rate);
-  if (!Number.isFinite(value)) return "0.00";
+  if (!Number.isFinite(value)) return null;
   return value.toFixed(2);
 }
