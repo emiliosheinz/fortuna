@@ -16,7 +16,7 @@ export function AuthenticatedShell({
   defaultSidebarOpen,
 }: AuthenticatedShellProps) {
   return (
-    <AuthGuard>
+    <AuthGuard sidebarOpen={defaultSidebarOpen}>
       <ShellInterior defaultSidebarOpen={defaultSidebarOpen}>
         {children}
       </ShellInterior>

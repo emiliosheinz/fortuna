@@ -5,6 +5,7 @@ import { createContext, useContext } from "react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { type CurrentUser, usersApi } from "@/lib/users/api-client";
+import { cn } from "@/lib/utils";
 import { USER_QUERY_KEY } from "@/lib/users/query-keys";
 
 interface AuthContextValue {
@@ -13,6 +14,7 @@ interface AuthContextValue {
 
 interface AuthGuardProps {
   children: React.ReactNode;
+  sidebarOpen?: boolean;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -25,7 +27,7 @@ export function useAuth(): AuthContextValue {
   return value;
 }
 
-export function AuthGuard({ children }: AuthGuardProps) {
+export function AuthGuard({ children, sidebarOpen = true }: AuthGuardProps) {
   const { data, isPending, isError, refetch, isFetching } = useQuery({
     queryKey: USER_QUERY_KEY,
     queryFn: () => usersApi.getMe(),
@@ -34,7 +36,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
   });
 
   if (isPending) {
-    return <AuthGuardSkeleton />;
+    return <AuthGuardSkeleton sidebarOpen={sidebarOpen} />;
   }
 
   if (isError) {
@@ -65,7 +67,7 @@ export function AuthGuard({ children }: AuthGuardProps) {
   );
 }
 
-function AuthGuardSkeleton() {
+function AuthGuardSkeleton({ sidebarOpen }: { sidebarOpen: boolean }) {
   return (
     <div
       data-testid="auth-guard-loading"
@@ -73,10 +75,25 @@ function AuthGuardSkeleton() {
       aria-live="polite"
       className="flex min-h-screen bg-background"
     >
-      <aside className="sticky top-0 flex h-screen w-64 shrink-0 flex-col gap-3 border-r border-border bg-background p-4">
-        <Skeleton className="h-6 w-24" />
-        <Skeleton className="mt-2 h-10 w-full" />
-        <Skeleton className="mt-2 h-8 w-full" />
+      <aside
+        className={cn(
+          "sticky top-0 flex h-screen shrink-0 flex-col gap-3 border-r border-border bg-background",
+          sidebarOpen ? "w-64 p-4" : "w-12 p-2",
+        )}
+      >
+        {sidebarOpen ? (
+          <>
+            <Skeleton className="h-6 w-24" />
+            <Skeleton className="mt-2 h-10 w-full" />
+            <Skeleton className="mt-2 h-8 w-full" />
+          </>
+        ) : (
+          <>
+            <Skeleton className="size-8" />
+            <Skeleton className="size-8" />
+            <Skeleton className="size-8" />
+          </>
+        )}
       </aside>
       <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-6 px-4 py-8 sm:px-6">
         <Skeleton className="h-7 w-1/2" />
