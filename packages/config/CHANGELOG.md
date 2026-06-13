@@ -1,3 +1,7 @@
+## 0.3.2 (2026-06-13)
+
+This was a version bump only for @fortuna/config to align it with other projects, there were no code changes.
+
 ## 0.3.1 (2026-05-27)
 
 This was a version bump only for @fortuna/config to align it with other projects, there were no code changes.

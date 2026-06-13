@@ -1,3 +1,17 @@
+## 0.5.1 (2026-06-13)
+
+### 🚀 Features
+
+- **cashflow:** expenses and income tracking ([#12](https://github.com/emiliosheinz/fortuna/pull/12))
+
+### 🧱 Updated Dependencies
+
+- Updated @fortuna/config to 0.3.2
+
+### ❤️ Thank You
+
+- Emilio Heinzmann @emiliosheinz
+
 ## 0.5.0 (2026-06-01)
 
 ### 🚀 Features
