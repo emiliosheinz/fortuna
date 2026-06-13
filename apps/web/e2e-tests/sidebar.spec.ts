@@ -21,7 +21,9 @@ test.describe("Authenticated sidebar", () => {
     await page.getByTestId("sidebar-identity").click();
     await page.getByTestId("identity-menu-sessions").click();
     await expect(page).toHaveURL(/\/settings\/sessions$/);
-    await expect(page.getByRole("heading", { name: "Sessions" })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Sessions", exact: true }),
+    ).toBeVisible();
   });
 
   test("persists the chosen theme across navigation", async ({ page }) => {

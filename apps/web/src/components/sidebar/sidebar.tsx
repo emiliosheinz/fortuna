@@ -64,10 +64,12 @@ const NAV_ITEMS: NavItem[] = [
 
 export function Sidebar({ me }: { me: CurrentUser }) {
   useCloseMobileSidebarOnNavigate();
+  const { state } = useSidebar();
   return (
     <ShadcnSidebar
       collapsible="icon"
       data-testid="sidebar"
+      data-state={state}
       className="border-r border-border"
     >
       <SidebarHeader>

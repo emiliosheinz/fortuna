@@ -31,6 +31,7 @@ test.describe("Cashflow capture", () => {
     await dialog.getByRole("button", { name: "Save transaction" }).click();
     await expect(dialog).toBeHidden();
 
+    await page.goto("/transactions");
     const list = page.getByTestId("transaction-list");
     await expect(list).toBeVisible();
     await expect(list.getByText(description)).toBeVisible();
