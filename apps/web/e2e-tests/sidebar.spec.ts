@@ -7,18 +7,24 @@ test.describe("Authenticated sidebar", () => {
   }) => {
     await signInWithGoogle(page, "E2E User");
 
-    await page.getByTestId("sidebar-identity").click();
+    const identityMenu = page.getByTestId("sidebar-identity-menu");
 
+    await page.getByTestId("sidebar-identity").click();
+    await expect(identityMenu).toBeVisible();
     await page.getByTestId("identity-menu-account").click();
     await expect(page).toHaveURL(/\/settings\/account$/);
     await expect(page.getByRole("heading", { name: "Account" })).toBeVisible();
+    await expect(identityMenu).toBeHidden();
 
     await page.getByTestId("sidebar-identity").click();
+    await expect(identityMenu).toBeVisible();
     await page.getByTestId("identity-menu-settings").click();
     await expect(page).toHaveURL(/\/settings\/preferences$/);
     await expect(page.getByRole("heading", { name: "Settings" })).toBeVisible();
+    await expect(identityMenu).toBeHidden();
 
     await page.getByTestId("sidebar-identity").click();
+    await expect(identityMenu).toBeVisible();
     await page.getByTestId("identity-menu-sessions").click();
     await expect(page).toHaveURL(/\/settings\/sessions$/);
     await expect(
