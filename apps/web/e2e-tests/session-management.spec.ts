@@ -18,10 +18,12 @@ test.describe("Session management", () => {
     page,
   }) => {
     await signInWithGoogle(page, "E2E User");
-    await expect(page.getByText("Welcome, E2E User")).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Dashboard", level: 1 }),
+    ).toBeVisible();
 
-    await page.getByRole("button", { name: "Account menu" }).click();
-    await page.getByRole("menuitem", { name: "Sign out" }).click();
+    await page.getByTestId("sidebar-identity").click();
+    await page.getByTestId("identity-menu-sign-out").click();
     await page.waitForURL(/\/auth\/sign-in$/);
 
     await page.goto("/");

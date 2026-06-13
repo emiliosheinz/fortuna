@@ -1,0 +1,245 @@
+"use client";
+
+import { PencilIcon, TrashIcon } from "lucide-react";
+import { useId, useState } from "react";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Skeleton } from "@/components/ui/skeleton";
+import { ApiError } from "@/lib/api-client";
+import { useCreateTag, useDeleteTag, useRenameTag, useTags } from "../hooks";
+import type { Tag } from "../types";
+
+export function TagsManager() {
+  const list = useTags();
+  const createMutation = useCreateTag();
+  const [name, setName] = useState("");
+  const [createError, setCreateError] = useState<string | null>(null);
+  const [editing, setEditing] = useState<Tag | null>(null);
+  const [deleting, setDeleting] = useState<Tag | null>(null);
+
+  async function handleCreate(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setCreateError(null);
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    try {
+      await createMutation.mutateAsync(trimmed);
+      setName("");
+    } catch (err) {
+      setCreateError(
+        err instanceof ApiError && err.status === 409
+          ? "A tag with that name already exists."
+          : "Could not create tag. Try again.",
+      );
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      <form
+        onSubmit={handleCreate}
+        data-testid="tag-create-form"
+        className="flex flex-col gap-2 sm:flex-row"
+      >
+        <Input
+          aria-label="New tag name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="New tag"
+        />
+        <Button type="submit" disabled={createMutation.isPending}>
+          {createMutation.isPending ? "Adding…" : "Add tag"}
+        </Button>
+      </form>
+      {createError ? (
+        <p role="alert" className="text-sm text-destructive">
+          {createError}
+        </p>
+      ) : null}
+
+      {list.isPending ? (
+        <ListSkeleton />
+      ) : list.isError ? (
+        <p role="alert" className="text-sm text-destructive">
+          Could not load tags.
+        </p>
+      ) : list.data.items.length === 0 ? (
+        <p
+          data-testid="tags-empty"
+          className="rounded-md border border-dashed border-border p-6 text-center text-sm text-muted-foreground"
+        >
+          No tags yet.
+        </p>
+      ) : (
+        <ul
+          data-testid="tags-list"
+          className="flex flex-col divide-y divide-border rounded-md border border-border"
+        >
+          {list.data.items.map((tag) => (
+            <li
+              key={tag.id}
+              className="flex items-center justify-between gap-3 p-3"
+            >
+              <span className="text-sm">{tag.name}</span>
+              <div className="flex items-center gap-1">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  aria-label={`Rename ${tag.name}`}
+                  onClick={() => setEditing(tag)}
+                >
+                  <PencilIcon className="size-4" />
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  aria-label={`Delete ${tag.name}`}
+                  onClick={() => setDeleting(tag)}
+                >
+                  <TrashIcon className="size-4" />
+                </Button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {editing ? (
+        <RenameTagDialog tag={editing} onClose={() => setEditing(null)} />
+      ) : null}
+      {deleting ? (
+        <DeleteTagDialog tag={deleting} onClose={() => setDeleting(null)} />
+      ) : null}
+    </div>
+  );
+}
+
+function RenameTagDialog({ tag, onClose }: { tag: Tag; onClose: () => void }) {
+  const inputId = useId();
+  const [name, setName] = useState(tag.name);
+  const [error, setError] = useState<string | null>(null);
+  const mutation = useRenameTag();
+
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setError(null);
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    try {
+      await mutation.mutateAsync({ id: tag.id, name: trimmed });
+      onClose();
+    } catch (err) {
+      setError(
+        err instanceof ApiError && err.status === 409
+          ? "A tag with that name already exists."
+          : "Could not rename tag. Try again.",
+      );
+    }
+  }
+
+  return (
+    <Dialog open onOpenChange={(open) => (!open ? onClose() : undefined)}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Rename tag</DialogTitle>
+        </DialogHeader>
+        <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+          <Label htmlFor={inputId}>Name</Label>
+          <Input
+            id={inputId}
+            autoFocus
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
+          {error ? (
+            <p role="alert" className="text-sm text-destructive">
+              {error}
+            </p>
+          ) : null}
+          <DialogFooter>
+            <Button type="button" variant="ghost" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={mutation.isPending}>
+              {mutation.isPending ? "Saving…" : "Save"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function DeleteTagDialog({ tag, onClose }: { tag: Tag; onClose: () => void }) {
+  const [error, setError] = useState<string | null>(null);
+  const mutation = useDeleteTag();
+
+  async function handleConfirm() {
+    setError(null);
+    try {
+      await mutation.mutateAsync(tag.id);
+      onClose();
+    } catch {
+      setError("Could not delete tag. Try again.");
+    }
+  }
+
+  return (
+    <Dialog open onOpenChange={(open) => (!open ? onClose() : undefined)}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Delete tag?</DialogTitle>
+          <DialogDescription>
+            Removing "{tag.name}" detaches it from every transaction.
+            Transactions themselves are not deleted.
+          </DialogDescription>
+        </DialogHeader>
+        {error ? (
+          <p role="alert" className="text-sm text-destructive">
+            {error}
+          </p>
+        ) : null}
+        <DialogFooter>
+          <Button type="button" variant="ghost" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            variant="destructive"
+            disabled={mutation.isPending}
+            onClick={handleConfirm}
+          >
+            {mutation.isPending ? "Deleting…" : "Delete"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function ListSkeleton() {
+  return (
+    <div
+      data-testid="tags-loading"
+      className="flex flex-col divide-y divide-border rounded-md border border-border"
+    >
+      {[0, 1, 2].map((i) => (
+        <div key={i} className="flex items-center justify-between p-3">
+          <Skeleton className="h-4 w-32" />
+          <Skeleton className="h-6 w-16" />
+        </div>
+      ))}
+    </div>
+  );
+}

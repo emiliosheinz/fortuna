@@ -46,6 +46,9 @@ bin/fortuna db migration:run                           # apply pending
 bin/fortuna db migration:revert                        # revert last
 bin/fortuna db migration:show                          # show status
 
+# FX rates (dev only — fires the same self-healing job the daily cron runs in prod)
+bin/fortuna fx fetch                                   # catch up fx_rates from the coverage watermark to today
+
 # Production-parity / CI reproduction
 docker compose -f docker-compose.prod.yaml up -d       # prod Docker target locally
 ```
@@ -204,7 +207,7 @@ Biome is the single source of truth for formatting and linting (`biome.json` ext
 # Operational Boundaries & Guardrails
 
 ## Always Do
-- Route every command through `bin/fortuna` (or the appropriate `bin/fortuna db` / `bin/fortuna e2e` subcommand).
+- Route every command through `bin/fortuna` (or the appropriate `bin/fortuna db` / `bin/fortuna fx` / `bin/fortuna e2e` subcommand).
 - Consult the relevant ADR before any structural change.
 - Keep DB access confined to `apps/api`. The web app talks to the API over HTTP.
 - Treat shadcn components under `apps/web/src/components/ui/` as vendored; customize via wrappers.

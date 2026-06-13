@@ -16,5 +16,24 @@
       "next": "recommended",
       "react": "recommended"
     }
-  }
+  },
+  "overrides": [
+    {
+      "includes": ["src/components/ui/**", "src/hooks/use-mobile.tsx"],
+      "linter": {
+        "rules": {
+          "security": {
+            "noDangerouslySetInnerHtml": "off"
+          },
+          "suspicious": {
+            "noArrayIndexKey": "off",
+            "noDocumentCookie": "off"
+          },
+          "correctness": {
+            "useExhaustiveDependencies": "off"
+          }
+        }
+      }
+    }
+  ]
 }

@@ -32,6 +32,18 @@ case "${1:-}" in
       docker compose -f docker-compose.e2e.yaml "$@"
     fi
     ;;
+  fx)
+    shift
+    task="${1:-}"
+    if [ "$task" != "fetch" ] || [ "$#" -gt 1 ]; then
+      echo "Usage: bin/fortuna fx fetch" >&2
+      echo "  Runs the same self-healing catch-up job the daily cron fires" >&2
+      echo "  in production." >&2
+      exit 1
+    fi
+    docker exec api curl -fsS -X POST http://localhost:3000/internal/fx/fetch
+    echo
+    ;;
   "")
     docker exec ${docker_tty_flag} workspace sh
     ;;

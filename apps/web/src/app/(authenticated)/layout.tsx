@@ -1,28 +1,20 @@
-"use client";
+import { cookies } from "next/headers";
+import { AuthenticatedShell } from "./_shell";
 
-import { AuthGuard, useAuth } from "@/components/auth/auth-guard";
-import { Header } from "@/components/header/header";
+const SIDEBAR_COOKIE_NAME = "sidebar_state";
 
 interface AuthenticatedLayoutProps {
   children: React.ReactNode;
 }
 
-export default function AuthenticatedLayout({
+export default async function AuthenticatedLayout({
   children,
 }: AuthenticatedLayoutProps) {
+  const cookieStore = await cookies();
+  const sidebarOpen = cookieStore.get(SIDEBAR_COOKIE_NAME)?.value !== "false";
   return (
-    <AuthGuard>
-      <AuthenticatedShell>{children}</AuthenticatedShell>
-    </AuthGuard>
-  );
-}
-
-function AuthenticatedShell({ children }: { children: React.ReactNode }) {
-  const { me } = useAuth();
-  return (
-    <div className="flex min-h-screen flex-col bg-background text-foreground">
-      <Header me={me} />
-      <div className="flex-1">{children}</div>
-    </div>
+    <AuthenticatedShell defaultSidebarOpen={sidebarOpen}>
+      {children}
+    </AuthenticatedShell>
   );
 }

@@ -46,6 +46,31 @@ bin/fortuna db migration:show
 
 Lists every migration with an `[X]` next to the ones that have been applied.
 
+## FX rates
+
+The cashflow domain converts foreign-currency transactions to the user's base currency at read time using EUR-anchored daily rates from [frankfurter.app](https://www.frankfurter.app/). The product supports four currencies — **USD, EUR, BRL, GBP** — set in `src/fx/constants.ts`. Rates for anything else returned by Frankfurter are dropped on ingest.
+
+### How the daily job works
+
+`FxScheduledJob` fires once a day at 06:00 UTC. Each firing is a self-healing catch-up: it reads the `fx_coverage` watermark (the last date the job has attempted to cover), fetches the open range `(watermark, today]` from Frankfurter, upserts every supported quote currency, and advances the watermark to today. The coverage window starts at `FX_COVERAGE_START_DATE = 2026-01-01`.
+
+Behaviour notes:
+
+- Idempotent: a second firing on the same day finds the watermark already at today and no-ops.
+- Self-healing: if the job misses N days, the next firing fetches the full N-day gap in one historical request.
+- Coverage anchor: the very first firing fetches `2026-01-01..today` in one shot. Frankfurter conveniently extends the lower bound to the last preceding business day, which gives Jan 1 a backstop rate.
+- Currency filter: only USD, BRL, and GBP rows are persisted (EUR is the pivot; same-currency lookup is identity).
+
+### Triggering the job locally
+
+`bin/fortuna fx fetch` runs the same job, via a dev-only `POST /internal/fx/fetch` route. The route returns 404 in production.
+
+```bash
+bin/fortuna fx fetch
+```
+
+After a fresh `docker compose up -d`, one call seeds the entire supported window. Re-runs are no-ops until tomorrow.
+
 ## Local schema reset
 
 ```bash

@@ -11,10 +11,6 @@ const useAuthMock = useAuth as jest.MockedFunction<typeof useAuth>;
 
 describe("Account settings page", () => {
   beforeEach(() => {
-    useAuthMock.mockReset();
-  });
-
-  it("renders the signed-in user's profile and the danger zone", () => {
     useAuthMock.mockReturnValue({
       me: {
         id: "u_1",
@@ -23,9 +19,14 @@ describe("Account settings page", () => {
         avatarUrl: null,
       },
     });
+  });
 
+  it("renders the profile and danger zone for the signed-in user", () => {
     render(<Page />);
 
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Account" }),
+    ).toBeInTheDocument();
     expect(screen.getByText("Ada Lovelace")).toBeInTheDocument();
     expect(screen.getByText("ada@example.com")).toBeInTheDocument();
     expect(screen.getByTestId("danger-zone")).toBeInTheDocument();

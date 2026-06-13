@@ -1,0 +1,27 @@
+groups:
+  - name: fortuna-cashflow-fx
+    interval: 30s
+    rules:
+      - alert: FxRatesStale
+        expr: fx_rates_freshness_days > 3
+        for: 30m
+        labels:
+          severity: warn
+        annotations:
+          summary: FX rates older than 3 days
+          description: |
+            The most recent EUR-anchored rate in fx_rates is more than 3 days
+            old. Check upstream availability at frankfurter.app, inspect the
+            FX scheduled job logs, and confirm the daily cron is firing.
+
+      - alert: FxFetchFailuresRecurring
+        expr: increase(fx_fetch_attempts_total{result="failure"}[1h]) >= 3
+        for: 0m
+        labels:
+          severity: warn
+        annotations:
+          summary: FX fetch attempts failing repeatedly
+          description: |
+            At least 3 final-failure FX fetch attempts in the last hour. Check
+            frankfurter.app status, FX job logs, and network egress from the
+            API container.

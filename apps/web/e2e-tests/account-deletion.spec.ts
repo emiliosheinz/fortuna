@@ -7,7 +7,9 @@ test.describe("Account deletion", () => {
     context,
   }) => {
     await signInWithGoogle(page, "Delete Me User");
-    await expect(page.getByText(/Welcome,/)).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Dashboard", level: 1 }),
+    ).toBeVisible();
 
     // The session cookie should exist before deletion.
     const before = (await context.cookies()).find(
@@ -15,8 +17,8 @@ test.describe("Account deletion", () => {
     );
     expect(before).toBeDefined();
 
-    await page.getByRole("button", { name: "Account menu" }).click();
-    await page.getByRole("menuitem", { name: "Account" }).click();
+    await page.getByTestId("sidebar-identity").click();
+    await page.getByTestId("identity-menu-account").click();
     await page.waitForURL(/\/settings\/account$/);
 
     const submit = page.getByRole("button", { name: /delete my account/i });
