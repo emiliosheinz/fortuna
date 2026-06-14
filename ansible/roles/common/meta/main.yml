@@ -1,0 +1,13 @@
+---
+galaxy_info:
+  role_name: common
+  author: emiliosheinz
+  description: APT baseline and unattended-upgrades for the Fortuna VPS.
+  license: MIT
+  min_ansible_version: "2.16"
+  platforms:
+    - name: Ubuntu
+      versions:
+        - jammy
+        - noble
+dependencies: []

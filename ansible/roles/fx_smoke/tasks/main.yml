@@ -1,0 +1,22 @@
+---
+# Validates that the chosen Hetzner region's egress reaches frankfurter.app.
+# The holdings + expenses designs fall back to cached daily rates if this is
+# blocked, so failure here is informational — the task does not abort the
+# overall site playbook.
+- name: Probe api.frankfurter.app egress
+  ansible.builtin.uri:
+    url: https://api.frankfurter.app/latest?from=USD&to=BRL
+    return_content: false
+    status_code: 200
+    timeout: 10
+  register: fx_probe
+  failed_when: false
+  changed_when: false
+
+- name: Report FX egress status
+  ansible.builtin.debug:
+    msg: >-
+      api.frankfurter.app is
+      {{ 'reachable (HTTP ' ~ fx_probe.status ~ ')'
+         if fx_probe.status is defined and fx_probe.status == 200
+         else 'NOT reachable from this host — holdings and expenses will fall back to cached daily rates' }}

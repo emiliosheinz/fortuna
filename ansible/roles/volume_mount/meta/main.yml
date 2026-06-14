@@ -1,0 +1,13 @@
+---
+galaxy_info:
+  role_name: volume_mount
+  author: emiliosheinz
+  description: Mount the attached Hetzner Volume at /var/lib/docker/volumes before Docker installs.
+  license: MIT
+  min_ansible_version: "2.16"
+  platforms:
+    - name: Ubuntu
+      versions:
+        - jammy
+        - noble
+dependencies: []

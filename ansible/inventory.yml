@@ -1,0 +1,20 @@
+---
+all:
+  children:
+    fortuna:
+      hosts:
+        production:
+          # ansible_host is the Hetzner VPS public IP. It is supplied via:
+          #   - the operator's environment when running from the workstation
+          #     (`DEPLOY_SSH_HOST` or `-e deploy_host=...`), or
+          #   - the GitHub Actions deploy job, which exports `DEPLOY_SSH_HOST`
+          #     from the `production` Environment before invoking the playbook.
+          # No real address is checked into the repository.
+          ansible_host: "{{ lookup('env', 'DEPLOY_SSH_HOST') | default(deploy_host | default(''), true) }}"
+          ansible_user: "{{ lookup('env', 'DEPLOY_SSH_USER') | default(deploy_user | default('deploy'), true) }}"
+          ansible_python_interpreter: /usr/bin/python3
+      vars:
+        # Roles that need elevated privileges call `become: true` per task; the
+        # default connection is the unprivileged `deploy` user.
+        ansible_become: false
+        ansible_become_method: sudo

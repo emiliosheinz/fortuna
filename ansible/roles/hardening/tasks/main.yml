@@ -1,0 +1,89 @@
+---
+- name: Refuse to run without a deploy public key
+  ansible.builtin.assert:
+    that:
+      - hardening_deploy_ssh_public_key | length > 0
+    fail_msg: >-
+      `hardening_deploy_ssh_public_key` is empty. The hardening role needs an authorized
+      key for the deploy user before sshd is locked down to key-only auth,
+      otherwise the next ansible run cannot reach the host.
+
+- name: Ensure deploy group exists
+  become: true
+  ansible.builtin.group:
+    name: "{{ deploy_group }}"
+    state: present
+    system: false
+
+- name: Ensure deploy user exists
+  become: true
+  ansible.builtin.user:
+    name: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    shell: /bin/bash
+    create_home: true
+    state: present
+
+- name: Authorize the deploy public key
+  become: true
+  ansible.posix.authorized_key:
+    user: "{{ deploy_user }}"
+    key: "{{ hardening_deploy_ssh_public_key }}"
+    exclusive: true
+    state: present
+
+- name: Drop the restricted sudoers entry for deploy
+  become: true
+  ansible.builtin.copy:
+    dest: /etc/sudoers.d/deploy
+    owner: root
+    group: root
+    mode: "0440"
+    content: |
+      # Managed by Ansible (role: hardening). Do not edit by hand.
+      {{ deploy_user }} ALL=(root) NOPASSWD: {{ deploy_sudoers_commands | join(', ') }}
+    validate: "visudo -cf %s"
+
+- name: Drop the SSH hardening config
+  become: true
+  ansible.builtin.copy:
+    dest: /etc/ssh/sshd_config.d/99-fortuna-hardening.conf
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      # Managed by Ansible (role: hardening). Do not edit by hand.
+      PermitRootLogin no
+      PasswordAuthentication no
+      KbdInteractiveAuthentication no
+      ChallengeResponseAuthentication no
+      UsePAM yes
+      X11Forwarding no
+      AllowUsers {{ deploy_user }}
+      MaxAuthTries 3
+      LoginGraceTime 30
+      ClientAliveInterval 60
+      ClientAliveCountMax 3
+    validate: "sshd -t -f %s"
+  notify: Restart sshd
+
+- name: Enable ufw with default deny inbound
+  become: true
+  community.general.ufw:
+    state: enabled
+    direction: incoming
+    policy: deny
+
+- name: Allow outbound by default
+  become: true
+  community.general.ufw:
+    direction: outgoing
+    policy: allow
+
+- name: Allow inbound TCP ports from the design
+  become: true
+  community.general.ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: tcp
+  loop: "{{ allowed_inbound_tcp_ports }}"

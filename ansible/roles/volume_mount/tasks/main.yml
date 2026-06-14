@@ -1,0 +1,40 @@
+---
+- name: Confirm the attached device is present
+  ansible.builtin.stat:
+    path: "{{ attached_volume_device }}"
+  register: attached_device
+
+- name: Refuse to proceed if the attached device is missing
+  ansible.builtin.assert:
+    that:
+      - attached_device.stat.exists
+      - attached_device.stat.isblk | default(false)
+    fail_msg: >-
+      Expected attached device `{{ attached_volume_device }}` to be a block
+      device. Hetzner attaches volumes as /dev/sdb by default; if you renamed
+      it, override `attached_volume_device` in group_vars.
+
+- name: Ensure EXT4 filesystem on the attached device (no-op if already formatted)
+  become: true
+  community.general.filesystem:
+    fstype: ext4
+    dev: "{{ attached_volume_device }}"
+    force: false
+
+- name: Ensure the mount point exists
+  become: true
+  ansible.builtin.file:
+    path: "{{ attached_volume_mount }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0711"
+
+- name: Mount the attached volume and persist in fstab
+  become: true
+  ansible.posix.mount:
+    path: "{{ attached_volume_mount }}"
+    src: "{{ attached_volume_device }}"
+    fstype: ext4
+    opts: defaults,noatime,nofail
+    state: mounted

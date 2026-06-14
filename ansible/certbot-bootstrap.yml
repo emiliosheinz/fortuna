@@ -1,0 +1,108 @@
+---
+# One-shot first-cert issuance against Let's Encrypt. Runs from the operator
+# workstation per the technical design's split. The Hetzner Cloud Firewall +
+# host ufw must already permit inbound 80 (the `site` play ensures this).
+#
+# Required:
+#   ansible-playbook certbot-bootstrap.yml -e certbot_email=ops@example.com
+- name: Issue first Let's Encrypt certificates for the public subdomains
+  hosts: fortuna
+  gather_facts: false
+  any_errors_fatal: true
+  vars:
+    certbot_image: certbot/certbot:v3.0.1
+    certbot_email: ""
+    certbot_certs_volume: fortuna-certbot-certs
+    certbot_webroot_volume: fortuna-certbot-webroot
+    cert_live_path: "/etc/letsencrypt/live/{{ public_web_domain }}/fullchain.pem"
+  tasks:
+    - name: Refuse to run without an ACME registration email
+      ansible.builtin.assert:
+        that:
+          - certbot_email | length > 0
+          - "'@' in certbot_email"
+        fail_msg: >-
+          `certbot_email` is required (e.g.
+          `-e certbot_email=ops@example.com`). It is the ACME account email
+          Let's Encrypt sends rate-limit and expiry notices to.
+
+    - name: Ensure the certbot certs volume exists
+      become: true
+      community.docker.docker_volume:
+        name: "{{ certbot_certs_volume }}"
+        state: present
+
+    - name: Ensure the certbot webroot volume exists
+      become: true
+      community.docker.docker_volume:
+        name: "{{ certbot_webroot_volume }}"
+        state: present
+
+    - name: Issue staging cert (always first; proves the ACME flow without burning prod rate limits)
+      become: true
+      community.docker.docker_container:
+        name: certbot-bootstrap-staging
+        image: "{{ certbot_image }}"
+        state: started
+        detach: false
+        auto_remove: true
+        cleanup: true
+        published_ports:
+          - "80:80"
+        volumes:
+          - "{{ certbot_certs_volume }}:/etc/letsencrypt"
+          - "{{ certbot_webroot_volume }}:/var/www/certbot"
+        command: >-
+          certonly --standalone --non-interactive --agree-tos
+          --email {{ certbot_email | quote }}
+          --staging --force-renewal
+          --rsa-key-size 4096
+          -d {{ public_web_domain | quote }}
+          -d {{ public_grafana_domain | quote }}
+
+    - name: Issue production cert (overwrites the staging artefact in place)
+      become: true
+      community.docker.docker_container:
+        name: certbot-bootstrap-production
+        image: "{{ certbot_image }}"
+        state: started
+        detach: false
+        auto_remove: true
+        cleanup: true
+        published_ports:
+          - "80:80"
+        volumes:
+          - "{{ certbot_certs_volume }}:/etc/letsencrypt"
+          - "{{ certbot_webroot_volume }}:/var/www/certbot"
+        command: >-
+          certonly --standalone --non-interactive --agree-tos
+          --email {{ certbot_email | quote }}
+          --force-renewal
+          --rsa-key-size 4096
+          -d {{ public_web_domain | quote }}
+          -d {{ public_grafana_domain | quote }}
+
+    - name: Verify a production fullchain landed in the shared volume
+      become: true
+      community.docker.docker_container:
+        name: certbot-bootstrap-verify
+        image: "{{ certbot_image }}"
+        state: started
+        detach: false
+        auto_remove: true
+        cleanup: true
+        entrypoint:
+          - sh
+          - -c
+        command:
+          - "test -s {{ cert_live_path }} && echo OK"
+        volumes:
+          - "{{ certbot_certs_volume }}:/etc/letsencrypt:ro"
+
+    - name: Report success
+      ansible.builtin.debug:
+        msg: >-
+          Production certificate issued for
+          {{ public_web_domain }} and {{ public_grafana_domain }}.
+          Run `ansible-playbook deploy.yml` (or push a release tag) to bring
+          the stack up against the new cert.

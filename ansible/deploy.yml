@@ -1,0 +1,117 @@
+---
+# Release-delivery playbook. Owned by GitHub Actions on tag, dispatchable
+# manually from the operator workstation as an emergency fallback.
+#
+# Required:
+#   -e env_file=/path/to/materialized/.env
+# Optional:
+#   -e healthcheck_timeout_seconds=180  (override healthcheck poll cap)
+- name: Deliver the Fortuna release to the production host
+  hosts: fortuna
+  gather_facts: false
+  any_errors_fatal: true
+  vars:
+    env_file: ""
+    healthcheck_timeout_seconds: 180
+    healthcheck_poll_seconds: 5
+    payload_excludes:
+      - "*.git*"
+      - "node_modules/**"
+      - "apps/**"
+      - "packages/**"
+      - ".specs/**"
+      - "docker/mock-oauth2/**"
+  tasks:
+    - name: Refuse to run without a materialized env file
+      ansible.builtin.assert:
+        that:
+          - env_file | length > 0
+        fail_msg: >-
+          `env_file` is required. Pass the path to the materialized .env via
+          `-e env_file=/path/to/.env`. The release pipeline materializes it
+          from the `production` GitHub Environment before invoking this play.
+
+    - name: Confirm the env file exists on the controller
+      delegate_to: localhost
+      ansible.builtin.stat:
+        path: "{{ env_file }}"
+      register: env_file_stat
+
+    - name: Refuse to proceed with a missing or empty env file
+      ansible.builtin.assert:
+        that:
+          - env_file_stat.stat.exists
+          - env_file_stat.stat.size | int > 0
+        fail_msg: "env_file `{{ env_file }}` does not exist or is empty."
+
+    - name: Ensure the fortuna root exists on the host
+      become: true
+      ansible.builtin.file:
+        path: "{{ fortuna_root }}"
+        state: directory
+        owner: "{{ deploy_user }}"
+        group: "{{ deploy_group }}"
+        mode: "0750"
+
+    - name: Sync the compose payload to the host
+      ansible.posix.synchronize:
+        src: "{{ playbook_dir }}/../"
+        dest: "{{ fortuna_root }}/"
+        delete: false
+        recursive: true
+        rsync_opts:
+          - "--exclude=*.git*"
+          - "--exclude=node_modules"
+          - "--exclude=apps"
+          - "--exclude=packages"
+          - "--exclude=.specs"
+          - "--exclude=docker/mock-oauth2"
+          - "--exclude=ansible"
+          - "--exclude=docs"
+          - "--exclude=scripts"
+          - "--exclude=bin"
+          - "--exclude=.env"
+          - "--exclude=.env.local"
+          - "--exclude=docker-compose.yaml"
+          - "--exclude=docker-compose.e2e.yaml"
+
+    - name: Materialize the host-side .env (0600, owned by deploy)
+      become: true
+      ansible.builtin.copy:
+        src: "{{ env_file }}"
+        dest: "{{ fortuna_root }}/.env"
+        owner: "{{ deploy_user }}"
+        group: "{{ deploy_group }}"
+        mode: "0600"
+
+    - name: Pull the latest images from GHCR
+      community.docker.docker_compose_v2_pull:
+        project_src: "{{ fortuna_root }}"
+        files:
+          - "{{ fortuna_compose_file }}"
+
+    - name: Bring the stack up (compose enforces migration ordering; --remove-orphans reaps removed services)
+      community.docker.docker_compose_v2:
+        project_src: "{{ fortuna_root }}"
+        files:
+          - "{{ fortuna_compose_file }}"
+        state: present
+        pull: never
+        remove_orphans: true
+        wait: false
+
+    - name: Poll the web container healthcheck
+      community.docker.docker_container_info:
+        name: web
+      register: web_state
+      until: >-
+        web_state.container is defined
+        and (web_state.container.State.Health.Status | default('')) == 'healthy'
+      retries: "{{ (healthcheck_timeout_seconds | int / healthcheck_poll_seconds | int) | round(0, 'ceil') | int }}"
+      delay: "{{ healthcheck_poll_seconds }}"
+
+    - name: Report deploy success
+      ansible.builtin.debug:
+        msg: >-
+          Deploy complete: web container healthy after
+          {{ (web_state.attempts | default(1)) * healthcheck_poll_seconds }}s.

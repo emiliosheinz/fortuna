@@ -1,0 +1,14 @@
+---
+galaxy_info:
+  role_name: docker
+  author: emiliosheinz
+  description: Docker Engine install + the fortuna compose root directory.
+  license: MIT
+  min_ansible_version: "2.16"
+  platforms:
+    - name: Ubuntu
+      versions:
+        - jammy
+        - noble
+dependencies:
+  - role: volume_mount
