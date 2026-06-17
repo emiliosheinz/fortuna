@@ -86,19 +86,6 @@
     validate: "sshd -t -f %s"
   notify: Restart sshd
 
-- name: Enable ufw with default deny inbound
-  become: true
-  community.general.ufw:
-    state: enabled
-    direction: incoming
-    policy: deny
-
-- name: Allow outbound by default
-  become: true
-  community.general.ufw:
-    direction: outgoing
-    policy: allow
-
 - name: Allow inbound TCP ports from the design
   become: true
   community.general.ufw:
@@ -106,3 +93,16 @@
     port: "{{ item }}"
     proto: tcp
   loop: "{{ allowed_inbound_tcp_ports }}"
+
+- name: Allow outbound by default
+  become: true
+  community.general.ufw:
+    direction: outgoing
+    policy: allow
+
+- name: Enable ufw with default deny inbound
+  become: true
+  community.general.ufw:
+    state: enabled
+    direction: incoming
+    policy: deny

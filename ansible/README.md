@@ -8,7 +8,7 @@ The split mirrors the technical design (`.specs/vps-deployment/TECHNICAL-DESIGN.
 
 | Playbook | Run from | Purpose |
 |----------|----------|---------|
-| `site.yml` | Operator workstation | Converge the host to the operational baseline: `common`, `hardening`, `volume-mount`, `docker`, then the FX-egress smoke task. |
+| `site.yml` | Operator workstation | Converge the host to the operational baseline: `common`, `hardening`, `volume_mount`, `docker`, `fx_smoke`. |
 | `certbot-bootstrap.yml` | Operator workstation | One-shot first issuance of Let's Encrypt certificates for both public subdomains (staging then production). |
 | `deploy.yml` | GitHub Actions (and ad-hoc from workstation) | Materialize the host-side `.env`, ship the compose payload, `docker compose pull && up -d --remove-orphans`, poll the `web` healthcheck. |
 
@@ -24,11 +24,11 @@ ansible/
   certbot-bootstrap.yml
   deploy.yml
   roles/
-    common/              # apt baseline
+    common/              # apt baseline + unattended-upgrades
     hardening/           # deploy user, SSH hardening, ufw, restricted sudoers
-    volume-mount/        # mount the attached Hetzner Volume at /var/lib/docker/volumes
-    docker/              # Docker Engine + unattended-upgrades
-    fx-smoke/            # confirm api.frankfurter.app is reachable from the host
+    volume_mount/        # mount the attached Hetzner Volume at /var/lib/docker/volumes
+    docker/              # Docker Engine + compose plugin
+    fx_smoke/            # confirm api.frankfurter.app is reachable from the host
 ```
 
 ## Running locally
@@ -47,7 +47,7 @@ ansible-playbook site.yml
 ansible-playbook certbot-bootstrap.yml
 
 # ad-hoc redeploy from the workstation (GHA owns the tag-driven path)
-ansible-playbook deploy.yml -e env_file=/path/to/materialized/.env -e image_tag=latest
+ansible-playbook deploy.yml -e env_file=/path/to/materialized/.env
 ```
 
 The inventory expects `DEPLOY_SSH_HOST` (or `--inventory inventory.yml -e deploy_host=...`) to identify the production host. See `inventory.yml` for the active pattern.

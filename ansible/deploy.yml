@@ -14,13 +14,6 @@
     env_file: ""
     healthcheck_timeout_seconds: 180
     healthcheck_poll_seconds: 5
-    payload_excludes:
-      - "*.git*"
-      - "node_modules/**"
-      - "apps/**"
-      - "packages/**"
-      - ".specs/**"
-      - "docker/mock-oauth2/**"
   tasks:
     - name: Refuse to run without a materialized env file
       ansible.builtin.assert:

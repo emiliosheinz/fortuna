@@ -69,8 +69,11 @@ services:
       target: prod
       dockerfile: apps/web/Dockerfile
     environment:
-      PORT: ${WEB_PORT:?required}
-      HOST: ${WEB_HOST:?required}
+      # PORT/HOST are production constants pinned here so the nginx vhost
+      # (docker/nginx/conf.d/fortuna.conf -> proxy_pass http://web:3001)
+      # can't drift from the container's listen port.
+      PORT: "3001"
+      HOST: "0.0.0.0"
       API_BASE_URL: ${API_BASE_URL:?required}
       OIDC_ISSUER_URL: ${OIDC_ISSUER_URL:?required}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:?required}
