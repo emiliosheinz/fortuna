@@ -1,3 +1,13 @@
+## 0.5.3 (2026-06-17)
+
+### 🩹 Fixes
+
+- **auth:** anchor token-exchange redirect_uri on GOOGLE_REDIRECT_URI ([#14](https://github.com/emiliosheinz/fortuna/pull/14))
+
+### ❤️ Thank You
+
+- Emilio Heinzmann @emiliosheinz
+
 ## 0.5.1 (2026-06-13)
 
 ### 🚀 Features
