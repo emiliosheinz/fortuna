@@ -1,6 +1,7 @@
 ---
-# Public SSH key the GHA deploy job (and the operator workstation) uses to
+# Controller-side path to the public SSH key the operator workstation uses to
 # reach the deploy user. The site playbook expects this to be provided via:
-#   ansible-playbook site.yml -e "hardening_deploy_ssh_public_key=$(cat ~/.ssh/fortuna_deploy.pub)"
-# or via the inventory's group_vars override.
-hardening_deploy_ssh_public_key: ""
+#   ansible-playbook site.yml -e hardening_deploy_ssh_public_key_path=~/.ssh/fortuna-vps.pub
+# Path-based input (not the key body) is required: inline values get truncated
+# by Ansible's parse_kv whenever they contain whitespace, which SSH keys always do.
+hardening_deploy_ssh_public_key_path: ""
