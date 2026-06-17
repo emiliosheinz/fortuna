@@ -102,26 +102,6 @@ export function TransactionFilterBar({
           onCommit={(next) => onChange({ ...value, q: next })}
           debounceMs={searchDebounceMs}
         />
-
-        {active.length > 0 ? (
-          <Button
-            type="button"
-            variant="ghost"
-            data-testid="transaction-filter-clear"
-            onClick={() =>
-              onChange({
-                from: null,
-                to: null,
-                categoryId: null,
-                tagId: null,
-                kind: null,
-                q: null,
-              })
-            }
-          >
-            Clear all
-          </Button>
-        ) : null}
       </div>
 
       {active.length > 0 ? (
@@ -135,6 +115,23 @@ export function TransactionFilterBar({
               onRemove={() => reset(key)}
             />
           ))}
+          <button
+            type="button"
+            data-testid="transaction-filter-clear"
+            onClick={() =>
+              onChange({
+                from: null,
+                to: null,
+                categoryId: null,
+                tagId: null,
+                kind: null,
+                q: null,
+              })
+            }
+            className="inline-flex h-7 items-center rounded-full px-2.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
+          >
+            Clear all
+          </button>
         </div>
       ) : null}
     </div>
