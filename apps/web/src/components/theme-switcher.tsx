@@ -36,26 +36,20 @@ export function ThemeSwitcher() {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent data-testid="theme-menu">
-        <DropdownMenuItem
-          role="menuitem"
-          data-testid="theme-light"
-          onSelect={() => setTheme("light")}
-        >
-          <SunIcon aria-hidden /> Light
+        <DropdownMenuItem asChild data-testid="theme-light">
+          <button type="button" onClick={() => setTheme("light")}>
+            <SunIcon aria-hidden /> Light
+          </button>
         </DropdownMenuItem>
-        <DropdownMenuItem
-          role="menuitem"
-          data-testid="theme-dark"
-          onSelect={() => setTheme("dark")}
-        >
-          <MoonIcon aria-hidden /> Dark
+        <DropdownMenuItem asChild data-testid="theme-dark">
+          <button type="button" onClick={() => setTheme("dark")}>
+            <MoonIcon aria-hidden /> Dark
+          </button>
         </DropdownMenuItem>
-        <DropdownMenuItem
-          role="menuitem"
-          data-testid="theme-system"
-          onSelect={() => setTheme("system")}
-        >
-          <LaptopMinimalIcon aria-hidden /> System
+        <DropdownMenuItem asChild data-testid="theme-system">
+          <button type="button" onClick={() => setTheme("system")}>
+            <LaptopMinimalIcon aria-hidden /> System
+          </button>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
