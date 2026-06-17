@@ -11,7 +11,7 @@ import {
   setDeviceIdCookie,
   setSessionCookie,
 } from "@/lib/auth/cookies";
-import { getOidcConfig } from "@/lib/auth/oidc";
+import { getOidcConfig, getRedirectUri } from "@/lib/auth/oidc";
 
 /**
  * OAuth callback for Google sign-in.
@@ -39,9 +39,20 @@ export async function GET(req: NextRequest) {
 
   const config = await getOidcConfig();
 
+  // Anchor the URL passed to openid-client on the configured GOOGLE_REDIRECT_URI
+  // so the redirect_uri sent in the token exchange matches the one used in the
+  // auth request. Next.js builds `req.url` from the upstream socket protocol
+  // (http, behind nginx) + Host header, so trusting it would send Google a
+  // redirect_uri Google rejects as non-compliant.
+  const inbound = new URL(req.url);
+  const callbackUrl = new URL(getRedirectUri());
+  inbound.searchParams.forEach((value, key) => {
+    callbackUrl.searchParams.set(key, value);
+  });
+
   let idToken: string | undefined;
   try {
-    const tokens = await authorizationCodeGrant(config, new URL(req.url), {
+    const tokens = await authorizationCodeGrant(config, callbackUrl, {
       expectedState: state,
       expectedNonce: nonce,
       pkceCodeVerifier: codeVerifier,
