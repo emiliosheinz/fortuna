@@ -4,6 +4,7 @@ import { format, parseISO } from "date-fns";
 import {
   CalendarRangeIcon,
   ChevronDownIcon,
+  ChevronLeftIcon,
   ChevronRightIcon,
   HashIcon,
   ListFilterIcon,
@@ -21,6 +22,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { useCategories, useTags } from "../hooks";
 import type { TransactionKind } from "../types";
 
@@ -105,7 +107,6 @@ export function TransactionFilterBar({
           <Button
             type="button"
             variant="ghost"
-            size="sm"
             data-testid="transaction-filter-clear"
             onClick={() =>
               onChange({
@@ -153,11 +154,28 @@ function AddFilterPopover({
   value: TransactionFilterState;
   onChange: (next: TransactionFilterState) => void;
 }) {
+  const isMobile = useIsMobile();
   const [hovered, setHovered] = useState<FilterKey>(filters[0] ?? "date");
+  const [mobileView, setMobileView] = useState<"menu" | "editor">("menu");
 
   useEffect(() => {
-    if (!open) setHovered(filters[0] ?? "date");
+    if (!open) {
+      setHovered(filters[0] ?? "date");
+      setMobileView("menu");
+    }
   }, [open, filters]);
+
+  useEffect(() => {
+    if (!isMobile) setMobileView("menu");
+  }, [isMobile]);
+
+  function selectFilter(key: FilterKey) {
+    setHovered(key);
+    if (isMobile) setMobileView("editor");
+  }
+
+  const showMenu = !isMobile || mobileView === "menu";
+  const showEditor = !isMobile || mobileView === "editor";
 
   return (
     <Popover open={open} onOpenChange={onOpenChange}>
@@ -165,7 +183,6 @@ function AddFilterPopover({
         <Button
           type="button"
           variant="outline"
-          size="sm"
           data-testid="transaction-filter-add"
         >
           <ListFilterIcon className="size-4" />
@@ -175,40 +192,67 @@ function AddFilterPopover({
       </PopoverTrigger>
       <PopoverContent
         align="start"
-        className="flex w-auto gap-0 overflow-hidden p-0"
+        className="flex w-auto max-w-[calc(100vw-2rem)] gap-0 overflow-hidden p-0"
       >
-        <ul className="flex w-48 flex-col border-r border-border py-1">
-          {filters.map((key) => {
-            const Icon = FILTER_ICONS[key];
-            return (
-              <li key={key}>
-                <button
-                  type="button"
-                  data-testid={`transaction-filter-add-${key}`}
-                  onMouseEnter={() => setHovered(key)}
-                  onFocus={() => setHovered(key)}
-                  className={
-                    hovered === key
-                      ? "flex w-full items-center gap-2 bg-accent px-3 py-1.5 text-left text-sm"
-                      : "flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm hover:bg-accent/50"
-                  }
-                >
-                  <Icon className="size-4 opacity-70" />
-                  <span className="flex-1">{FILTER_LABELS[key]}</span>
-                  <ChevronRightIcon className="size-4 opacity-40" />
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-        <div className="min-w-[18rem] p-2">
-          <FilterEditor
-            filter={hovered}
-            value={value}
-            onChange={onChange}
-            onApplied={() => onOpenChange(false)}
-          />
-        </div>
+        {showMenu ? (
+          <ul
+            className={
+              isMobile
+                ? "flex w-64 flex-col py-1"
+                : "flex w-48 flex-col border-r border-border py-1"
+            }
+          >
+            {filters.map((key) => {
+              const Icon = FILTER_ICONS[key];
+              const highlighted = !isMobile && hovered === key;
+              return (
+                <li key={key}>
+                  <button
+                    type="button"
+                    data-testid={`transaction-filter-add-${key}`}
+                    onMouseEnter={isMobile ? undefined : () => setHovered(key)}
+                    onFocus={isMobile ? undefined : () => setHovered(key)}
+                    onClick={() => selectFilter(key)}
+                    className={
+                      highlighted
+                        ? "flex w-full items-center gap-2 bg-accent px-3 py-1.5 text-left text-sm"
+                        : "flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm hover:bg-accent/50"
+                    }
+                  >
+                    <Icon className="size-4 opacity-70" />
+                    <span className="flex-1">{FILTER_LABELS[key]}</span>
+                    <ChevronRightIcon className="size-4 opacity-40" />
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        ) : null}
+        {showEditor ? (
+          <div
+            className={
+              isMobile ? "flex w-full flex-col p-2" : "min-w-[18rem] p-2"
+            }
+          >
+            {isMobile ? (
+              <button
+                type="button"
+                aria-label="Back to filters"
+                onClick={() => setMobileView("menu")}
+                className="mb-2 flex items-center gap-1 self-start rounded-sm px-2 py-1 text-sm text-muted-foreground hover:bg-accent/40 hover:text-foreground"
+              >
+                <ChevronLeftIcon className="size-4" />
+                {FILTER_LABELS[hovered]}
+              </button>
+            ) : null}
+            <FilterEditor
+              filter={hovered}
+              value={value}
+              onChange={onChange}
+              onApplied={() => onOpenChange(false)}
+            />
+          </div>
+        ) : null}
       </PopoverContent>
     </Popover>
   );
@@ -294,7 +338,10 @@ function FilterChip({ filter, value, onChange, onRemove }: FilterChipProps) {
             <span className="text-muted-foreground">{summary}</span>
           </button>
         </PopoverTrigger>
-        <PopoverContent className="w-auto p-2" align="start">
+        <PopoverContent
+          className="w-auto max-w-[calc(100vw-2rem)] p-2"
+          align="start"
+        >
           <FilterEditor
             filter={filter}
             value={value}
