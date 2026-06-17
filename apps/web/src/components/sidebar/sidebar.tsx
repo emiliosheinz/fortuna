@@ -175,6 +175,11 @@ function IdentityPopover({ me }: { me: CurrentUser }) {
             sideOffset={8}
             className="w-48"
             data-testid="sidebar-identity-menu"
+            // The mobile sidebar renders inside a Radix Sheet whose trapped
+            // FocusScope bounces focus back into the dialog on open; that
+            // focusin lands outside this portaled content and would otherwise
+            // trigger the dropdown's auto-dismiss.
+            onFocusOutside={(event) => event.preventDefault()}
           >
             <IdentityMenuLink
               href="/settings/account"
@@ -265,6 +270,8 @@ function ThemeToggle() {
         side="right"
         sideOffset={8}
         data-testid="sidebar-theme-menu"
+        // See identity popover above — same FocusScope-vs-portal interaction.
+        onFocusOutside={(event) => event.preventDefault()}
       >
         <DropdownMenuItem
           data-testid="theme-light"
