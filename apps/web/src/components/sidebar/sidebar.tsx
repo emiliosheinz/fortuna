@@ -112,6 +112,7 @@ function useCloseMobileSidebarOnNavigate() {
 
 function SidebarNavItem({ item }: { item: NavItem }) {
   const pathname = usePathname();
+  const { isMobile, setOpenMobile } = useSidebar();
   const isActive =
     pathname === item.href ||
     (item.href !== "/" && pathname?.startsWith(item.href));
@@ -127,6 +128,9 @@ function SidebarNavItem({ item }: { item: NavItem }) {
           href={item.href}
           data-testid={`sidebar-nav-${item.label.toLowerCase()}`}
           aria-current={isActive ? "page" : undefined}
+          onClick={() => {
+            if (isMobile) setOpenMobile(false);
+          }}
         >
           <Icon aria-hidden />
           <span className="transition-opacity duration-200 group-data-[collapsible=icon]:opacity-0">
@@ -239,9 +243,15 @@ function IdentityMenuLink({
   icon: IconComponent;
   testId: string;
 }) {
+  const { isMobile, setOpenMobile } = useSidebar();
   return (
     <DropdownMenuItem asChild data-testid={testId}>
-      <Link href={href}>
+      <Link
+        href={href}
+        onClick={() => {
+          if (isMobile) setOpenMobile(false);
+        }}
+      >
         <Icon className="mr-2 size-4" aria-hidden />
         {label}
       </Link>
