@@ -1,0 +1,37 @@
+---
+# Single source of truth for paths and identities the host plane shares with
+# the deploy plane. Values referenced by both `site.yml` and `deploy.yml` live
+# here so they cannot drift between plays.
+
+deploy_user: deploy
+deploy_group: deploy
+
+# Compose project root on the host. Owned by `deploy:deploy`; the deploy
+# playbook ships docker-compose.prod.yaml, the docker/ tree, and the
+# materialized .env into this directory.
+fortuna_root: /opt/fortuna
+fortuna_compose_file: docker-compose.prod.yaml
+
+# Attached Hetzner Volume mounted before Docker installs so every named
+# volume in docker-compose.prod.yaml lands on it automatically.
+attached_volume_device: /dev/sdb
+attached_volume_mount: /var/lib/docker/volumes
+
+# Public subdomains served by the on-host nginx.
+public_web_domain: fortuna.emiliosheinz.com
+public_grafana_domain: grafana.fortuna.emiliosheinz.com
+
+# Inbound TCP ports allowed by host-level ufw. Mirrors the network-level
+# Hetzner Cloud Firewall.
+allowed_inbound_tcp_ports:
+  - 22
+  - 80
+  - 443
+
+# Sudoers entries the deploy user is allowed to invoke without a password.
+# Restricted to the compose lifecycle commands the deploy playbook needs.
+deploy_sudoers_commands:
+  - /usr/bin/docker
+  - /usr/bin/docker compose
+  - /usr/bin/systemctl restart docker
+  - /usr/bin/systemctl status docker

@@ -1,0 +1,16 @@
+---
+# Workstation-run host bring-up. Converges a fresh Hetzner CX23 to the
+# operational baseline described in `.specs/vps-deployment/TECHNICAL-DESIGN.md`.
+#
+# First-run bootstrap: pass `-u root` because the deploy user does not exist
+# yet. Subsequent runs use the inventory default (the deploy user).
+- name: Converge the Fortuna VPS
+  hosts: fortuna
+  gather_facts: true
+  any_errors_fatal: true
+  roles:
+    - role: common
+    - role: hardening
+    - role: volume_mount
+    - role: docker
+    - role: fx_smoke

@@ -1,0 +1,108 @@
+---
+- name: Refuse to run without a deploy public key path
+  ansible.builtin.assert:
+    that:
+      - hardening_deploy_ssh_public_key_path | length > 0
+    fail_msg: >-
+      `hardening_deploy_ssh_public_key_path` is empty. Pass the controller-side path
+      to the deploy user's authorized public key, e.g.
+      `-e hardening_deploy_ssh_public_key_path=~/.ssh/fortuna-vps.pub`.
+      Inline values via `-e key=value` get mangled by Ansible's parse_kv when they
+      contain spaces (which every SSH public key does).
+
+- name: Load the deploy public key from the controller
+  ansible.builtin.set_fact:
+    hardening_deploy_ssh_public_key: "{{ lookup('file', hardening_deploy_ssh_public_key_path) }}"
+
+- name: Ensure deploy group exists
+  become: true
+  ansible.builtin.group:
+    name: "{{ deploy_group }}"
+    state: present
+    system: false
+
+- name: Ensure deploy user exists
+  become: true
+  ansible.builtin.user:
+    name: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    shell: /bin/bash
+    create_home: true
+    state: present
+
+- name: Ensure deploy .ssh directory exists
+  become: true
+  ansible.builtin.file:
+    path: "/home/{{ deploy_user }}/.ssh"
+    state: directory
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: "0700"
+
+- name: Authorize the deploy public key
+  become: true
+  ansible.builtin.copy:
+    dest: "/home/{{ deploy_user }}/.ssh/authorized_keys"
+    content: "{{ hardening_deploy_ssh_public_key | trim }}\n"
+    owner: "{{ deploy_user }}"
+    group: "{{ deploy_group }}"
+    mode: "0600"
+
+- name: Drop the restricted sudoers entry for deploy
+  become: true
+  ansible.builtin.copy:
+    dest: /etc/sudoers.d/deploy
+    owner: root
+    group: root
+    mode: "0440"
+    content: |
+      # Managed by Ansible (role: hardening). Do not edit by hand.
+      {{ deploy_user }} ALL=(root) NOPASSWD: {{ deploy_sudoers_commands | join(', ') }}
+    validate: "visudo -cf %s"
+
+- name: Drop the SSH hardening config
+  become: true
+  ansible.builtin.copy:
+    dest: /etc/ssh/sshd_config.d/99-fortuna-hardening.conf
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      # Managed by Ansible (role: hardening). Do not edit by hand.
+      # Root login is key-only ("prohibit-password"), not disabled, so that the
+      # workstation-run site.yml and certbot-bootstrap.yml plays remain re-runnable.
+      # The deploy user keeps its narrow NOPASSWD sudoers entry for the bot path.
+      PermitRootLogin prohibit-password
+      PasswordAuthentication no
+      KbdInteractiveAuthentication no
+      ChallengeResponseAuthentication no
+      UsePAM yes
+      X11Forwarding no
+      AllowUsers root {{ deploy_user }}
+      MaxAuthTries 3
+      LoginGraceTime 30
+      ClientAliveInterval 60
+      ClientAliveCountMax 3
+    validate: "sshd -t -f %s"
+  notify: Restart sshd
+
+- name: Allow inbound TCP ports from the design
+  become: true
+  community.general.ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: tcp
+  loop: "{{ allowed_inbound_tcp_ports }}"
+
+- name: Allow outbound by default
+  become: true
+  community.general.ufw:
+    direction: outgoing
+    policy: allow
+
+- name: Enable ufw with default deny inbound
+  become: true
+  community.general.ufw:
+    state: enabled
+    direction: incoming
+    policy: deny

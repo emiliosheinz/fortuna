@@ -152,9 +152,73 @@ jobs:
           docker buildx imagetools create -t "$IMAGE:$VERSION" -t "$IMAGE:latest" \
             "$IMAGE:$VERSION-amd64" "$IMAGE:$VERSION-arm64"
 
+  deploy:
+    name: Deploy to production
+    needs: [setup, manifest]
+    if: needs.setup.outputs.type == 'app'
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://fortuna.emiliosheinz.com
+    # Queue every production deploy so two tag pushes can't race the
+    # compose lifecycle commands against the host.
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 1
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+      - name: Materialize .env from the production Environment
+        uses: ./.github/actions/write-env-from-github
+        with:
+          vars: ${{ toJSON(vars) }}
+          secrets: ${{ toJSON(secrets) }}
+      - name: Install Ansible
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install 'ansible-core==2.17.7'
+      - name: Install Ansible collections
+        working-directory: ansible
+        run: ansible-galaxy collection install -r requirements.yml
+      - name: Prepare SSH identity and known_hosts
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          # DEPLOY_HOST_KEY must be a full known_hosts line, e.g.
+          #   <ip> ssh-ed25519 AAAAC3Nz...
+          # Captured once at host bring-up via `ssh-keyscan -t ed25519 <ip>`.
+          DEPLOY_HOST_KEY: ${{ vars.DEPLOY_HOST_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          printf '%s\n' "$DEPLOY_HOST_KEY" > ~/.ssh/known_hosts
+          chmod 644 ~/.ssh/known_hosts
+      - name: Run deploy playbook
+        working-directory: ansible
+        env:
+          DEPLOY_SSH_HOST: ${{ vars.DEPLOY_SSH_HOST }}
+          DEPLOY_SSH_USER: ${{ vars.DEPLOY_SSH_USER }}
+        run: |
+          ansible-playbook deploy.yml \
+            --private-key ~/.ssh/id_deploy \
+            -e env_file="${GITHUB_WORKSPACE}/.env"
+      - name: Append deploy status to summary
+        if: always()
+        run: |
+          {
+            echo "## Deploy"
+            echo "- Target: \`fortuna.emiliosheinz.com\`"
+            echo "- Tag: \`${{ needs.setup.outputs.tag }}\`"
+            echo "- Result: \`${{ job.status }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
   summary:
     name: Write output
-    needs: [setup, npm, docker, manifest]
+    needs: [setup, npm, docker, manifest, deploy]
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -171,4 +235,5 @@ jobs:
             echo "- npm: \`${{ needs.npm.result || 'skipped' }}\`"
             echo "- docker matrix: \`${{ needs.docker.result || 'skipped' }}\`"
             echo "- manifest: \`${{ needs.manifest.result || 'skipped' }}\`"
+            echo "- deploy: \`${{ needs.deploy.result || 'skipped' }}\`"
           } >> "$GITHUB_STEP_SUMMARY"
