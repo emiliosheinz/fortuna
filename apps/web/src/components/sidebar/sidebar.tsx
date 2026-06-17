@@ -139,6 +139,7 @@ function SidebarNavItem({ item }: { item: NavItem }) {
 }
 
 function IdentityPopover({ me }: { me: CurrentUser }) {
+  const { isMobile } = useSidebar();
   const signOutMutation = useMutation({
     mutationFn: signOut,
     onSuccess: () => navigateTo(CLEAR_SESSION_PATH),
@@ -171,7 +172,7 @@ function IdentityPopover({ me }: { me: CurrentUser }) {
           </DropdownMenuTrigger>
           <DropdownMenuContent
             align="start"
-            side="right"
+            side={isMobile ? "bottom" : "right"}
             sideOffset={8}
             className="w-48"
             data-testid="sidebar-identity-menu"
@@ -251,6 +252,7 @@ function IdentityMenuLink({
 
 function ThemeToggle() {
   const { setTheme } = useTheme();
+  const { isMobile } = useSidebar();
   return (
     <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>
@@ -267,7 +269,7 @@ function ThemeToggle() {
       </DropdownMenuTrigger>
       <DropdownMenuContent
         align="start"
-        side="right"
+        side={isMobile ? "top" : "right"}
         sideOffset={8}
         data-testid="sidebar-theme-menu"
         // See identity popover above — same FocusScope-vs-portal interaction.
