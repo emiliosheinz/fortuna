@@ -283,23 +283,20 @@ function ThemeToggle() {
         // See identity popover above — same FocusScope-vs-portal interaction.
         onFocusOutside={(event) => event.preventDefault()}
       >
-        <DropdownMenuItem
-          data-testid="theme-light"
-          onSelect={() => setTheme("light")}
-        >
-          <SunIcon className="mr-2 size-4" aria-hidden /> Light
+        <DropdownMenuItem asChild data-testid="theme-light">
+          <button type="button" onClick={() => setTheme("light")}>
+            <SunIcon className="mr-2 size-4" aria-hidden /> Light
+          </button>
         </DropdownMenuItem>
-        <DropdownMenuItem
-          data-testid="theme-dark"
-          onSelect={() => setTheme("dark")}
-        >
-          <MoonIcon className="mr-2 size-4" aria-hidden /> Dark
+        <DropdownMenuItem asChild data-testid="theme-dark">
+          <button type="button" onClick={() => setTheme("dark")}>
+            <MoonIcon className="mr-2 size-4" aria-hidden /> Dark
+          </button>
         </DropdownMenuItem>
-        <DropdownMenuItem
-          data-testid="theme-system"
-          onSelect={() => setTheme("system")}
-        >
-          <LaptopMinimalIcon className="mr-2 size-4" aria-hidden /> System
+        <DropdownMenuItem asChild data-testid="theme-system">
+          <button type="button" onClick={() => setTheme("system")}>
+            <LaptopMinimalIcon className="mr-2 size-4" aria-hidden /> System
+          </button>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

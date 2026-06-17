@@ -198,6 +198,33 @@ describe("Sidebar", () => {
     expect(setThemeMock).toHaveBeenCalledWith("dark");
   });
 
+  it("changes theme when a theme menu item is tapped inside the mobile sheet", async () => {
+    useIsMobileMock.mockReturnValue(true);
+
+    const client = new QueryClient({
+      defaultOptions: { mutations: { retry: false } },
+    });
+
+    render(
+      <QueryClientProvider client={client}>
+        <SidebarProvider>
+          <MobileHeader />
+          <Sidebar me={me} />
+        </SidebarProvider>
+      </QueryClientProvider>,
+    );
+
+    fireEvent.click(screen.getByTestId("mobile-sidebar-trigger"));
+
+    const trigger = await screen.findByTestId("sidebar-theme-toggle");
+    trigger.focus();
+    fireEvent.keyDown(trigger, { key: "Enter" });
+
+    fireEvent.click(await screen.findByTestId("theme-dark"));
+
+    expect(setThemeMock).toHaveBeenCalledWith("dark");
+  });
+
   it("flips the collapse toggle's aria-pressed and label when clicked", async () => {
     renderSidebar({ defaultOpen: true });
 
