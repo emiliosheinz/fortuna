@@ -227,6 +227,66 @@ describe("Sidebar", () => {
     expect(toggle).toHaveAttribute("aria-label", "Expand sidebar");
   });
 
+  it("dismisses the mobile sheet when tapping an identity dropdown link", async () => {
+    useIsMobileMock.mockReturnValue(true);
+    usePathnameMock.mockReturnValue("/settings/account");
+
+    const client = new QueryClient({
+      defaultOptions: { mutations: { retry: false } },
+    });
+
+    render(
+      <QueryClientProvider client={client}>
+        <SidebarProvider>
+          <MobileHeader />
+          <Sidebar me={me} />
+        </SidebarProvider>
+      </QueryClientProvider>,
+    );
+
+    fireEvent.click(screen.getByTestId("mobile-sidebar-trigger"));
+
+    openIdentityMenu();
+
+    fireEvent.click(await screen.findByTestId("identity-menu-account"));
+
+    await waitFor(() =>
+      expect(
+        screen.queryByTestId("sidebar-nav-transactions"),
+      ).not.toBeInTheDocument(),
+    );
+  });
+
+  it("dismisses the mobile sheet when tapping the current route's nav link", async () => {
+    useIsMobileMock.mockReturnValue(true);
+    usePathnameMock.mockReturnValue("/transactions");
+
+    const client = new QueryClient({
+      defaultOptions: { mutations: { retry: false } },
+    });
+
+    render(
+      <QueryClientProvider client={client}>
+        <SidebarProvider>
+          <MobileHeader />
+          <Sidebar me={me} />
+        </SidebarProvider>
+      </QueryClientProvider>,
+    );
+
+    fireEvent.click(screen.getByTestId("mobile-sidebar-trigger"));
+
+    const link = await screen.findByTestId("sidebar-nav-transactions");
+
+    fireEvent.click(link);
+
+    await waitFor(() =>
+      expect(
+        screen.queryByTestId("sidebar-nav-transactions"),
+      ).not.toBeInTheDocument(),
+    );
+  });
+
   it("dismisses the mobile sheet after navigating to a new route", async () => {
     useIsMobileMock.mockReturnValue(true);
 
