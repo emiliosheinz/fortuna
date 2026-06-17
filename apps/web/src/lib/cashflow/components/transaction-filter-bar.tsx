@@ -229,20 +229,16 @@ function AddFilterPopover({
           </ul>
         ) : null}
         {showEditor ? (
-          <div
-            className={
-              isMobile ? "flex w-full flex-col p-2" : "min-w-[18rem] p-2"
-            }
-          >
+          <div className={isMobile ? "flex w-full flex-col p-2" : "p-2"}>
             {isMobile ? (
               <button
                 type="button"
                 aria-label="Back to filters"
                 onClick={() => setMobileView("menu")}
-                className="mb-2 flex items-center gap-1 self-start rounded-sm px-2 py-1 text-sm text-muted-foreground hover:bg-accent/40 hover:text-foreground"
+                className="-ml-1 mb-1 flex h-7 items-center gap-1 self-start rounded-sm px-2 text-sm font-medium text-foreground hover:bg-accent/40"
               >
-                <ChevronLeftIcon className="size-4" />
-                {FILTER_LABELS[hovered]}
+                <ChevronLeftIcon className="size-4 shrink-0" />
+                <span className="leading-none">{FILTER_LABELS[hovered]}</span>
               </button>
             ) : null}
             <FilterEditor
