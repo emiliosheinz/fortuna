@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { cashflowApi } from "../../api-client";
 import {
   TransactionFilterBar,
@@ -13,12 +14,17 @@ jest.mock("../../api-client", () => ({
   },
 }));
 
+jest.mock("@/hooks/use-mobile", () => ({
+  useIsMobile: jest.fn(),
+}));
+
 const listCategoriesMock = cashflowApi.listCategories as jest.MockedFunction<
   typeof cashflowApi.listCategories
 >;
 const listTagsMock = cashflowApi.listTags as jest.MockedFunction<
   typeof cashflowApi.listTags
 >;
+const useIsMobileMock = useIsMobile as jest.MockedFunction<typeof useIsMobile>;
 
 const emptyState: TransactionFilterState = {
   from: null,
@@ -61,6 +67,7 @@ describe("TransactionFilterBar", () => {
     listTagsMock.mockResolvedValue({
       items: [{ id: "tag-travel", name: "travel" }],
     });
+    useIsMobileMock.mockReturnValue(false);
   });
 
   it("commits the search input after the debounce window", async () => {
@@ -132,5 +139,53 @@ describe("TransactionFilterBar", () => {
       ...emptyState,
       categoryId: "cat-food",
     });
+  });
+
+  it("shows only the filter list on mobile and reveals the editor via drill-down", () => {
+    useIsMobileMock.mockReturnValue(true);
+    renderBar();
+
+    fireEvent.click(screen.getByTestId("transaction-filter-add"));
+
+    expect(
+      screen.getByTestId("transaction-filter-add-date"),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByTestId("transaction-filter-date-editor"),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByTestId("transaction-filter-add-date"));
+
+    expect(
+      screen.getByTestId("transaction-filter-date-editor"),
+    ).toBeInTheDocument();
+    const back = screen.getByRole("button", { name: /back to filters/i });
+    expect(back).toBeInTheDocument();
+    expect(
+      screen.queryByTestId("transaction-filter-add-date"),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(back);
+
+    expect(
+      screen.getByTestId("transaction-filter-add-date"),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByTestId("transaction-filter-date-editor"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("keeps the menu and editor side by side on desktop", () => {
+    useIsMobileMock.mockReturnValue(false);
+    renderBar();
+
+    fireEvent.click(screen.getByTestId("transaction-filter-add"));
+
+    expect(
+      screen.getByTestId("transaction-filter-add-date"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByTestId("transaction-filter-date-editor"),
+    ).toBeInTheDocument();
   });
 });
