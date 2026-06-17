@@ -39,21 +39,21 @@ export function ThemeSwitcher() {
         <DropdownMenuItem
           role="menuitem"
           data-testid="theme-light"
-          onClick={() => setTheme("light")}
+          onSelect={() => setTheme("light")}
         >
           <SunIcon aria-hidden /> Light
         </DropdownMenuItem>
         <DropdownMenuItem
           role="menuitem"
           data-testid="theme-dark"
-          onClick={() => setTheme("dark")}
+          onSelect={() => setTheme("dark")}
         >
           <MoonIcon aria-hidden /> Dark
         </DropdownMenuItem>
         <DropdownMenuItem
           role="menuitem"
           data-testid="theme-system"
-          onClick={() => setTheme("system")}
+          onSelect={() => setTheme("system")}
         >
           <LaptopMinimalIcon aria-hidden /> System
         </DropdownMenuItem>

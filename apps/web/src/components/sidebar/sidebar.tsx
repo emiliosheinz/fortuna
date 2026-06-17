@@ -285,19 +285,19 @@ function ThemeToggle() {
       >
         <DropdownMenuItem
           data-testid="theme-light"
-          onClick={() => setTheme("light")}
+          onSelect={() => setTheme("light")}
         >
           <SunIcon className="mr-2 size-4" aria-hidden /> Light
         </DropdownMenuItem>
         <DropdownMenuItem
           data-testid="theme-dark"
-          onClick={() => setTheme("dark")}
+          onSelect={() => setTheme("dark")}
         >
           <MoonIcon className="mr-2 size-4" aria-hidden /> Dark
         </DropdownMenuItem>
         <DropdownMenuItem
           data-testid="theme-system"
-          onClick={() => setTheme("system")}
+          onSelect={() => setTheme("system")}
         >
           <LaptopMinimalIcon className="mr-2 size-4" aria-hidden /> System
         </DropdownMenuItem>
