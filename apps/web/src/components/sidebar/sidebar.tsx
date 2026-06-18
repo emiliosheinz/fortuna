@@ -292,17 +292,29 @@ function ThemeToggle() {
         }}
       >
         <DropdownMenuItem asChild data-testid="theme-light">
-          <button type="button" onClick={() => setTheme("light")}>
+          <button
+            type="button"
+            onClick={() => setTheme("light")}
+            className="w-full"
+          >
             <SunIcon className="mr-2 size-4" aria-hidden /> Light
           </button>
         </DropdownMenuItem>
         <DropdownMenuItem asChild data-testid="theme-dark">
-          <button type="button" onClick={() => setTheme("dark")}>
+          <button
+            type="button"
+            onClick={() => setTheme("dark")}
+            className="w-full"
+          >
             <MoonIcon className="mr-2 size-4" aria-hidden /> Dark
           </button>
         </DropdownMenuItem>
         <DropdownMenuItem asChild data-testid="theme-system">
-          <button type="button" onClick={() => setTheme("system")}>
+          <button
+            type="button"
+            onClick={() => setTheme("system")}
+            className="w-full"
+          >
             <LaptopMinimalIcon className="mr-2 size-4" aria-hidden /> System
           </button>
         </DropdownMenuItem>
