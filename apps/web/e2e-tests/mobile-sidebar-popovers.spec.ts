@@ -53,4 +53,20 @@ test.describe("Mobile sidebar popovers", () => {
     await expect(themeMenu).toBeVisible();
     await expectWithinViewport(page, themeMenu);
   });
+
+  test("tapping a theme option applies the theme to <html>", async ({
+    page,
+  }) => {
+    await signInWithGoogle(page, "Mobile Sidebar User");
+
+    await page.getByTestId("mobile-sidebar-trigger").tap();
+    await expect(page.locator('[data-mobile="true"]')).toBeVisible();
+
+    await page.getByTestId("sidebar-theme-toggle").tap();
+    await expect(page.getByTestId("sidebar-theme-menu")).toBeVisible();
+
+    await page.getByTestId("theme-dark").tap();
+
+    await expect(page.locator("html")).toHaveClass(/(^|\s)dark(\s|$)/);
+  });
 });
