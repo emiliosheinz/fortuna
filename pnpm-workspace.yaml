@@ -21,3 +21,13 @@ catalog:
   typescript: 6.0.3
 
 injectWorkspacePackages: true
+
+# Radix Dialog and Radix Menu both bundle react-dismissable-layer but at
+# slightly different patch versions (1.1.11 vs 1.1.12). Each version's
+# React context is its own module instance, so a Sheet (Dialog) and a
+# DropdownMenu inside it cannot see each other's layers. The Sheet sets
+# body.style.pointerEvents = "none" and the dropdown never knows to apply
+# its own pointerEvents: auto override -- taps fall through the dropdown
+# to the Sheet behind. Pin to one version to force a single context.
+overrides:
+  '@radix-ui/react-dismissable-layer': 1.1.12
