@@ -143,6 +143,7 @@ function SidebarNavItem({ item }: { item: NavItem }) {
 }
 
 function IdentityPopover({ me }: { me: CurrentUser }) {
+  const { isMobile } = useSidebar();
   const signOutMutation = useMutation({
     mutationFn: signOut,
     onSuccess: () => navigateTo(CLEAR_SESSION_PATH),
@@ -182,8 +183,11 @@ function IdentityPopover({ me }: { me: CurrentUser }) {
             // The mobile sidebar renders inside a Radix Sheet whose trapped
             // FocusScope bounces focus back into the dialog on open; that
             // focusin lands outside this portaled content and would otherwise
-            // trigger the dropdown's auto-dismiss.
-            onFocusOutside={(event) => event.preventDefault()}
+            // trigger the dropdown's auto-dismiss. Desktop has no Sheet, so
+            // let focus-outside dismiss normally there (e.g., Tab to leave).
+            onFocusOutside={(event) => {
+              if (isMobile) event.preventDefault();
+            }}
           >
             <IdentityMenuLink
               href="/settings/account"
@@ -261,6 +265,7 @@ function IdentityMenuLink({
 
 function ThemeToggle() {
   const { setTheme } = useTheme();
+  const { isMobile } = useSidebar();
   return (
     <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>
@@ -280,8 +285,11 @@ function ThemeToggle() {
         side="top"
         sideOffset={8}
         data-testid="sidebar-theme-menu"
-        // See identity popover above — same FocusScope-vs-portal interaction.
-        onFocusOutside={(event) => event.preventDefault()}
+        // See identity popover above: same FocusScope-vs-portal interaction,
+        // and only mobile renders inside the Sheet.
+        onFocusOutside={(event) => {
+          if (isMobile) event.preventDefault();
+        }}
       >
         <DropdownMenuItem asChild data-testid="theme-light">
           <button type="button" onClick={() => setTheme("light")}>

@@ -18,15 +18,22 @@ test.use({
 });
 
 async function expectWithinViewport(page: Page, locator: Locator) {
+  // boundingBox() returns sub-pixel values; a 1px tolerance absorbs cross-browser
+  // rounding without masking real overflows (which are visibly off by many px).
+  const SUBPIXEL_TOLERANCE = 1;
   const viewport = page.viewportSize();
   expect(viewport).not.toBeNull();
   const box = await locator.boundingBox();
   expect(box).not.toBeNull();
   if (!box || !viewport) return;
-  expect(box.x).toBeGreaterThanOrEqual(0);
-  expect(box.y).toBeGreaterThanOrEqual(0);
-  expect(box.x + box.width).toBeLessThanOrEqual(viewport.width);
-  expect(box.y + box.height).toBeLessThanOrEqual(viewport.height);
+  expect(box.x).toBeGreaterThanOrEqual(-SUBPIXEL_TOLERANCE);
+  expect(box.y).toBeGreaterThanOrEqual(-SUBPIXEL_TOLERANCE);
+  expect(box.x + box.width).toBeLessThanOrEqual(
+    viewport.width + SUBPIXEL_TOLERANCE,
+  );
+  expect(box.y + box.height).toBeLessThanOrEqual(
+    viewport.height + SUBPIXEL_TOLERANCE,
+  );
 }
 
 test.describe("Mobile sidebar popovers", () => {
