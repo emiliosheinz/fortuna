@@ -1,12 +1,14 @@
 "use client";
 
 import { PencilIcon, TrashIcon } from "lucide-react";
-import { useId, useState } from "react";
+import { useId, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import {
   ResponsiveDialog,
   ResponsiveDialogContent,
   ResponsiveDialogHeader,
   ResponsiveDialogTitle,
+  useResponsiveDialogScrollIntoView,
 } from "@/components/responsive-dialog";
 import { Button } from "@/components/ui/button";
 import {
@@ -36,6 +38,8 @@ export function CategoriesManager() {
   const [createError, setCreateError] = useState<string | null>(null);
   const [editing, setEditing] = useState<Category | null>(null);
   const [deleting, setDeleting] = useState<Category | null>(null);
+  const createErrorRef = useRef<HTMLParagraphElement | null>(null);
+  const scrollIntoView = useResponsiveDialogScrollIntoView();
 
   async function handleCreate(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -46,11 +50,12 @@ export function CategoriesManager() {
       await createMutation.mutateAsync(trimmed);
       setName("");
     } catch (err) {
-      setCreateError(
+      const message =
         err instanceof ApiError && err.status === 409
           ? "A category with that name already exists."
-          : "Could not create category. Try again.",
-      );
+          : "Could not create category. Try again.";
+      flushSync(() => setCreateError(message));
+      scrollIntoView(createErrorRef.current);
     }
   }
 
@@ -72,7 +77,11 @@ export function CategoriesManager() {
         </Button>
       </form>
       {createError ? (
-        <p role="alert" className="text-sm text-destructive">
+        <p
+          ref={createErrorRef}
+          role="alert"
+          className="text-sm text-destructive"
+        >
           {createError}
         </p>
       ) : null}
@@ -152,6 +161,8 @@ function RenameCategoryDialog({
   const inputId = useId();
   const [name, setName] = useState(category.name);
   const [error, setError] = useState<string | null>(null);
+  const errorRef = useRef<HTMLParagraphElement | null>(null);
+  const scrollIntoView = useResponsiveDialogScrollIntoView();
   const mutation = useRenameCategory();
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -163,11 +174,12 @@ function RenameCategoryDialog({
       await mutation.mutateAsync({ id: category.id, name: trimmed });
       onClose();
     } catch (err) {
-      setError(
+      const message =
         err instanceof ApiError && err.status === 409
           ? "A category with that name already exists."
-          : "Could not rename category. Try again.",
-      );
+          : "Could not rename category. Try again.";
+      flushSync(() => setError(message));
+      scrollIntoView(errorRef.current);
     }
   }
 
@@ -189,7 +201,7 @@ function RenameCategoryDialog({
             onChange={(e) => setName(e.target.value)}
           />
           {error ? (
-            <p role="alert" className="text-sm text-destructive">
+            <p ref={errorRef} role="alert" className="text-sm text-destructive">
               {error}
             </p>
           ) : null}

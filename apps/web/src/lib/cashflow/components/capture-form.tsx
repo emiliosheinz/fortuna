@@ -2,7 +2,8 @@
 
 import { format, parseISO } from "date-fns";
 import { CalendarIcon, MinusIcon, PlusIcon } from "lucide-react";
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { KeyboardSafeCombobox } from "@/components/keyboard-safe-combobox";
 import {
   KeyboardSafePopover,
@@ -16,6 +17,7 @@ import {
   KeyboardSafeSelectTrigger,
   KeyboardSafeSelectValue,
 } from "@/components/keyboard-safe-select";
+import { useResponsiveDialogScrollIntoView } from "@/components/responsive-dialog";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
@@ -75,7 +77,14 @@ export function CaptureForm({ baseCurrency, onCaptured }: CaptureFormProps) {
   >({});
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [calendarOpen, setCalendarOpen] = useState(false);
+  const submitErrorRef = useRef<HTMLParagraphElement | null>(null);
+  const scrollIntoView = useResponsiveDialogScrollIntoView();
   const mutation = useCreateTransaction();
+
+  function showSubmitError(message: string) {
+    flushSync(() => setSubmitError(message));
+    scrollIntoView(submitErrorRef.current);
+  }
 
   function update<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -127,11 +136,11 @@ export function CaptureForm({ baseCurrency, onCaptured }: CaptureFormProps) {
       }));
       onCaptured?.();
     } catch (err) {
-      if (err instanceof ApiError && err.status === 400) {
-        setSubmitError("The server rejected the payload. Check the fields.");
-      } else {
-        setSubmitError("Could not save the transaction. Try again.");
-      }
+      showSubmitError(
+        err instanceof ApiError && err.status === 400
+          ? "The server rejected the payload. Check the fields."
+          : "Could not save the transaction. Try again.",
+      );
     }
   }
 
@@ -279,6 +288,7 @@ export function CaptureForm({ baseCurrency, onCaptured }: CaptureFormProps) {
 
       {submitError ? (
         <p
+          ref={submitErrorRef}
           data-testid="capture-form-submit-error"
           role="alert"
           className="text-sm text-destructive"

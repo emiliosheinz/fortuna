@@ -1,4 +1,5 @@
 import { act, render, screen } from "@testing-library/react";
+import * as React from "react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import {
   ResponsiveDialog,
@@ -6,6 +7,7 @@ import {
   ResponsiveDialogDescription,
   ResponsiveDialogHeader,
   ResponsiveDialogTitle,
+  useResponsiveDialogScrollIntoView,
 } from "../responsive-dialog";
 
 jest.mock("@/hooks/use-mobile", () => ({ useIsMobile: jest.fn() }));
@@ -99,5 +101,77 @@ describe("ResponsiveDialog", () => {
     } finally {
       jest.useRealTimers();
     }
+  });
+
+  it("exposes a scrollIntoView helper that centers the target node", () => {
+    useIsMobileMock.mockReturnValue(true);
+
+    function Consumer() {
+      const scrollIntoView = useResponsiveDialogScrollIntoView();
+      const ref = React.useRef<HTMLDivElement>(null);
+      return (
+        <>
+          <button
+            type="button"
+            data-testid="scroll-trigger"
+            onClick={() => scrollIntoView(ref.current)}
+          >
+            scroll
+          </button>
+          <div data-testid="error" ref={ref}>
+            error
+          </div>
+        </>
+      );
+    }
+
+    render(
+      <ResponsiveDialog open onOpenChange={() => undefined}>
+        <ResponsiveDialogContent>
+          <Consumer />
+        </ResponsiveDialogContent>
+      </ResponsiveDialog>,
+    );
+
+    const error = screen.getByTestId("error");
+    const scrollIntoView = jest.fn();
+    error.scrollIntoView = scrollIntoView;
+
+    act(() => {
+      screen.getByTestId("scroll-trigger").click();
+    });
+
+    expect(scrollIntoView).toHaveBeenCalledTimes(1);
+    expect(scrollIntoView).toHaveBeenCalledWith({
+      block: "center",
+      behavior: "smooth",
+    });
+  });
+
+  it("scrollIntoView helper is a no-op when the node is null", () => {
+    useIsMobileMock.mockReturnValue(false);
+
+    function Consumer() {
+      const scrollIntoView = useResponsiveDialogScrollIntoView();
+      return (
+        <button
+          type="button"
+          data-testid="scroll-trigger"
+          onClick={() => scrollIntoView(null)}
+        >
+          scroll
+        </button>
+      );
+    }
+
+    render(
+      <ResponsiveDialog open onOpenChange={() => undefined}>
+        <ResponsiveDialogContent>
+          <Consumer />
+        </ResponsiveDialogContent>
+      </ResponsiveDialog>,
+    );
+
+    expect(() => screen.getByTestId("scroll-trigger").click()).not.toThrow();
   });
 });

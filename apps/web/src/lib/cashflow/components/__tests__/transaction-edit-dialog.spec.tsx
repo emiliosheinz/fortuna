@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { ApiError } from "@/lib/api-client";
 import { cashflowApi } from "../../api-client";
 import type { Transaction } from "../../types";
 import { TransactionEditDialog } from "../transaction-edit-dialog";
@@ -79,6 +80,35 @@ describe("TransactionEditDialog", () => {
     renderDialog();
     const dialog = screen.getByRole("dialog");
     expect(dialog).toHaveAttribute("data-slot", "dialog-content");
+  });
+
+  it("scrolls the save error into view when the API rejects", async () => {
+    useIsMobileMock.mockReturnValue(false);
+    (cashflowApi.updateTransaction as jest.Mock).mockRejectedValue(
+      new ApiError(500),
+    );
+    const scrollIntoView = jest
+      .spyOn(Element.prototype, "scrollIntoView")
+      .mockImplementation(() => undefined);
+    try {
+      renderDialog();
+
+      fireEvent.submit(screen.getByTestId("transaction-edit-form"));
+
+      const errorEl = await screen.findByTestId("transaction-edit-error");
+      await waitFor(() => {
+        expect(scrollIntoView).toHaveBeenCalled();
+      });
+      const matchingCall = scrollIntoView.mock.calls.find(
+        (_call, idx) => scrollIntoView.mock.instances[idx] === errorEl,
+      );
+      expect(matchingCall?.[0]).toEqual({
+        block: "center",
+        behavior: "smooth",
+      });
+    } finally {
+      scrollIntoView.mockRestore();
+    }
   });
 
   it("dismisses the keyboard before opening the date popover", () => {
