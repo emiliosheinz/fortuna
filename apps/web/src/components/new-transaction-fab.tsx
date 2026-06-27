@@ -2,13 +2,13 @@
 
 import { PlusIcon } from "lucide-react";
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  ResponsiveDialog,
+  ResponsiveDialogContent,
+  ResponsiveDialogHeader,
+  ResponsiveDialogTitle,
+} from "@/components/responsive-dialog";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CaptureForm } from "@/lib/cashflow/components/capture-form";
 import { useBaseCurrency } from "@/lib/cashflow/hooks";
@@ -20,7 +20,7 @@ export function NewTransactionFab() {
   const baseCurrency = useBaseCurrency();
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <ResponsiveDialog open={open} onOpenChange={setOpen}>
       <div className="group fixed right-6 bottom-6 z-40 sm:right-8 sm:bottom-8">
         <Button
           type="button"
@@ -40,13 +40,13 @@ export function NewTransactionFab() {
           {TOOLTIP_LABEL}
         </span>
       </div>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>New transaction</DialogTitle>
-        </DialogHeader>
+      <ResponsiveDialogContent>
+        <ResponsiveDialogHeader>
+          <ResponsiveDialogTitle>New transaction</ResponsiveDialogTitle>
+        </ResponsiveDialogHeader>
         {renderFormBody(baseCurrency, () => setOpen(false))}
-      </DialogContent>
-    </Dialog>
+      </ResponsiveDialogContent>
+    </ResponsiveDialog>
   );
 }
 
