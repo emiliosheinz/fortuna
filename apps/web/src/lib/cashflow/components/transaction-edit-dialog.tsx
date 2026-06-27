@@ -3,16 +3,16 @@
 import { format, parseISO } from "date-fns";
 import { CalendarIcon } from "lucide-react";
 import { useId, useState } from "react";
+import {
+  ResponsiveDialog,
+  ResponsiveDialogContent,
+  ResponsiveDialogDescription,
+  ResponsiveDialogHeader,
+  ResponsiveDialogTitle,
+} from "@/components/responsive-dialog";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -127,11 +127,14 @@ export function TransactionEditDialog({
   }
 
   return (
-    <Dialog open onOpenChange={(open) => (!open ? onClose() : undefined)}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Edit transaction</DialogTitle>
-        </DialogHeader>
+    <ResponsiveDialog
+      open
+      onOpenChange={(open) => (!open ? onClose() : undefined)}
+    >
+      <ResponsiveDialogContent>
+        <ResponsiveDialogHeader>
+          <ResponsiveDialogTitle>Edit transaction</ResponsiveDialogTitle>
+        </ResponsiveDialogHeader>
         <form
           onSubmit={handleSave}
           data-testid="transaction-edit-form"
@@ -264,19 +267,21 @@ export function TransactionEditDialog({
         </form>
 
         {confirmingDelete ? (
-          <Dialog
+          <ResponsiveDialog
             open
             onOpenChange={(open) =>
               !open ? setConfirmingDelete(false) : undefined
             }
           >
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Delete transaction?</DialogTitle>
-                <DialogDescription>
+            <ResponsiveDialogContent>
+              <ResponsiveDialogHeader>
+                <ResponsiveDialogTitle>
+                  Delete transaction?
+                </ResponsiveDialogTitle>
+                <ResponsiveDialogDescription>
                   This permanently removes the row. It cannot be undone.
-                </DialogDescription>
-              </DialogHeader>
+                </ResponsiveDialogDescription>
+              </ResponsiveDialogHeader>
               <DialogFooter>
                 <Button
                   type="button"
@@ -295,10 +300,10 @@ export function TransactionEditDialog({
                   {remove.isPending ? "Deleting…" : "Delete"}
                 </Button>
               </DialogFooter>
-            </DialogContent>
-          </Dialog>
+            </ResponsiveDialogContent>
+          </ResponsiveDialog>
         ) : null}
-      </DialogContent>
-    </Dialog>
+      </ResponsiveDialogContent>
+    </ResponsiveDialog>
   );
 }
