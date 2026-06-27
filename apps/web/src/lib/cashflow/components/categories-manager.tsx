@@ -2,6 +2,12 @@
 
 import { PencilIcon, TrashIcon } from "lucide-react";
 import { useId, useState } from "react";
+import {
+  ResponsiveDialog,
+  ResponsiveDialogContent,
+  ResponsiveDialogHeader,
+  ResponsiveDialogTitle,
+} from "@/components/responsive-dialog";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -166,11 +172,14 @@ function RenameCategoryDialog({
   }
 
   return (
-    <Dialog open onOpenChange={(open) => (!open ? onClose() : undefined)}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Rename category</DialogTitle>
-        </DialogHeader>
+    <ResponsiveDialog
+      open
+      onOpenChange={(open) => (!open ? onClose() : undefined)}
+    >
+      <ResponsiveDialogContent>
+        <ResponsiveDialogHeader>
+          <ResponsiveDialogTitle>Rename category</ResponsiveDialogTitle>
+        </ResponsiveDialogHeader>
         <form onSubmit={handleSubmit} className="flex flex-col gap-3">
           <Label htmlFor={inputId}>Name</Label>
           <Input
@@ -193,8 +202,8 @@ function RenameCategoryDialog({
             </Button>
           </DialogFooter>
         </form>
-      </DialogContent>
-    </Dialog>
+      </ResponsiveDialogContent>
+    </ResponsiveDialog>
   );
 }
 
