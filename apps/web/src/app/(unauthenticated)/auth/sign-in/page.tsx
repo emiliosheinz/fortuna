@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 
 export default function SignInPage() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background p-4">
+    <div className="flex min-h-dvh items-center justify-center bg-background p-4">
       <div className="w-full max-w-sm rounded-2xl border bg-card p-8 shadow-sm">
         <div className="flex flex-col items-center gap-6 text-center">
           <Image

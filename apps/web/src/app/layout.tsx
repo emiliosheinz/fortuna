@@ -1,5 +1,5 @@
 import "./globals.css";
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono as GeistMono } from "next/font/google";
 import { QueryProvider } from "@/components/query-provider";
 import { ThemeProvider } from "@/components/theme-switcher";
@@ -17,6 +17,13 @@ const geistMono = GeistMono({
 
 const title = "Fortuna";
 const description = "A simple, frictionless app to manage your finances";
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  interactiveWidget: "resizes-content",
+};
 
 export const metadata: Metadata = {
   title,

@@ -44,7 +44,7 @@ export function AuthGuard({ children, sidebarOpen = true }: AuthGuardProps) {
       <div
         role="alert"
         data-testid="auth-guard-error"
-        className="flex min-h-screen flex-col items-center justify-center gap-4 bg-background p-8 text-center text-foreground"
+        className="flex min-h-dvh flex-col items-center justify-center gap-4 bg-background p-8 text-center text-foreground"
       >
         <h1 className="text-lg font-semibold">Something went wrong</h1>
         <p className="max-w-sm text-sm text-muted-foreground">
@@ -76,7 +76,7 @@ function AuthGuardSkeleton({ sidebarOpen }: { sidebarOpen: boolean }) {
       data-testid="auth-guard-loading"
       aria-busy="true"
       aria-live="polite"
-      className="flex min-h-screen bg-background"
+      className="flex min-h-dvh bg-background"
     >
       <aside
         className={cn(
