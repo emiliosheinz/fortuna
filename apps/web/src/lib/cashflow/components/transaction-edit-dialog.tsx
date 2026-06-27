@@ -3,6 +3,19 @@
 import { format, parseISO } from "date-fns";
 import { CalendarIcon } from "lucide-react";
 import { useId, useState } from "react";
+import { KeyboardSafeCombobox } from "@/components/keyboard-safe-combobox";
+import {
+  KeyboardSafePopover,
+  KeyboardSafePopoverContent,
+  KeyboardSafePopoverTrigger,
+} from "@/components/keyboard-safe-popover";
+import {
+  KeyboardSafeSelect,
+  KeyboardSafeSelectContent,
+  KeyboardSafeSelectItem,
+  KeyboardSafeSelectTrigger,
+  KeyboardSafeSelectValue,
+} from "@/components/keyboard-safe-select";
 import {
   ResponsiveDialog,
   ResponsiveDialogContent,
@@ -15,18 +28,6 @@ import { Calendar } from "@/components/ui/calendar";
 import { DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { ApiError } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 import { SUPPORTED_CURRENCIES, TRANSACTION_KINDS } from "../constants";
@@ -36,7 +37,6 @@ import type {
   TransactionKind,
   UpdateTransactionInput,
 } from "../types";
-import { CategoryCombobox } from "./category-combobox";
 import { CurrencyOption } from "./currency-option";
 import { MoneyInput } from "./money-input";
 import { TagInput } from "./tag-input";
@@ -156,12 +156,16 @@ export function TransactionEditDialog({
 
           <div className="flex flex-col gap-1.5">
             <Label htmlFor={dateId}>Date</Label>
-            <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
-              <PopoverTrigger asChild>
+            <KeyboardSafePopover
+              open={calendarOpen}
+              onOpenChange={setCalendarOpen}
+            >
+              <KeyboardSafePopoverTrigger asChild>
                 <Button
                   id={dateId}
                   type="button"
                   variant="outline"
+                  data-testid="transaction-edit-date-trigger"
                   className={cn(
                     "justify-start text-left font-normal",
                     !date && "text-muted-foreground",
@@ -170,8 +174,8 @@ export function TransactionEditDialog({
                   <CalendarIcon className="size-4" />
                   {date ? format(parseISO(date), "PPP") : "Pick a date"}
                 </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
+              </KeyboardSafePopoverTrigger>
+              <KeyboardSafePopoverContent className="w-auto p-0" align="start">
                 <Calendar
                   mode="single"
                   selected={date ? parseISO(date) : undefined}
@@ -183,48 +187,48 @@ export function TransactionEditDialog({
                   }}
                   autoFocus
                 />
-              </PopoverContent>
-            </Popover>
+              </KeyboardSafePopoverContent>
+            </KeyboardSafePopover>
           </div>
 
           <div className="flex flex-col gap-1.5">
             <Label htmlFor={kindId}>Kind</Label>
-            <Select
+            <KeyboardSafeSelect
               value={kind}
               onValueChange={(value) => setKind(value as TransactionKind)}
             >
-              <SelectTrigger id={kindId} className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
+              <KeyboardSafeSelectTrigger id={kindId} className="w-full">
+                <KeyboardSafeSelectValue />
+              </KeyboardSafeSelectTrigger>
+              <KeyboardSafeSelectContent>
                 {TRANSACTION_KINDS.map((k) => (
-                  <SelectItem key={k} value={k}>
+                  <KeyboardSafeSelectItem key={k} value={k}>
                     {k === "expense" ? "Expense" : "Income"}
-                  </SelectItem>
+                  </KeyboardSafeSelectItem>
                 ))}
-              </SelectContent>
-            </Select>
+              </KeyboardSafeSelectContent>
+            </KeyboardSafeSelect>
           </div>
 
           <div className="flex flex-col gap-1.5">
             <Label htmlFor={currencyId}>Currency</Label>
-            <Select value={currency} onValueChange={setCurrency}>
-              <SelectTrigger id={currencyId} className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
+            <KeyboardSafeSelect value={currency} onValueChange={setCurrency}>
+              <KeyboardSafeSelectTrigger id={currencyId} className="w-full">
+                <KeyboardSafeSelectValue />
+              </KeyboardSafeSelectTrigger>
+              <KeyboardSafeSelectContent>
                 {SUPPORTED_CURRENCIES.map((code) => (
-                  <SelectItem key={code} value={code}>
+                  <KeyboardSafeSelectItem key={code} value={code}>
                     <CurrencyOption code={code} />
-                  </SelectItem>
+                  </KeyboardSafeSelectItem>
                 ))}
-              </SelectContent>
-            </Select>
+              </KeyboardSafeSelectContent>
+            </KeyboardSafeSelect>
           </div>
 
           <div className="flex flex-col gap-1.5">
             <Label htmlFor={categoryId}>Category</Label>
-            <CategoryCombobox
+            <KeyboardSafeCombobox
               id={categoryId}
               value={categoryIdValue}
               onChange={setCategoryIdValue}

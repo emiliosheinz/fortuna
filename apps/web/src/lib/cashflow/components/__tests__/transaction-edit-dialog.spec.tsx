@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cashflowApi } from "../../api-client";
 import type { Transaction } from "../../types";
@@ -79,5 +79,30 @@ describe("TransactionEditDialog", () => {
     renderDialog();
     const dialog = screen.getByRole("dialog");
     expect(dialog).toHaveAttribute("data-slot", "dialog-content");
+  });
+
+  it("dismisses the keyboard before opening the date popover", () => {
+    useIsMobileMock.mockReturnValue(false);
+    const rafSpy = jest
+      .spyOn(window, "requestAnimationFrame")
+      .mockImplementation((cb) => {
+        cb(0);
+        return 0;
+      });
+    try {
+      renderDialog();
+      const description = screen.getByLabelText(
+        /description/i,
+      ) as HTMLInputElement;
+      const blurSpy = jest.spyOn(description, "blur");
+      description.focus();
+      expect(document.activeElement).toBe(description);
+
+      fireEvent.click(screen.getByTestId("transaction-edit-date-trigger"));
+
+      expect(blurSpy).toHaveBeenCalled();
+    } finally {
+      rafSpy.mockRestore();
+    }
   });
 });
