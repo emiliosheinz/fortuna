@@ -23,18 +23,37 @@ import { cn } from "@/lib/utils";
 
 type RootProps = React.ComponentProps<typeof DialogPrimitive.Root>;
 
-const ResponsiveDialogContext = React.createContext<{ isMobile: boolean }>({
+type ScrollIntoView = (node: HTMLElement | null) => void;
+
+const scrollIntoViewHelper: ScrollIntoView = (node) => {
+  if (!node) return;
+  node.scrollIntoView({ block: "center", behavior: "smooth" });
+};
+
+const ResponsiveDialogContext = React.createContext<{
+  isMobile: boolean;
+  scrollIntoView: ScrollIntoView;
+}>({
   isMobile: false,
+  scrollIntoView: scrollIntoViewHelper,
 });
 
 function ResponsiveDialog({ children, ...props }: RootProps) {
   const isMobile = useIsMobile();
   const Root = isMobile ? Sheet : Dialog;
+  const value = React.useMemo(
+    () => ({ isMobile, scrollIntoView: scrollIntoViewHelper }),
+    [isMobile],
+  );
   return (
-    <ResponsiveDialogContext.Provider value={{ isMobile }}>
+    <ResponsiveDialogContext.Provider value={value}>
       <Root {...props}>{children}</Root>
     </ResponsiveDialogContext.Provider>
   );
+}
+
+function useResponsiveDialogScrollIntoView(): ScrollIntoView {
+  return React.useContext(ResponsiveDialogContext).scrollIntoView;
 }
 
 type ContentProps = React.ComponentProps<typeof DialogPrimitive.Content> & {
@@ -129,4 +148,5 @@ export {
   ResponsiveDialogDescription,
   ResponsiveDialogHeader,
   ResponsiveDialogTitle,
+  useResponsiveDialogScrollIntoView,
 };

@@ -2,7 +2,8 @@
 
 import { format, parseISO } from "date-fns";
 import { CalendarIcon } from "lucide-react";
-import { useId, useState } from "react";
+import { useId, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { KeyboardSafeCombobox } from "@/components/keyboard-safe-combobox";
 import {
   KeyboardSafePopover,
@@ -22,6 +23,7 @@ import {
   ResponsiveDialogDescription,
   ResponsiveDialogHeader,
   ResponsiveDialogTitle,
+  useResponsiveDialogScrollIntoView,
 } from "@/components/responsive-dialog";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -78,19 +80,26 @@ export function TransactionEditDialog({
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const errorRef = useRef<HTMLParagraphElement | null>(null);
+  const scrollIntoView = useResponsiveDialogScrollIntoView();
 
   const update = useUpdateTransaction();
   const remove = useDeleteTransaction();
+
+  function showError(message: string) {
+    flushSync(() => setError(message));
+    scrollIntoView(errorRef.current);
+  }
 
   async function handleSave(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
     if (!AMOUNT_RE.test(amount)) {
-      setError("Use a non-negative amount with up to two decimals.");
+      showError("Use a non-negative amount with up to two decimals.");
       return;
     }
     if (!description.trim()) {
-      setError("Add a description.");
+      showError("Add a description.");
       return;
     }
 
@@ -108,7 +117,7 @@ export function TransactionEditDialog({
       await update.mutateAsync({ id: transaction.id, input: payload });
       onClose();
     } catch (err) {
-      setError(
+      showError(
         err instanceof ApiError && err.status === 400
           ? "The server rejected the payload. Check the fields."
           : "Could not save changes. Try again.",
@@ -122,7 +131,7 @@ export function TransactionEditDialog({
       await remove.mutateAsync(transaction.id);
       onClose();
     } catch {
-      setError("Could not delete transaction. Try again.");
+      showError("Could not delete transaction. Try again.");
     }
   }
 
@@ -242,6 +251,7 @@ export function TransactionEditDialog({
 
           {error ? (
             <p
+              ref={errorRef}
               role="alert"
               data-testid="transaction-edit-error"
               className="text-sm text-destructive"

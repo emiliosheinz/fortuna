@@ -1,12 +1,14 @@
 "use client";
 
 import { PencilIcon, TrashIcon } from "lucide-react";
-import { useId, useState } from "react";
+import { useId, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import {
   ResponsiveDialog,
   ResponsiveDialogContent,
   ResponsiveDialogHeader,
   ResponsiveDialogTitle,
+  useResponsiveDialogScrollIntoView,
 } from "@/components/responsive-dialog";
 import { Button } from "@/components/ui/button";
 import {
@@ -31,6 +33,8 @@ export function TagsManager() {
   const [createError, setCreateError] = useState<string | null>(null);
   const [editing, setEditing] = useState<Tag | null>(null);
   const [deleting, setDeleting] = useState<Tag | null>(null);
+  const createErrorRef = useRef<HTMLParagraphElement | null>(null);
+  const scrollIntoView = useResponsiveDialogScrollIntoView();
 
   async function handleCreate(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -41,11 +45,12 @@ export function TagsManager() {
       await createMutation.mutateAsync(trimmed);
       setName("");
     } catch (err) {
-      setCreateError(
+      const message =
         err instanceof ApiError && err.status === 409
           ? "A tag with that name already exists."
-          : "Could not create tag. Try again.",
-      );
+          : "Could not create tag. Try again.";
+      flushSync(() => setCreateError(message));
+      scrollIntoView(createErrorRef.current);
     }
   }
 
@@ -67,7 +72,11 @@ export function TagsManager() {
         </Button>
       </form>
       {createError ? (
-        <p role="alert" className="text-sm text-destructive">
+        <p
+          ref={createErrorRef}
+          role="alert"
+          className="text-sm text-destructive"
+        >
           {createError}
         </p>
       ) : null}
@@ -135,6 +144,8 @@ function RenameTagDialog({ tag, onClose }: { tag: Tag; onClose: () => void }) {
   const inputId = useId();
   const [name, setName] = useState(tag.name);
   const [error, setError] = useState<string | null>(null);
+  const errorRef = useRef<HTMLParagraphElement | null>(null);
+  const scrollIntoView = useResponsiveDialogScrollIntoView();
   const mutation = useRenameTag();
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -146,11 +157,12 @@ function RenameTagDialog({ tag, onClose }: { tag: Tag; onClose: () => void }) {
       await mutation.mutateAsync({ id: tag.id, name: trimmed });
       onClose();
     } catch (err) {
-      setError(
+      const message =
         err instanceof ApiError && err.status === 409
           ? "A tag with that name already exists."
-          : "Could not rename tag. Try again.",
-      );
+          : "Could not rename tag. Try again.";
+      flushSync(() => setError(message));
+      scrollIntoView(errorRef.current);
     }
   }
 
@@ -172,7 +184,7 @@ function RenameTagDialog({ tag, onClose }: { tag: Tag; onClose: () => void }) {
             onChange={(e) => setName(e.target.value)}
           />
           {error ? (
-            <p role="alert" className="text-sm text-destructive">
+            <p ref={errorRef} role="alert" className="text-sm text-destructive">
               {error}
             </p>
           ) : null}

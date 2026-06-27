@@ -139,6 +139,36 @@ describe("CaptureForm", () => {
     ).toHaveTextContent(/could not save/i);
   });
 
+  it("scrolls the submit error into view when submission fails", async () => {
+    const scrollIntoView = jest
+      .spyOn(Element.prototype, "scrollIntoView")
+      .mockImplementation(() => undefined);
+    try {
+      createTransactionMock.mockRejectedValue(new ApiError(500));
+      renderForm();
+
+      setAmount("12.34");
+      setDescription("Lunch");
+      submit();
+
+      const errorEl = await screen.findByTestId("capture-form-submit-error");
+      await waitFor(() => {
+        expect(scrollIntoView).toHaveBeenCalled();
+      });
+      const callTargets = scrollIntoView.mock.instances;
+      expect(callTargets).toContain(errorEl);
+      const matchingCall = scrollIntoView.mock.calls.find(
+        (_call, idx) => scrollIntoView.mock.instances[idx] === errorEl,
+      );
+      expect(matchingCall?.[0]).toEqual({
+        block: "center",
+        behavior: "smooth",
+      });
+    } finally {
+      scrollIntoView.mockRestore();
+    }
+  });
+
   it("offers only the supported currencies in the picker", () => {
     renderForm();
 
