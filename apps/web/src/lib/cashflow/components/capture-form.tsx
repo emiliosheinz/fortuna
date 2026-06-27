@@ -3,28 +3,28 @@
 import { format, parseISO } from "date-fns";
 import { CalendarIcon, MinusIcon, PlusIcon } from "lucide-react";
 import { useEffect, useId, useState } from "react";
+import { KeyboardSafeCombobox } from "@/components/keyboard-safe-combobox";
+import {
+  KeyboardSafePopover,
+  KeyboardSafePopoverContent,
+  KeyboardSafePopoverTrigger,
+} from "@/components/keyboard-safe-popover";
+import {
+  KeyboardSafeSelect,
+  KeyboardSafeSelectContent,
+  KeyboardSafeSelectItem,
+  KeyboardSafeSelectTrigger,
+  KeyboardSafeSelectValue,
+} from "@/components/keyboard-safe-select";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { ApiError } from "@/lib/api-client";
 import { cn } from "@/lib/utils";
 import { SUPPORTED_CURRENCIES, TRANSACTION_KINDS } from "../constants";
 import { useCreateTransaction } from "../hooks";
 import type { CreateTransactionInput, TransactionKind } from "../types";
-import { CategoryCombobox } from "./category-combobox";
 import { CurrencyOption } from "./currency-option";
 import { MoneyInput } from "./money-input";
 import { TagInput } from "./tag-input";
@@ -158,27 +158,27 @@ export function CaptureForm({ baseCurrency, onCaptured }: CaptureFormProps) {
       <div className="flex flex-col gap-1.5">
         <Label>Amount</Label>
         <div className="grid grid-cols-[6rem_1fr_5rem] gap-2 sm:grid-cols-[7rem_1fr_7rem]">
-          <Select
+          <KeyboardSafeSelect
             value={form.currency}
             onValueChange={(value) => update("currency", value)}
           >
-            <SelectTrigger
+            <KeyboardSafeSelectTrigger
               id={currencyId}
               data-testid="capture-form-currency-trigger"
               aria-label="Currency"
               aria-invalid={Boolean(errors.currency)}
               className="w-full"
             >
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
+              <KeyboardSafeSelectValue />
+            </KeyboardSafeSelectTrigger>
+            <KeyboardSafeSelectContent>
               {SUPPORTED_CURRENCIES.map((code) => (
-                <SelectItem key={code} value={code}>
+                <KeyboardSafeSelectItem key={code} value={code}>
                   <CurrencyOption code={code} />
-                </SelectItem>
+                </KeyboardSafeSelectItem>
               ))}
-            </SelectContent>
-          </Select>
+            </KeyboardSafeSelectContent>
+          </KeyboardSafeSelect>
           <MoneyInput
             id={amountId}
             value={form.amount}
@@ -202,8 +202,8 @@ export function CaptureForm({ baseCurrency, onCaptured }: CaptureFormProps) {
 
       <div className="flex flex-col gap-1.5">
         <Label htmlFor={dateId}>Date</Label>
-        <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
-          <PopoverTrigger asChild>
+        <KeyboardSafePopover open={calendarOpen} onOpenChange={setCalendarOpen}>
+          <KeyboardSafePopoverTrigger asChild>
             <Button
               id={dateId}
               type="button"
@@ -218,8 +218,8 @@ export function CaptureForm({ baseCurrency, onCaptured }: CaptureFormProps) {
               <CalendarIcon className="size-4" />
               {form.date ? format(parseISO(form.date), "PPP") : "Pick a date"}
             </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="start">
+          </KeyboardSafePopoverTrigger>
+          <KeyboardSafePopoverContent className="w-auto p-0" align="start">
             <Calendar
               mode="single"
               selected={form.date ? parseISO(form.date) : undefined}
@@ -231,37 +231,37 @@ export function CaptureForm({ baseCurrency, onCaptured }: CaptureFormProps) {
               }}
               autoFocus
             />
-          </PopoverContent>
-        </Popover>
+          </KeyboardSafePopoverContent>
+        </KeyboardSafePopover>
         {errors.date ? <FieldError message={errors.date} /> : null}
       </div>
 
       <div className="flex flex-col gap-1.5">
         <Label htmlFor={kindId}>Kind</Label>
-        <Select
+        <KeyboardSafeSelect
           value={form.kind}
           onValueChange={(value) => update("kind", value as TransactionKind)}
         >
-          <SelectTrigger
+          <KeyboardSafeSelectTrigger
             id={kindId}
             data-testid="capture-form-kind-trigger"
             className="w-full"
           >
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
+            <KeyboardSafeSelectValue />
+          </KeyboardSafeSelectTrigger>
+          <KeyboardSafeSelectContent>
             {TRANSACTION_KINDS.map((kind) => (
-              <SelectItem key={kind} value={kind}>
+              <KeyboardSafeSelectItem key={kind} value={kind}>
                 {kind === "expense" ? "Expense" : "Income"}
-              </SelectItem>
+              </KeyboardSafeSelectItem>
             ))}
-          </SelectContent>
-        </Select>
+          </KeyboardSafeSelectContent>
+        </KeyboardSafeSelect>
       </div>
 
       <div className="flex flex-col gap-1.5">
         <Label htmlFor={categoryId}>Category</Label>
-        <CategoryCombobox
+        <KeyboardSafeCombobox
           id={categoryId}
           value={form.categoryId}
           onChange={(next) => update("categoryId", next)}

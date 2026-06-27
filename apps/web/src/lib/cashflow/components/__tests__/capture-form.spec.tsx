@@ -300,6 +300,31 @@ describe("CaptureForm", () => {
     expect(payload?.installments).toBeUndefined();
   });
 
+  it("dismisses the keyboard before opening the date popover", () => {
+    const rafSpy = jest
+      .spyOn(window, "requestAnimationFrame")
+      .mockImplementation((cb) => {
+        cb(0);
+        return 0;
+      });
+    try {
+      renderForm();
+
+      const description = screen.getByLabelText(
+        /description/i,
+      ) as HTMLInputElement;
+      const blurSpy = jest.spyOn(description, "blur");
+      description.focus();
+      expect(document.activeElement).toBe(description);
+
+      fireEvent.click(screen.getByTestId("capture-form-date-trigger"));
+
+      expect(blurSpy).toHaveBeenCalled();
+    } finally {
+      rafSpy.mockRestore();
+    }
+  });
+
   it("sends typed tag names as part of the payload", async () => {
     createTransactionMock.mockResolvedValue({
       transactions: [
