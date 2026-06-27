@@ -32,7 +32,7 @@ function ShellInterior({
   return (
     <SidebarProvider defaultOpen={defaultSidebarOpen}>
       <Sidebar me={me} />
-      <div className="relative flex min-h-svh flex-1 flex-col">
+      <div className="relative flex min-h-svh flex-1 flex-col pb-[calc(env(safe-area-inset-bottom)+6rem)]">
         <MobileHeader />
         {children}
         <NewTransactionFab />
