@@ -1,3 +1,19 @@
+## 0.6.0 (2026-06-28)
+
+### 🚀 Features
+
+- **web:** keep the floating + clear of authenticated page content ([328612b](https://github.com/emiliosheinz/fortuna/commit/328612b))
+- **web:** keep focused account-settings input above the mobile keyboard ([3e4b0ff](https://github.com/emiliosheinz/fortuna/commit/3e4b0ff))
+- **web:** declare mobile-aware viewport and dynamic-height layout baseline ([f828114](https://github.com/emiliosheinz/fortuna/commit/f828114))
+- **web:** scroll submit errors into view on in-scope forms ([58b8ae4](https://github.com/emiliosheinz/fortuna/commit/58b8ae4))
+- **web:** dismiss the on-screen keyboard before in-form popovers open ([3561a11](https://github.com/emiliosheinz/fortuna/commit/3561a11))
+- **web:** route edit + rename dialogs through ResponsiveDialog ([8239934](https://github.com/emiliosheinz/fortuna/commit/8239934))
+- **web:** add ResponsiveDialog wrapper for keyboard-safe mobile capture ([6c427c1](https://github.com/emiliosheinz/fortuna/commit/6c427c1))
+
+### ❤️ Thank You
+
+- Emilio Heinzmann
+
 ## 0.5.4 (2026-06-18)
 
 ### 🩹 Fixes
