@@ -12,6 +12,8 @@ type FakeVisualViewport = {
   dispatchEvent: (type: string) => void;
 };
 
+const originalInnerHeight = window.innerHeight;
+
 function installVisualViewport(initial: {
   height: number;
   offsetTop: number;
@@ -54,6 +56,11 @@ function uninstallVisualViewport() {
   Object.defineProperty(window, "visualViewport", {
     configurable: true,
     value: undefined,
+  });
+  Object.defineProperty(window, "innerHeight", {
+    configurable: true,
+    value: originalInnerHeight,
+    writable: true,
   });
 }
 
