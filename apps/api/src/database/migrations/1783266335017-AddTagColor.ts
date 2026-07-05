@@ -46,12 +46,13 @@ export class AddTagColor1783266335017 implements MigrationInterface {
     }
 
     // Guard: never fire SET NOT NULL against remaining NULLs.
-    const [{ count }]: { count: string }[] = await queryRunner.query(
+    const rows: { count: string }[] = await queryRunner.query(
       `SELECT COUNT(*)::text AS "count" FROM "tags" WHERE "color" IS NULL`,
     );
-    if (Number(count) > 0) {
+    const remaining = Number(rows[0]?.count ?? 0);
+    if (remaining > 0) {
       throw new Error(
-        `AddTagColor: ${count} tag row(s) still have color IS NULL after backfill`,
+        `AddTagColor: ${remaining} tag row(s) still have color IS NULL after backfill`,
       );
     }
 

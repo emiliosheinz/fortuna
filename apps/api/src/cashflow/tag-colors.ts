@@ -36,5 +36,5 @@ export function fnv1a32(input: string): number {
  * creation, and the migration backfill.
  */
 export function assignColor(name: string): PaletteKey {
-  return PALETTE_KEYS[fnv1a32(name) % PALETTE_KEYS.length];
+  return PALETTE_KEYS[fnv1a32(name) % PALETTE_KEYS.length] as PaletteKey;
 }
