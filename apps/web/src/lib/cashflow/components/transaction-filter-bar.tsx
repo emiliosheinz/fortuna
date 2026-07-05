@@ -9,7 +9,6 @@ import {
   HashIcon,
   ListFilterIcon,
   SearchIcon,
-  WalletIcon,
   XIcon,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -23,13 +22,12 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { useCategories, useTags } from "../hooks";
+import { useTags } from "../hooks";
 import type { TransactionKind } from "../types";
 
 export interface TransactionFilterState {
   from: string | null;
   to: string | null;
-  categoryId: string | null;
   tagId: string | null;
   kind: TransactionKind | null;
   q: string | null;
@@ -41,18 +39,16 @@ interface TransactionFilterBarProps {
   searchDebounceMs?: number;
 }
 
-type FilterKey = "date" | "category" | "tag" | "kind";
+type FilterKey = "date" | "tag" | "kind";
 
 const FILTER_LABELS: Record<FilterKey, string> = {
   date: "Date range",
-  category: "Category",
   tag: "Tag",
   kind: "Kind",
 };
 
 const FILTER_ICONS: Record<FilterKey, typeof CalendarRangeIcon> = {
   date: CalendarRangeIcon,
-  category: WalletIcon,
   tag: HashIcon,
   kind: ListFilterIcon,
 };
@@ -73,8 +69,6 @@ export function TransactionFilterBar({
     if (key === "date") {
       next.from = null;
       next.to = null;
-    } else if (key === "category") {
-      next.categoryId = null;
     } else if (key === "tag") {
       next.tagId = null;
     } else if (key === "kind") {
@@ -122,7 +116,6 @@ export function TransactionFilterBar({
               onChange({
                 from: null,
                 to: null,
-                categoryId: null,
                 tagId: null,
                 kind: null,
                 q: null,
@@ -304,13 +297,9 @@ interface FilterChipProps {
 function FilterChip({ filter, value, onChange, onRemove }: FilterChipProps) {
   const [open, setOpen] = useState(false);
   const Icon = FILTER_ICONS[filter];
-  const categories = useCategories();
   const tags = useTags();
 
   const summary = summaryFor(filter, value, {
-    categoryName:
-      categories.data?.items.find((c) => c.id === value.categoryId)?.name ??
-      null,
     tagName: tags.data?.items.find((t) => t.id === value.tagId)?.name ?? null,
   });
 
@@ -376,17 +365,6 @@ function FilterEditor({
           onChange({ ...value, from: next.from, to: next.to });
         }}
         onComplete={() => onApplied?.()}
-      />
-    );
-  }
-  if (filter === "category") {
-    return (
-      <CategoryEditor
-        value={value.categoryId}
-        onChange={(next) => {
-          onChange({ ...value, categoryId: next });
-          if (next) onApplied?.();
-        }}
       />
     );
   }
@@ -482,50 +460,6 @@ const DATE_RANGE_CALENDAR_CLASSNAMES = {
   range_end: "[&>button]:rounded-l-none",
 };
 
-function CategoryEditor({
-  value,
-  onChange,
-}: {
-  value: string | null;
-  onChange: (next: string | null) => void;
-}) {
-  const categories = useCategories();
-  const [search, setSearch] = useState("");
-  const items = (categories.data?.items ?? []).filter((c) =>
-    c.name.toLowerCase().includes(search.toLowerCase()),
-  );
-  return (
-    <div className="flex w-56 flex-col gap-2">
-      <Input
-        type="search"
-        placeholder="Category…"
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        autoFocus
-      />
-      <ul className="max-h-60 overflow-y-auto">
-        {items.map((c) => (
-          <li key={c.id}>
-            <button
-              type="button"
-              data-testid={`transaction-filter-category-option-${c.id}`}
-              className={chipOptionClass(value === c.id)}
-              onClick={() => onChange(c.id)}
-            >
-              {c.name}
-            </button>
-          </li>
-        ))}
-        {items.length === 0 ? (
-          <li className="px-2 py-1 text-xs text-muted-foreground">
-            No categories.
-          </li>
-        ) : null}
-      </ul>
-    </div>
-  );
-}
-
 function TagEditor({
   value,
   onChange,
@@ -610,7 +544,6 @@ function chipOptionClass(active: boolean): string {
 function activeFilters(value: TransactionFilterState): FilterKey[] {
   const out: FilterKey[] = [];
   if (value.from || value.to) out.push("date");
-  if (value.categoryId) out.push("category");
   if (value.tagId) out.push("tag");
   if (value.kind) out.push("kind");
   return out;
@@ -619,7 +552,7 @@ function activeFilters(value: TransactionFilterState): FilterKey[] {
 function summaryFor(
   filter: FilterKey,
   value: TransactionFilterState,
-  resolved: { categoryName: string | null; tagName: string | null },
+  resolved: { tagName: string | null },
 ): string {
   if (filter === "date") {
     if (value.from && value.to) {
@@ -630,7 +563,6 @@ function summaryFor(
     return "any";
   }
   if (filter === "kind") return value.kind ?? "any";
-  if (filter === "category") return resolved.categoryName ?? "any";
   if (filter === "tag") return resolved.tagName ?? "any";
   return "";
 }

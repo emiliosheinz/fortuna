@@ -9,7 +9,6 @@ import {
 
 jest.mock("../../api-client", () => ({
   cashflowApi: {
-    listCategories: jest.fn(),
     listTags: jest.fn(),
   },
 }));
@@ -18,9 +17,6 @@ jest.mock("@/hooks/use-mobile", () => ({
   useIsMobile: jest.fn(),
 }));
 
-const listCategoriesMock = cashflowApi.listCategories as jest.MockedFunction<
-  typeof cashflowApi.listCategories
->;
 const listTagsMock = cashflowApi.listTags as jest.MockedFunction<
   typeof cashflowApi.listTags
 >;
@@ -29,7 +25,6 @@ const useIsMobileMock = useIsMobile as jest.MockedFunction<typeof useIsMobile>;
 const emptyState: TransactionFilterState = {
   from: null,
   to: null,
-  categoryId: null,
   tagId: null,
   kind: null,
   q: null,
@@ -58,12 +53,6 @@ function renderBar(
 
 describe("TransactionFilterBar", () => {
   beforeEach(() => {
-    listCategoriesMock.mockResolvedValue({
-      items: [
-        { id: "cat-food", name: "Food" },
-        { id: "cat-transport", name: "Transport" },
-      ],
-    });
     listTagsMock.mockResolvedValue({
       items: [{ id: "tag-travel", name: "travel" }],
     });
@@ -101,20 +90,20 @@ describe("TransactionFilterBar", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("renders a chip for each active filter and resolves the category name", async () => {
+  it("renders a chip for each active filter and resolves the tag name", async () => {
     renderBar({
-      value: { ...emptyState, categoryId: "cat-food", kind: "expense" },
+      value: { ...emptyState, tagId: "tag-travel", kind: "expense" },
     });
     expect(
-      screen.getByTestId("transaction-filter-chip-category"),
+      screen.getByTestId("transaction-filter-chip-tag"),
     ).toBeInTheDocument();
     expect(
       screen.getByTestId("transaction-filter-chip-kind"),
     ).toBeInTheDocument();
     await waitFor(() => {
       expect(
-        screen.getByTestId("transaction-filter-chip-category"),
-      ).toHaveTextContent("Food");
+        screen.getByTestId("transaction-filter-chip-tag"),
+      ).toHaveTextContent("travel");
     });
   });
 
@@ -131,13 +120,13 @@ describe("TransactionFilterBar", () => {
   it("removes only the targeted filter when its chip × is clicked", () => {
     const onChange = jest.fn();
     renderBar({
-      value: { ...emptyState, kind: "expense", categoryId: "cat-food" },
+      value: { ...emptyState, kind: "expense", tagId: "tag-travel" },
       onChange,
     });
     fireEvent.click(screen.getByTestId("transaction-filter-chip-kind-remove"));
     expect(onChange).toHaveBeenCalledWith({
       ...emptyState,
-      categoryId: "cat-food",
+      tagId: "tag-travel",
     });
   });
 
