@@ -6,9 +6,9 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatMoney } from "../format-money";
 import { useSummary } from "../hooks";
-import type { CategoryBucket } from "../types";
-import { CategoryPie, categoryColor } from "./category-pie";
+import type { TagBucket } from "../types";
 import { MonthPicker } from "./month-picker";
+import { TagPie, tagColor } from "./tag-pie";
 
 interface SummaryViewProps {
   month: string;
@@ -72,7 +72,7 @@ function SummaryContent({
   const isEmpty =
     data.income === "0.00" &&
     data.expense === "0.00" &&
-    data.byCategory.length === 0;
+    data.byTag.length === 0;
 
   return (
     <>
@@ -101,8 +101,8 @@ function SummaryContent({
           No transactions for this month yet.
         </p>
       ) : (
-        <CategoryBreakdown
-          buckets={data.byCategory}
+        <TagBreakdown
+          buckets={data.byTag}
           baseCurrency={data.baseCurrency}
         />
       )}
@@ -178,11 +178,11 @@ function Total({
   );
 }
 
-function CategoryBreakdown({
+function TagBreakdown({
   buckets,
   baseCurrency,
 }: {
-  buckets: CategoryBucket[];
+  buckets: TagBucket[];
   baseCurrency: string;
 }) {
   const expenseBuckets = useMemo(
@@ -192,29 +192,29 @@ function CategoryBreakdown({
 
   return (
     <div
-      data-testid="summary-by-category"
+      data-testid="summary-by-tag"
       className="flex flex-col gap-2 rounded-md border border-border"
     >
       <h2 className="border-b border-border px-3 py-2 text-sm font-medium">
-        By category
+        By tag
       </h2>
       {expenseBuckets.length === 0 ? (
         <p
-          data-testid="summary-by-category-empty"
+          data-testid="summary-by-tag-empty"
           className="px-3 py-6 text-center text-sm text-muted-foreground"
         >
           No expenses this month.
         </p>
       ) : (
-        <CategoryPie buckets={expenseBuckets} baseCurrency={baseCurrency} />
+        <TagPie buckets={expenseBuckets} baseCurrency={baseCurrency} />
       )}
       <ul className="flex flex-col divide-y divide-border border-t border-border">
         {expenseBuckets.map((bucket, index) => (
-          <CategoryRow
-            key={bucket.categoryId ?? "__uncategorized__"}
+          <TagRow
+            key={bucket.tagId ?? "__untagged__"}
             bucket={bucket}
             baseCurrency={baseCurrency}
-            color={categoryColor(index)}
+            color={tagColor(index)}
           />
         ))}
       </ul>
@@ -222,18 +222,18 @@ function CategoryBreakdown({
   );
 }
 
-function CategoryRow({
+function TagRow({
   bucket,
   baseCurrency,
   color,
 }: {
-  bucket: CategoryBucket;
+  bucket: TagBucket;
   baseCurrency: string;
   color: string;
 }) {
   return (
     <li
-      data-testid="summary-category-row"
+      data-testid="summary-tag-row"
       className="flex items-center justify-between gap-4 px-3 py-2"
     >
       <span className="flex items-center gap-2 text-sm">
@@ -242,10 +242,10 @@ function CategoryRow({
           className="size-2.5 rounded-full"
           style={{ background: color }}
         />
-        {bucket.categoryName ?? "Uncategorized"}
+        {bucket.tagName ?? "Untagged"}
       </span>
       <span
-        data-testid="summary-category-net"
+        data-testid="summary-tag-net"
         className="text-sm font-semibold text-foreground tabular-nums"
       >
         {formatMoney(`-${bucket.expense}`, baseCurrency)}
