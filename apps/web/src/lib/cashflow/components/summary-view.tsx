@@ -101,10 +101,7 @@ function SummaryContent({
           No transactions for this month yet.
         </p>
       ) : (
-        <TagBreakdown
-          buckets={data.byTag}
-          baseCurrency={data.baseCurrency}
-        />
+        <TagBreakdown buckets={data.byTag} baseCurrency={data.baseCurrency} />
       )}
     </>
   );

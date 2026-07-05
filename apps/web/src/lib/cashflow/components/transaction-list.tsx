@@ -11,11 +11,7 @@ import {
 } from "@/components/ui/popover";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatMoney } from "../format-money";
-import {
-  type TransactionFilters,
-  useTags,
-  useTransactions,
-} from "../hooks";
+import { type TransactionFilters, useTags, useTransactions } from "../hooks";
 import type { Transaction, TransactionGroup } from "../types";
 import { TransactionEditDialog } from "./transaction-edit-dialog";
 
