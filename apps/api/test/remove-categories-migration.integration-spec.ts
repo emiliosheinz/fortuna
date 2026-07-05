@@ -395,37 +395,42 @@ describe("RemoveCashflowCategories migration", () => {
       await seedCategory(dataSource, categoryId, userId, "Food");
       await seedTransaction(dataSource, transactionId, userId, categoryId);
 
-      const migration = new RemoveCashflowCategories1783255373760();
-      const qr: QueryRunner = dataSource.createQueryRunner();
-      await qr.connect();
-      await qr.startTransaction();
-
-      const originalQuery = qr.query.bind(qr);
-      (qr as unknown as { query: unknown }).query = async (
-        sql: string,
-        parameters?: unknown[],
-        useStructuredResult?: boolean,
-      ) => {
-        if (
-          typeof sql === "string" &&
-          sql.includes(`INSERT INTO "transaction_tags"`)
-        ) {
-          throw new Error("SIMULATED_FAILURE_IN_DATA_STEP");
-        }
-        return originalQuery(sql, parameters, useStructuredResult);
+      // Override createQueryRunner so TypeORM's migration executor picks up a
+      // QueryRunner whose second data-step INSERT throws. The transaction
+      // wrapping and rollback then come from the runner, not the test, so
+      // we're exercising the production path (AD-20, RCAT-03 AC5).
+      const originalCreateQueryRunner =
+        dataSource.createQueryRunner.bind(dataSource);
+      dataSource.createQueryRunner = (...args) => {
+        const qr: QueryRunner = originalCreateQueryRunner(...args);
+        const originalQuery = qr.query.bind(qr);
+        (qr as unknown as { query: unknown }).query = async (
+          sql: string,
+          parameters?: unknown[],
+          useStructuredResult?: boolean,
+        ) => {
+          if (
+            typeof sql === "string" &&
+            sql.includes(`INSERT INTO "transaction_tags"`)
+          ) {
+            throw new Error("SIMULATED_FAILURE_IN_DATA_STEP");
+          }
+          return originalQuery(sql, parameters, useStructuredResult);
+        };
+        return qr;
       };
 
       let raised: Error | null = null;
       try {
-        await migration.up(qr);
+        await dataSource.runMigrations();
       } catch (error) {
         raised = error as Error;
       } finally {
-        await qr.rollbackTransaction();
-        await qr.release();
+        dataSource.createQueryRunner = originalCreateQueryRunner;
       }
 
-      expect(raised?.message).toBe("SIMULATED_FAILURE_IN_DATA_STEP");
+      expect(raised?.message).toContain("SIMULATED_FAILURE_IN_DATA_STEP");
+      expect(await isTargetApplied(dataSource)).toBe(false);
       expect(await tableExists(dataSource, "categories")).toBe(true);
       expect(
         await columnExists(dataSource, "transactions", "category_id"),
@@ -450,6 +455,12 @@ describe("RemoveCashflowCategories migration", () => {
       expect(transactions).toEqual([
         { id: transactionId, category_id: categoryId },
       ]);
+
+      const tagCount: CountRow[] = await dataSource.query(
+        `SELECT COUNT(*)::text AS count FROM "tags" WHERE "user_id" = $1`,
+        [userId],
+      );
+      expect(tagCount[0].count).toBe("0");
     });
   });
 
