@@ -1,16 +1,11 @@
 import { randomUUID } from "node:crypto";
-import {
-  BadRequestException,
-  Injectable,
-  NotFoundException,
-} from "@nestjs/common";
+import { Injectable, NotFoundException } from "@nestjs/common";
 import { InjectDataSource, InjectRepository } from "@nestjs/typeorm";
 import { DataSource, In, Repository } from "typeorm";
 import { FxLookupService } from "@/fx/services/fx-lookup.service";
 import { UserSettingsService } from "@/users/services/user-settings.service";
 import type { CreateTransactionDto } from "../dto/create-transaction.dto";
 import type { UpdateTransactionDto } from "../dto/update-transaction.dto";
-import { Category } from "../entities/category.entity";
 import { Transaction } from "../entities/transaction.entity";
 import { TransactionTag } from "../entities/transaction-tag.entity";
 import { decodeCursor, encodeCursor } from "./cursor";
@@ -34,7 +29,6 @@ export interface ListTransactionsOptions {
   cursor?: string;
   from?: string;
   to?: string;
-  categoryId?: string;
   tagId?: string;
   groupId?: string;
   kind?: "income" | "expense";
@@ -61,8 +55,6 @@ export class TransactionsService {
     const dates = generateInstallmentDates(dto.date, count);
 
     const saved = await this.dataSource.transaction(async (manager) => {
-      await this.assertCategoryOwned(userId, dto.categoryId, manager);
-
       const transactionRepo = manager.getRepository(Transaction);
       const rows = await transactionRepo.save(
         dates.map((date) =>
@@ -73,7 +65,6 @@ export class TransactionsService {
             currency: dto.currency,
             description: dto.description,
             kind: dto.kind,
-            categoryId: dto.categoryId ?? null,
             groupId,
           }),
         ),
@@ -139,11 +130,6 @@ export class TransactionsService {
     }
     if (options.to) {
       qb.andWhere("t.date <= :to", { to: options.to });
-    }
-    if (options.categoryId) {
-      qb.andWhere("t.category_id = :categoryId", {
-        categoryId: options.categoryId,
-      });
     }
     if (options.kind) {
       qb.andWhere("t.kind = :kind", { kind: options.kind });
@@ -224,10 +210,6 @@ export class TransactionsService {
         throw new NotFoundException("Transaction not found");
       }
 
-      if (dto.categoryId !== undefined) {
-        await this.assertCategoryOwned(userId, dto.categoryId, manager);
-        row.categoryId = dto.categoryId;
-      }
       if (dto.date !== undefined) row.date = dto.date;
       if (dto.amount !== undefined) row.amount = dto.amount;
       if (dto.currency !== undefined) row.currency = dto.currency;
@@ -295,21 +277,6 @@ export class TransactionsService {
       baseCurrency,
     });
     return transactionToResponse(row, tagIds, baseCurrency, resolution, group);
-  }
-
-  private async assertCategoryOwned(
-    userId: string,
-    categoryId: string | null | undefined,
-    manager = this.dataSource.manager,
-  ): Promise<void> {
-    if (!categoryId) return;
-    const exists = await manager.getRepository(Category).findOne({
-      where: { id: categoryId, userId },
-      select: { id: true },
-    });
-    if (!exists) {
-      throw new BadRequestException("Unknown category");
-    }
   }
 
   private async loadTagIds(
