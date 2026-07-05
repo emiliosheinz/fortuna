@@ -1,3 +1,13 @@
+## 0.5.0 (2026-07-05)
+
+### 🚀 Features
+
+- **api:** add RemoveCashflowCategories migration with data copy ([ed02278](https://github.com/emiliosheinz/fortuna/commit/ed02278))
+
+### ❤️ Thank You
+
+- Emilio Heinzmann
+
 ## 0.4.4 (2026-06-18)
 
 ### 🧱 Updated Dependencies

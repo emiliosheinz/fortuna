@@ -1,3 +1,13 @@
+## 0.7.0 (2026-07-05)
+
+### 🚀 Features
+
+- **web:** drop Categories from sidebar and auth-guard skeleton ([0d72b2d](https://github.com/emiliosheinz/fortuna/commit/0d72b2d))
+
+### ❤️ Thank You
+
+- Emilio Heinzmann
+
 ## 0.6.0 (2026-06-28)
 
 ### 🚀 Features
