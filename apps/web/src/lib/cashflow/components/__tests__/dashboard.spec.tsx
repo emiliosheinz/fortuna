@@ -221,7 +221,9 @@ describe("Dashboard", () => {
       renderDashboard();
 
       const card = screen.getByTestId("dashboard-this-month");
-      expect(within(card).getByText(/No expenses this month/i)).toBeInTheDocument();
+      expect(
+        within(card).getByText(/No expenses this month/i),
+      ).toBeInTheDocument();
       expect(within(card).queryByText("salary")).toBeNull();
     });
   });
