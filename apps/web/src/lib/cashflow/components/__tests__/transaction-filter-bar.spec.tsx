@@ -54,9 +54,23 @@ function renderBar(
 describe("TransactionFilterBar", () => {
   beforeEach(() => {
     listTagsMock.mockResolvedValue({
-      items: [{ id: "tag-travel", name: "travel" }],
+      items: [{ id: "tag-travel", name: "travel", color: "amber" }],
     });
     useIsMobileMock.mockReturnValue(false);
+  });
+
+  it("renders a colored dot on the selected-tag filter chip", async () => {
+    const state: TransactionFilterState = {
+      ...emptyState,
+      tagId: "tag-travel",
+    };
+    renderBar({ value: state });
+    const chip = await screen.findByTestId("transaction-filter-chip-tag");
+    await waitFor(() => {
+      expect(chip.textContent).toContain("travel");
+    });
+    const dot = chip.querySelector<HTMLElement>("[data-testid=tag-color-dot]");
+    expect(dot?.style.background).toBe("var(--tag-color-amber)");
   });
 
   it("commits the search input after the debounce window", async () => {

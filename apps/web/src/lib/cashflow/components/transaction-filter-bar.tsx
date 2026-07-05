@@ -23,7 +23,8 @@ import {
 } from "@/components/ui/popover";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useTags } from "../hooks";
-import type { TransactionKind } from "../types";
+import type { PaletteKey, TransactionKind } from "../types";
+import { TagColorDot } from "./tag-color-dot";
 
 export interface TransactionFilterState {
   from: string | null;
@@ -299,9 +300,12 @@ function FilterChip({ filter, value, onChange, onRemove }: FilterChipProps) {
   const Icon = FILTER_ICONS[filter];
   const tags = useTags();
 
+  const activeTag = tags.data?.items.find((t) => t.id === value.tagId) ?? null;
   const summary = summaryFor(filter, value, {
-    tagName: tags.data?.items.find((t) => t.id === value.tagId)?.name ?? null,
+    tagName: activeTag?.name ?? null,
   });
+  const tagColor: PaletteKey | null =
+    filter === "tag" && activeTag ? activeTag.color : null;
 
   return (
     <div
@@ -317,6 +321,7 @@ function FilterChip({ filter, value, onChange, onRemove }: FilterChipProps) {
             className="flex items-center gap-1.5 rounded-sm px-1 hover:bg-accent/40"
           >
             <span className="font-medium">{FILTER_LABELS[filter]}</span>
+            {tagColor ? <TagColorDot color={tagColor} /> : null}
             <span className="text-muted-foreground">{summary}</span>
           </button>
         </PopoverTrigger>
