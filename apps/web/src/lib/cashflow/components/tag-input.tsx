@@ -9,7 +9,7 @@ import {
 } from "@/components/keyboard-safe-popover";
 import { Input } from "@/components/ui/input";
 import { useCreateTag, useTags } from "../hooks";
-import { PALETTE_KEYS } from "../tag-colors";
+import { PALETTE_KEYS, tagColorVar } from "../tag-colors";
 import type { PaletteKey } from "../types";
 import { TagColorDot } from "./tag-color-dot";
 
@@ -227,10 +227,9 @@ export function TagInput({ value, onChange, id }: TagInputProps) {
                         data-testid={`tag-input-create-swatch-${key}`}
                         disabled={createMutation.isPending}
                         onClick={() => createWithColor(trimmed, key)}
-                        className="rounded-full outline-none hover:opacity-70 focus-visible:ring-2 focus-visible:ring-ring"
-                      >
-                        <TagColorDot color={key} />
-                      </button>
+                        style={{ background: tagColorVar(key) }}
+                        className="size-6 rounded-full outline-none hover:opacity-80 focus-visible:ring-2 focus-visible:ring-ring"
+                      />
                     ))}
                   </div>
                 </div>
