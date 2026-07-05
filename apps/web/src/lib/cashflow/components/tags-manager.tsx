@@ -224,7 +224,7 @@ function EditTagDialog({ tag, onClose }: { tag: Tag; onClose: () => void }) {
                 <div
                   role="radiogroup"
                   aria-label="Tag color"
-                  className="grid grid-cols-5 place-items-center gap-1"
+                  className="grid grid-cols-[repeat(5,1.75rem)] gap-1"
                 >
                   {PALETTE_KEYS.map((key) => (
                     // biome-ignore lint/a11y/useSemanticElements: radiogroup of styled swatches; <input type="radio"> would leak the native circle and lose the color affordance
