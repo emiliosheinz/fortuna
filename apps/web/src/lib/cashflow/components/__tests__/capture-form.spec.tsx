@@ -368,11 +368,14 @@ describe("CaptureForm", () => {
 
     setAmount("12.34");
     setDescription("Lunch");
-    const tagInput = screen.getByTestId("tag-input-draft") as HTMLInputElement;
-    fireEvent.change(tagInput, { target: { value: "travel" } });
-    fireEvent.keyDown(tagInput, { key: "Enter" });
-    fireEvent.change(tagInput, { target: { value: "lisbon" } });
-    fireEvent.keyDown(tagInput, { key: "Enter" });
+    fireEvent.click(screen.getByTestId("tag-input-trigger"));
+    const search = (await screen.findByTestId(
+      "tag-input-search",
+    )) as HTMLInputElement;
+    fireEvent.change(search, { target: { value: "travel" } });
+    fireEvent.keyDown(search, { key: "Enter" });
+    fireEvent.change(search, { target: { value: "lisbon" } });
+    fireEvent.keyDown(search, { key: "Enter" });
     submit();
 
     await waitFor(() => {
