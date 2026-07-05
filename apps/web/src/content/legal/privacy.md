@@ -25,7 +25,7 @@ In addition, we generate and store the following data when you use Fortuna:
 
 - **Session records** — an opaque, per-device session identifier and metadata
   such as the device user-agent and the timestamp of last activity.
-- **Application activity** — records of the financial entries, categories and
+- **Application activity** — records of the financial entries, tags and
   preferences you create inside Fortuna.
 
 We do **not** collect financial credentials (such as banking passwords),
