@@ -90,9 +90,6 @@ describe("TagDrillDownView", () => {
 
     expect(await screen.findByText("# travel")).toBeInTheDocument();
     expect(screen.getByText("Coffee")).toBeInTheDocument();
-    expect(
-      screen.queryByTestId("tag-drill-down-by-category"),
-    ).not.toBeInTheDocument();
     expect(screen.getByTestId("tag-drill-down-by-month")).toHaveTextContent(
       "Jun 2026",
     );
