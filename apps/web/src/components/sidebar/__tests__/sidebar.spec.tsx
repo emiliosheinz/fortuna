@@ -79,7 +79,7 @@ describe("Sidebar", () => {
     expect(identity).toHaveTextContent("ada@example.com");
   });
 
-  it("renders the four primary nav items pointing to the right routes", () => {
+  it("renders the primary nav items pointing to the right routes", () => {
     renderSidebar();
 
     expect(screen.getByTestId("sidebar-nav-dashboard")).toHaveAttribute(
@@ -90,14 +90,14 @@ describe("Sidebar", () => {
       "href",
       "/transactions",
     );
-    expect(screen.getByTestId("sidebar-nav-categories")).toHaveAttribute(
-      "href",
-      "/categories",
-    );
     expect(screen.getByTestId("sidebar-nav-tags")).toHaveAttribute(
       "href",
       "/tags",
     );
+    expect(screen.queryByText(/^Categories$/)).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId("sidebar-nav-categories"),
+    ).not.toBeInTheDocument();
   });
 
   it("marks Dashboard active on /", () => {
