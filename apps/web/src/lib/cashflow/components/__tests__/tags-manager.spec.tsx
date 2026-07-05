@@ -68,7 +68,7 @@ describe("TagsManager edit dialog", () => {
     expect(dot.style.background).toBe("var(--tag-color-amber)");
   });
 
-  it("renders a ten-swatch color picker in the edit dialog", async () => {
+  it("shows the current color on the picker trigger and opens a ten-swatch popover", async () => {
     useIsMobileMock.mockReturnValue(false);
     renderManager();
 
@@ -76,6 +76,10 @@ describe("TagsManager edit dialog", () => {
       expect(screen.getByLabelText("Edit Travel")).toBeInTheDocument(),
     );
     fireEvent.click(screen.getByLabelText("Edit Travel"));
+
+    const trigger = screen.getByTestId("tag-color-picker-trigger");
+    expect(trigger.getAttribute("data-color")).toBe("amber");
+    fireEvent.click(trigger);
 
     const picker = await screen.findByTestId("tag-color-picker");
     expect(picker.querySelectorAll("[role=radio]")).toHaveLength(10);
@@ -115,7 +119,7 @@ describe("TagsManager edit dialog", () => {
       expect(screen.getByLabelText("Edit Travel")).toBeInTheDocument(),
     );
     fireEvent.click(screen.getByLabelText("Edit Travel"));
-
+    fireEvent.click(screen.getByTestId("tag-color-picker-trigger"));
     fireEvent.click(await screen.findByTestId("tag-color-swatch-emerald"));
     fireEvent.click(screen.getByRole("button", { name: /save/i }));
 
@@ -126,7 +130,7 @@ describe("TagsManager edit dialog", () => {
     );
   });
 
-  it("keeps the picker open with the attempted color highlighted when PATCH fails", async () => {
+  it("keeps the attempted color on the trigger when PATCH fails and surfaces an inline error", async () => {
     useIsMobileMock.mockReturnValue(false);
     updateTagMock.mockRejectedValue(new ApiError(500));
     renderManager();
@@ -135,19 +139,17 @@ describe("TagsManager edit dialog", () => {
       expect(screen.getByLabelText("Edit Travel")).toBeInTheDocument(),
     );
     fireEvent.click(screen.getByLabelText("Edit Travel"));
-
+    fireEvent.click(screen.getByTestId("tag-color-picker-trigger"));
     fireEvent.click(await screen.findByTestId("tag-color-swatch-emerald"));
     fireEvent.click(screen.getByRole("button", { name: /save/i }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
       /could not save the tag/i,
     );
-    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(screen.getByLabelText("Name")).toBeInTheDocument();
     expect(
-      screen
-        .getByTestId("tag-color-swatch-emerald")
-        .getAttribute("aria-checked"),
-    ).toBe("true");
+      screen.getByTestId("tag-color-picker-trigger").getAttribute("data-color"),
+    ).toBe("emerald");
   });
 
   it("scrolls the create error into view when the API rejects", async () => {
@@ -193,7 +195,7 @@ describe("TagsManager edit dialog", () => {
         expect(screen.getByLabelText("Edit Travel")).toBeInTheDocument();
       });
       fireEvent.click(screen.getByLabelText("Edit Travel"));
-
+      fireEvent.click(screen.getByTestId("tag-color-picker-trigger"));
       fireEvent.click(await screen.findByTestId("tag-color-swatch-emerald"));
       fireEvent.click(screen.getByRole("button", { name: /save/i }));
 

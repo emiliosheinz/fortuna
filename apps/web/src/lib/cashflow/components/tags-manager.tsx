@@ -21,6 +21,11 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ApiError } from "@/lib/api-client";
 import { useCreateTag, useDeleteTag, useTags, useUpdateTag } from "../hooks";
@@ -189,43 +194,62 @@ function EditTagDialog({ tag, onClose }: { tag: Tag; onClose: () => void }) {
           <ResponsiveDialogTitle>Edit tag</ResponsiveDialogTitle>
         </ResponsiveDialogHeader>
         <form onSubmit={handleSubmit} className="flex flex-col gap-3">
-          <Label htmlFor={inputId}>Name</Label>
-          <Input
-            id={inputId}
-            autoFocus
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-          />
-          <fieldset className="flex flex-col gap-2">
-            <legend className="text-sm font-medium">Color</legend>
-            <div
-              role="radiogroup"
-              aria-label="Tag color"
-              data-testid="tag-color-picker"
-              className="flex flex-wrap gap-2"
-            >
-              {PALETTE_KEYS.map((key) => (
-                // biome-ignore lint/a11y/useSemanticElements: radiogroup of styled swatches; <input type="radio"> would leak the native circle and lose the color affordance
+          <div className="flex items-end gap-2">
+            <Popover>
+              <PopoverTrigger asChild>
                 <button
-                  key={key}
                   type="button"
-                  role="radio"
-                  aria-checked={color === key}
-                  aria-label={`Color ${key}`}
-                  data-testid={`tag-color-swatch-${key}`}
-                  data-selected={color === key ? "true" : undefined}
-                  onClick={() => setColor(key)}
-                  className={
-                    color === key
-                      ? "rounded-full border-2 border-foreground p-0.5"
-                      : "rounded-full border-2 border-transparent p-0.5 hover:border-border"
-                  }
+                  aria-label={`Color: ${color}`}
+                  data-testid="tag-color-picker-trigger"
+                  data-color={color}
+                  className="inline-flex size-9 shrink-0 items-center justify-center rounded-md border border-border bg-background hover:bg-accent/40"
                 >
-                  <TagColorDot color={key} />
+                  <TagColorDot color={color} />
                 </button>
-              ))}
+              </PopoverTrigger>
+              <PopoverContent
+                align="start"
+                className="w-auto p-2"
+                data-testid="tag-color-picker"
+              >
+                <div
+                  role="radiogroup"
+                  aria-label="Tag color"
+                  className="grid grid-cols-5 gap-1"
+                >
+                  {PALETTE_KEYS.map((key) => (
+                    // biome-ignore lint/a11y/useSemanticElements: radiogroup of styled swatches; <input type="radio"> would leak the native circle and lose the color affordance
+                    <button
+                      key={key}
+                      type="button"
+                      role="radio"
+                      aria-checked={color === key}
+                      aria-label={`Color ${key}`}
+                      data-testid={`tag-color-swatch-${key}`}
+                      data-selected={color === key ? "true" : undefined}
+                      onClick={() => setColor(key)}
+                      className={
+                        color === key
+                          ? "flex size-7 items-center justify-center rounded-full border-2 border-foreground"
+                          : "flex size-7 items-center justify-center rounded-full border-2 border-transparent hover:border-border"
+                      }
+                    >
+                      <TagColorDot color={key} />
+                    </button>
+                  ))}
+                </div>
+              </PopoverContent>
+            </Popover>
+            <div className="flex flex-1 flex-col gap-1">
+              <Label htmlFor={inputId}>Name</Label>
+              <Input
+                id={inputId}
+                autoFocus
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+              />
             </div>
-          </fieldset>
+          </div>
           {error ? (
             <p ref={errorRef} role="alert" className="text-sm text-destructive">
               {error}
