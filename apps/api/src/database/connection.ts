@@ -5,7 +5,6 @@ import { Identity } from "@/auth/entities/identity.entity";
 import { Session } from "@/auth/entities/session.entity";
 import { SignInEvent } from "@/auth/entities/sign-in-event.entity";
 import { User } from "@/auth/entities/user.entity";
-import { Category } from "@/cashflow/entities/category.entity";
 import { Tag } from "@/cashflow/entities/tag.entity";
 import { Transaction } from "@/cashflow/entities/transaction.entity";
 import { TransactionTag } from "@/cashflow/entities/transaction-tag.entity";
@@ -29,7 +28,6 @@ export const AppDataSource = new DataSource({
     DeviceFingerprint,
     UserSettings,
     Transaction,
-    Category,
     Tag,
     TransactionTag,
     FxRate,

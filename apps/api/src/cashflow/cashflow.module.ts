@@ -3,16 +3,13 @@ import { TypeOrmModule } from "@nestjs/typeorm";
 import { AuthModule } from "@/auth/auth.module";
 import { FxModule } from "@/fx/fx.module";
 import { UsersModule } from "@/users/users.module";
-import { CategoriesController } from "./controllers/categories.controller";
 import { SummaryController } from "./controllers/summary.controller";
 import { TagsController } from "./controllers/tags.controller";
 import { TransactionsController } from "./controllers/transactions.controller";
 import { TrendController } from "./controllers/trend.controller";
-import { Category } from "./entities/category.entity";
 import { Tag } from "./entities/tag.entity";
 import { Transaction } from "./entities/transaction.entity";
 import { TransactionTag } from "./entities/transaction-tag.entity";
-import { CategoriesService } from "./services/categories.service";
 import { SummaryService } from "./services/summary.service";
 import { TagDrillDownService } from "./services/tag-drill-down.service";
 import { TagsService } from "./services/tags.service";
@@ -21,21 +18,19 @@ import { TrendService } from "./services/trend.service";
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Transaction, Category, Tag, TransactionTag]),
+    TypeOrmModule.forFeature([Transaction, Tag, TransactionTag]),
     AuthModule,
     UsersModule,
     FxModule,
   ],
   controllers: [
     TransactionsController,
-    CategoriesController,
     TagsController,
     SummaryController,
     TrendController,
   ],
   providers: [
     TransactionsService,
-    CategoriesService,
     TagsService,
     SummaryService,
     TrendService,

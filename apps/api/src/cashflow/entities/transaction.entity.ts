@@ -9,7 +9,6 @@ import {
   UpdateDateColumn,
 } from "typeorm";
 import { User } from "@/auth/entities/user.entity";
-import { Category } from "./category.entity";
 
 export type TransactionKind = "income" | "expense";
 
@@ -24,7 +23,6 @@ export type TransactionKind = "income" | "expense";
  */
 @Entity({ name: "transactions" })
 @Index("transactions_user_date_id_idx", ["userId", "date", "id"])
-@Index("transactions_user_category_idx", ["userId", "categoryId"])
 @Index("transactions_user_group_idx", ["userId", "groupId"], {
   where: '"group_id" IS NOT NULL',
 })
@@ -53,13 +51,6 @@ export class Transaction {
 
   @Column({ type: "varchar", length: 16 })
   declare kind: TransactionKind;
-
-  @Column({ name: "category_id", type: "uuid", nullable: true })
-  declare categoryId: string | null;
-
-  @ManyToOne(() => Category, { onDelete: "SET NULL", nullable: true })
-  @JoinColumn({ name: "category_id" })
-  declare category: Category | null;
 
   @Column({ name: "group_id", type: "uuid", nullable: true })
   declare groupId: string | null;
