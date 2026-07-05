@@ -49,7 +49,7 @@ export function TagsManager() {
     const trimmed = name.trim();
     if (!trimmed) return;
     try {
-      await createMutation.mutateAsync(trimmed);
+      await createMutation.mutateAsync({ name: trimmed });
       setName("");
     } catch (err) {
       const message =
@@ -195,6 +195,15 @@ function EditTagDialog({ tag, onClose }: { tag: Tag; onClose: () => void }) {
         </ResponsiveDialogHeader>
         <form onSubmit={handleSubmit} className="flex flex-col gap-3">
           <div className="flex items-end gap-2">
+            <div className="flex flex-1 flex-col gap-1">
+              <Label htmlFor={inputId}>Name</Label>
+              <Input
+                id={inputId}
+                autoFocus
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+              />
+            </div>
             <Popover>
               <PopoverTrigger asChild>
                 <button
@@ -208,7 +217,7 @@ function EditTagDialog({ tag, onClose }: { tag: Tag; onClose: () => void }) {
                 </button>
               </PopoverTrigger>
               <PopoverContent
-                align="start"
+                align="end"
                 className="w-auto p-2"
                 data-testid="tag-color-picker"
               >
@@ -240,15 +249,6 @@ function EditTagDialog({ tag, onClose }: { tag: Tag; onClose: () => void }) {
                 </div>
               </PopoverContent>
             </Popover>
-            <div className="flex flex-1 flex-col gap-1">
-              <Label htmlFor={inputId}>Name</Label>
-              <Input
-                id={inputId}
-                autoFocus
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-              />
-            </div>
           </div>
           {error ? (
             <p ref={errorRef} role="alert" className="text-sm text-destructive">
