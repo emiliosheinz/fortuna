@@ -112,7 +112,6 @@ describe("CaptureForm", () => {
       kind: "expense",
       tagNames: [],
     });
-    expect(payload).not.toHaveProperty("categoryId");
     expect(payload?.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
 

@@ -19,7 +19,7 @@ describe("Privacy Policy page", () => {
     expect(screen.getByText(/last updated:/i)).toBeInTheDocument();
   });
 
-  it("lists categories of personal data collected", async () => {
+  it("renders the 'Information We Collect' section", async () => {
     await renderPage();
     expect(
       screen.getByRole("heading", { name: /information we collect/i }),
