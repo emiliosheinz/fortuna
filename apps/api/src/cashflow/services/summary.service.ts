@@ -3,14 +3,15 @@ import { InjectRepository } from "@nestjs/typeorm";
 import { Between, Repository } from "typeorm";
 import { FxLookupService } from "@/fx/services/fx-lookup.service";
 import { UserSettingsService } from "@/users/services/user-settings.service";
-import { Category } from "../entities/category.entity";
+import { Tag } from "../entities/tag.entity";
 import { Transaction } from "../entities/transaction.entity";
 import {
   aggregate,
-  type CategoryBucket,
   type ConvertedRow,
+  type TagBucket,
 } from "./aggregations";
 import { monthBounds } from "./month-window";
+import { TransactionsService } from "./transactions.service";
 
 export interface SummaryResponse {
   month: string;
@@ -18,7 +19,7 @@ export interface SummaryResponse {
   income: string;
   expense: string;
   net: string;
-  byCategory: CategoryBucket[];
+  byTag: TagBucket[];
   excludedUnconvertibleCount: number;
 }
 
@@ -27,8 +28,9 @@ export class SummaryService {
   constructor(
     @InjectRepository(Transaction)
     private readonly transactions: Repository<Transaction>,
-    @InjectRepository(Category)
-    private readonly categories: Repository<Category>,
+    @InjectRepository(Tag)
+    private readonly tags: Repository<Tag>,
+    private readonly transactionsService: TransactionsService,
     private readonly fxLookup: FxLookupService,
     private readonly userSettings: UserSettingsService,
   ) {}
@@ -51,13 +53,25 @@ export class SummaryService {
         amount: true,
         currency: true,
         kind: true,
-        categoryId: true,
       },
     });
 
-    const converted = await convertRows(rows, baseCurrency, this.fxLookup);
-    const categoryNameById = await this.loadCategoryNames(userId);
-    const result = aggregate(converted, categoryNameById);
+    const tagIdsByTransaction =
+      await this.transactionsService.loadTagIdsByTransaction(
+        rows.map((r) => r.id),
+      );
+    const convertible: ConvertibleRow[] = rows.map((row) => ({
+      id: row.id,
+      date: row.date,
+      amount: row.amount,
+      currency: row.currency,
+      kind: row.kind,
+      tagIds: tagIdsByTransaction.get(row.id) ?? [],
+    }));
+
+    const converted = await convertRows(convertible, baseCurrency, this.fxLookup);
+    const tagNameById = await this.loadTagNames(userId);
+    const result = aggregate(converted, tagNameById);
 
     return {
       month,
@@ -65,15 +79,13 @@ export class SummaryService {
       income: result.totals.income,
       expense: result.totals.expense,
       net: result.totals.net,
-      byCategory: result.byCategory,
+      byTag: result.byTag,
       excludedUnconvertibleCount: result.excludedUnconvertibleCount,
     };
   }
 
-  private async loadCategoryNames(
-    userId: string,
-  ): Promise<Map<string, string>> {
-    const rows = await this.categories.find({
+  private async loadTagNames(userId: string): Promise<Map<string, string>> {
+    const rows = await this.tags.find({
       where: { userId },
       select: { id: true, name: true },
     });
@@ -87,7 +99,7 @@ export interface ConvertibleRow {
   amount: string;
   currency: string;
   kind: Transaction["kind"];
-  categoryId: string | null;
+  tagIds: string[];
 }
 
 export async function convertRows(
@@ -116,7 +128,7 @@ export async function convertRows(
       id: row.id,
       date: row.date,
       kind: row.kind,
-      categoryId: row.categoryId,
+      tagIds: row.tagIds,
       baseAmount,
       unconvertible: resolution.unconvertible,
     });
