@@ -12,7 +12,6 @@ export interface TransactionResponse {
   currency: string;
   description: string;
   kind: TransactionKind;
-  categoryId: string | null;
   tagIds: string[];
   baseAmount: string | null;
   baseCurrency: string;
@@ -42,7 +41,6 @@ export function transactionToResponse(
     currency: row.currency,
     description: row.description,
     kind: row.kind,
-    categoryId: row.categoryId,
     tagIds,
     baseAmount,
     baseCurrency,

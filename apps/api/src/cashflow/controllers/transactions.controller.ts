@@ -61,7 +61,6 @@ export class TransactionsController {
         cursor: query.cursor,
         from: query.from,
         to: query.to,
-        categoryId: query.categoryId,
         tagId: query.tagId,
         groupId: query.groupId,
         kind: query.kind,
