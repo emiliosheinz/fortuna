@@ -7,7 +7,6 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
-  IsUUID,
   Matches,
   Max,
   MaxLength,
@@ -65,10 +64,6 @@ export class CreateTransactionDto {
 
   @IsIn(["income", "expense"])
   declare kind: TransactionKind;
-
-  @IsOptional()
-  @IsUUID()
-  declare categoryId?: string;
 
   @IsOptional()
   @IsArray()

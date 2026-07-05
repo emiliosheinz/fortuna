@@ -41,10 +41,6 @@ export class ListTransactionsDto {
 
   @IsOptional()
   @IsUUID()
-  declare categoryId?: string;
-
-  @IsOptional()
-  @IsUUID()
   declare tagId?: string;
 
   @IsOptional()
