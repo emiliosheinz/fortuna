@@ -14,13 +14,20 @@ const NAME_MAX = 100;
 const TRIM = ({ value }: { value: unknown }) =>
   typeof value === "string" ? value.trim() : value;
 
-/** Request body for `POST /tags`. Server owns color at create time. */
+/**
+ * Request body for `POST /tags`. `color` is optional: when omitted, the
+ * service falls back to the deterministic `assignColor(name)` rule.
+ */
 export class CreateTagDto {
   @IsString()
   @Transform(TRIM)
   @IsNotEmpty()
   @MaxLength(NAME_MAX)
   declare name: string;
+
+  @IsOptional()
+  @IsIn([...PALETTE_KEYS])
+  declare color?: PaletteKey;
 }
 
 /**

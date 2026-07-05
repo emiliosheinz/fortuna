@@ -42,7 +42,7 @@ export class TagsController {
     @Body() body: CreateTagDto,
   ): Promise<{ tag: TagResponse }> {
     const principal = requirePrincipal(req);
-    const tag = await this.tags.create(principal.userId, body.name);
+    const tag = await this.tags.create(principal.userId, body.name, body.color);
     return { tag };
   }
 

@@ -46,10 +46,25 @@ describe("CreateTagDto", () => {
     );
   });
 
-  it("rejects a body carrying a color property when whitelisting is enforced", async () => {
-    const dto = plainToInstance(CreateTagDto, {
+  it("accepts an optional palette color at create time", async () => {
+    const { errors, dto } = await checkCreate({
       name: "travel",
       color: "amber",
+    });
+    expect(errors).toEqual([]);
+    expect(dto.color).toBe("amber");
+  });
+
+  it("rejects a color that is not a palette key", async () => {
+    expect(
+      (await checkCreate({ name: "travel", color: "bogus" })).errors,
+    ).toContain("isIn");
+  });
+
+  it("rejects an unknown property under whitelist", async () => {
+    const dto = plainToInstance(CreateTagDto, {
+      name: "travel",
+      unexpected: 42,
     });
     const errors = await validate(dto, {
       whitelist: true,

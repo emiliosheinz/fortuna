@@ -29,10 +29,14 @@ export class TagsService {
     private readonly tags: Repository<Tag>,
   ) {}
 
-  async create(userId: string, name: string): Promise<TagResponse> {
+  async create(
+    userId: string,
+    name: string,
+    color?: PaletteKey,
+  ): Promise<TagResponse> {
     try {
       const saved = await this.tags.save(
-        this.tags.create({ userId, name, color: assignColor(name) }),
+        this.tags.create({ userId, name, color: color ?? assignColor(name) }),
       );
       return toResponse(saved);
     } catch (err) {

@@ -510,12 +510,22 @@ describe("Cashflow integration", () => {
       expect(list.body.items[0].color).toBe(assignColor("groceries"));
     });
 
-    it("rejects POST /tags with a body color property (whitelisted DTO)", async () => {
+    it("persists an explicit palette color on POST /tags when provided", async () => {
+      const cookie = await aliceCookie();
+      const res = await request(app.getHttpServer())
+        .post("/tags")
+        .set("Cookie", cookie)
+        .send({ name: "travel", color: "emerald" })
+        .expect(201);
+      expect(res.body.tag.color).toBe("emerald");
+    });
+
+    it("rejects POST /tags with a color outside the palette", async () => {
       const cookie = await aliceCookie();
       await request(app.getHttpServer())
         .post("/tags")
         .set("Cookie", cookie)
-        .send({ name: "travel", color: "amber" })
+        .send({ name: "travel", color: "bogus" })
         .expect(400);
     });
 
