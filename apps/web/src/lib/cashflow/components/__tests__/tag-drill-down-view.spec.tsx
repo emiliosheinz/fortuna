@@ -41,7 +41,6 @@ const tx: Transaction = {
   currency: "USD",
   description: "Coffee",
   kind: "expense",
-  categoryId: null,
   tagIds: ["tag-1"],
   baseAmount: "12.34",
   baseCurrency: "USD",
@@ -74,22 +73,13 @@ describe("TagDrillDownView", () => {
     getTagDrillDownMock.mockReset();
   });
 
-  it("renders the tag name, transactions, and both breakdowns on success", async () => {
+  it("renders the tag name, transactions, and the month breakdown on success", async () => {
     getTagDrillDownMock.mockResolvedValue({
       tag: { id: "tag-1", name: "travel" },
       baseCurrency: "USD",
       from: null,
       to: null,
       transactions: [tx],
-      byCategory: [
-        {
-          categoryId: "cat-food",
-          categoryName: "Food",
-          income: "0.00",
-          expense: "12.34",
-          net: "-12.34",
-        },
-      ],
       byMonth: [
         { month: "2026-06", income: "0.00", expense: "12.34", net: "-12.34" },
       ],
@@ -100,9 +90,9 @@ describe("TagDrillDownView", () => {
 
     expect(await screen.findByText("# travel")).toBeInTheDocument();
     expect(screen.getByText("Coffee")).toBeInTheDocument();
-    expect(screen.getByTestId("tag-drill-down-by-category")).toHaveTextContent(
-      "Food",
-    );
+    expect(
+      screen.queryByTestId("tag-drill-down-by-category"),
+    ).not.toBeInTheDocument();
     expect(screen.getByTestId("tag-drill-down-by-month")).toHaveTextContent(
       "Jun 2026",
     );
@@ -115,7 +105,6 @@ describe("TagDrillDownView", () => {
       from: null,
       to: null,
       transactions: [],
-      byCategory: [],
       byMonth: [],
       excludedUnconvertibleCount: 0,
     });

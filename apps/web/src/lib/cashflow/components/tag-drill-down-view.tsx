@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatMoney } from "../format-money";
 import { useTagDrillDown } from "../hooks";
-import type { CategoryBucket, MonthBucket, Transaction } from "../types";
+import type { MonthBucket, Transaction } from "../types";
 import { MonthRangePicker } from "./month-range-picker";
 
 interface TagDrillDownViewProps {
@@ -36,7 +36,7 @@ export function TagDrillDownView({
             {query.data ? `# ${query.data.tag.name}` : "Tag drill-down"}
           </h1>
           <p className="text-sm text-muted-foreground">
-            Transactions tagged with this label, grouped by category and month.
+            Transactions tagged with this label, grouped by month.
           </p>
         </div>
         <div className="flex flex-col gap-1.5">
@@ -60,7 +60,7 @@ function renderBody(
 ): React.ReactElement {
   if (query.isPending) return <DrillDownSkeleton />;
   if (query.isError || !query.data) return <DrillDownError />;
-  const { transactions, byCategory, byMonth, baseCurrency } = query.data;
+  const { transactions, byMonth, baseCurrency } = query.data;
 
   if (transactions.length === 0) {
     return (
@@ -87,44 +87,9 @@ function renderBody(
         </p>
       ) : null}
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <CategoryBreakdown buckets={byCategory} baseCurrency={baseCurrency} />
-        <MonthBreakdown points={byMonth} baseCurrency={baseCurrency} />
-      </div>
+      <MonthBreakdown points={byMonth} baseCurrency={baseCurrency} />
 
       <TransactionsList transactions={transactions} />
-    </div>
-  );
-}
-
-function CategoryBreakdown({
-  buckets,
-  baseCurrency,
-}: {
-  buckets: CategoryBucket[];
-  baseCurrency: string;
-}) {
-  return (
-    <div
-      data-testid="tag-drill-down-by-category"
-      className="flex flex-col rounded-md border border-border"
-    >
-      <h2 className="border-b border-border px-3 py-2 text-sm font-medium">
-        By category
-      </h2>
-      <ul className="flex flex-col divide-y divide-border">
-        {buckets.map((bucket) => (
-          <li
-            key={bucket.categoryId ?? "__uncategorized__"}
-            className="flex items-center justify-between p-3 text-sm"
-          >
-            <span>{bucket.categoryName ?? "Uncategorized"}</span>
-            <span className="tabular-nums">
-              {formatMoney(bucket.net, baseCurrency)}
-            </span>
-          </li>
-        ))}
-      </ul>
     </div>
   );
 }
