@@ -11,6 +11,7 @@ import type {
   Transaction,
   TrendParams,
   TrendResponse,
+  UpdateTagInput,
   UpdateTransactionInput,
 } from "./types";
 
@@ -81,9 +82,9 @@ export const cashflowApi = {
       body: { name },
     }),
 
-  renameTag: (id: string, name: string) =>
+  updateTag: (id: string, input: UpdateTagInput) =>
     apiClient.patch<{ tag: Tag }>(`${PREFIX}/tags/${id}`, {
-      body: { name },
+      body: input,
     }),
 
   deleteTag: (id: string) => apiClient.delete<void>(`${PREFIX}/tags/${id}`),

@@ -14,6 +14,7 @@ import type {
   ListTransactionsParams,
   TagDrillDownParams,
   TrendParams,
+  UpdateTagInput,
   UpdateTransactionInput,
 } from "./types";
 
@@ -121,11 +122,11 @@ export function useCreateTag() {
   });
 }
 
-export function useRenameTag() {
+export function useUpdateTag() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, name }: { id: string; name: string }) =>
-      cashflowApi.renameTag(id, name),
+    mutationFn: ({ id, input }: { id: string; input: UpdateTagInput }) =>
+      cashflowApi.updateTag(id, input),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: CASHFLOW_QUERY_KEYS.tags });
       queryClient.invalidateQueries({
