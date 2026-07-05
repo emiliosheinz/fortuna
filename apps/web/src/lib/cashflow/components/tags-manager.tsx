@@ -23,8 +23,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ApiError } from "@/lib/api-client";
-import { useCreateTag, useDeleteTag, useRenameTag, useTags } from "../hooks";
-import type { Tag } from "../types";
+import { useCreateTag, useDeleteTag, useTags, useUpdateTag } from "../hooks";
+import { PALETTE_KEYS } from "../tag-colors";
+import type { PaletteKey, Tag } from "../types";
+import { TagColorDot } from "./tag-color-dot";
 
 export function TagsManager() {
   const list = useTags();
@@ -104,13 +106,16 @@ export function TagsManager() {
               key={tag.id}
               className="flex items-center justify-between gap-3 p-3"
             >
-              <span className="text-sm">{tag.name}</span>
+              <span className="flex items-center gap-2 text-sm">
+                <TagColorDot color={tag.color} />
+                {tag.name}
+              </span>
               <div className="flex items-center gap-1">
                 <Button
                   type="button"
                   variant="ghost"
                   size="sm"
-                  aria-label={`Rename ${tag.name}`}
+                  aria-label={`Edit ${tag.name}`}
                   onClick={() => setEditing(tag)}
                 >
                   <PencilIcon className="size-4" />
@@ -131,7 +136,7 @@ export function TagsManager() {
       )}
 
       {editing ? (
-        <RenameTagDialog tag={editing} onClose={() => setEditing(null)} />
+        <EditTagDialog tag={editing} onClose={() => setEditing(null)} />
       ) : null}
       {deleting ? (
         <DeleteTagDialog tag={deleting} onClose={() => setDeleting(null)} />
@@ -140,27 +145,35 @@ export function TagsManager() {
   );
 }
 
-function RenameTagDialog({ tag, onClose }: { tag: Tag; onClose: () => void }) {
+function EditTagDialog({ tag, onClose }: { tag: Tag; onClose: () => void }) {
   const inputId = useId();
   const [name, setName] = useState(tag.name);
+  const [color, setColor] = useState<PaletteKey>(tag.color);
   const [error, setError] = useState<string | null>(null);
   const errorRef = useRef<HTMLParagraphElement | null>(null);
   const scrollIntoView = useResponsiveDialogScrollIntoView();
-  const mutation = useRenameTag();
+  const mutation = useUpdateTag();
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
     const trimmed = name.trim();
     if (!trimmed) return;
+    const patch: { name?: string; color?: PaletteKey } = {};
+    if (trimmed !== tag.name) patch.name = trimmed;
+    if (color !== tag.color) patch.color = color;
+    if (patch.name === undefined && patch.color === undefined) {
+      onClose();
+      return;
+    }
     try {
-      await mutation.mutateAsync({ id: tag.id, name: trimmed });
+      await mutation.mutateAsync({ id: tag.id, input: patch });
       onClose();
     } catch (err) {
       const message =
         err instanceof ApiError && err.status === 409
           ? "A tag with that name already exists."
-          : "Could not rename tag. Try again.";
+          : "Could not save the tag. Try again.";
       flushSync(() => setError(message));
       scrollIntoView(errorRef.current);
     }
@@ -173,7 +186,7 @@ function RenameTagDialog({ tag, onClose }: { tag: Tag; onClose: () => void }) {
     >
       <ResponsiveDialogContent>
         <ResponsiveDialogHeader>
-          <ResponsiveDialogTitle>Rename tag</ResponsiveDialogTitle>
+          <ResponsiveDialogTitle>Edit tag</ResponsiveDialogTitle>
         </ResponsiveDialogHeader>
         <form onSubmit={handleSubmit} className="flex flex-col gap-3">
           <Label htmlFor={inputId}>Name</Label>
@@ -183,6 +196,36 @@ function RenameTagDialog({ tag, onClose }: { tag: Tag; onClose: () => void }) {
             value={name}
             onChange={(e) => setName(e.target.value)}
           />
+          <fieldset className="flex flex-col gap-2">
+            <legend className="text-sm font-medium">Color</legend>
+            <div
+              role="radiogroup"
+              aria-label="Tag color"
+              data-testid="tag-color-picker"
+              className="flex flex-wrap gap-2"
+            >
+              {PALETTE_KEYS.map((key) => (
+                // biome-ignore lint/a11y/useSemanticElements: radiogroup of styled swatches; <input type="radio"> would leak the native circle and lose the color affordance
+                <button
+                  key={key}
+                  type="button"
+                  role="radio"
+                  aria-checked={color === key}
+                  aria-label={`Color ${key}`}
+                  data-testid={`tag-color-swatch-${key}`}
+                  data-selected={color === key ? "true" : undefined}
+                  onClick={() => setColor(key)}
+                  className={
+                    color === key
+                      ? "rounded-full border-2 border-foreground p-0.5"
+                      : "rounded-full border-2 border-transparent p-0.5 hover:border-border"
+                  }
+                >
+                  <TagColorDot color={key} />
+                </button>
+              ))}
+            </div>
+          </fieldset>
           {error ? (
             <p ref={errorRef} role="alert" className="text-sm text-destructive">
               {error}
