@@ -10,14 +10,7 @@ const MIN_DELTA = 0.3;
 const ROOT_BG_L = 1;
 const DARK_BG_L = 0.145;
 
-const globalsPath = join(
-  __dirname,
-  "..",
-  "..",
-  "..",
-  "app",
-  "globals.css",
-);
+const globalsPath = join(__dirname, "..", "..", "..", "app", "globals.css");
 const css = readFileSync(globalsPath, "utf8");
 
 function extractBlock(selector: string): string {
@@ -29,9 +22,7 @@ function extractBlock(selector: string): string {
 }
 
 function extractLightness(block: string, key: string): number {
-  const re = new RegExp(
-    `--tag-color-${key}\\s*:\\s*oklch\\(\\s*([0-9.]+)`,
-  );
+  const re = new RegExp(`--tag-color-${key}\\s*:\\s*oklch\\(\\s*([0-9.]+)`);
   const match = block.match(re);
   if (!match) throw new Error(`Missing --tag-color-${key} declaration`);
   return Number(match[1]);
