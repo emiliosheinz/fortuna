@@ -17,6 +17,7 @@ import {
 import { Tag } from "@/cashflow/entities/tag.entity";
 import { Transaction } from "@/cashflow/entities/transaction.entity";
 import { TransactionTag } from "@/cashflow/entities/transaction-tag.entity";
+import { assignColor } from "@/cashflow/tag-colors";
 import { FxRate } from "@/fx/entities/fx-rate.entity";
 import {
   FX_FETCH_RETRY_OPTIONS,
@@ -471,6 +472,7 @@ describe("Cashflow integration", () => {
         .send({ name: "travel" })
         .expect(201);
       const id = created.body.tag.id as string;
+      expect(created.body.tag.color).toBe(assignColor("travel"));
 
       const renamed = await request(app.getHttpServer())
         .patch(`/tags/${id}`)
@@ -478,6 +480,8 @@ describe("Cashflow integration", () => {
         .send({ name: "vacation" })
         .expect(200);
       expect(renamed.body.tag.name).toBe("vacation");
+      // Rename preserves the original auto-assigned color.
+      expect(renamed.body.tag.color).toBe(assignColor("travel"));
 
       await request(app.getHttpServer())
         .delete(`/tags/${id}`)
@@ -488,6 +492,109 @@ describe("Cashflow integration", () => {
         .set("Cookie", cookie)
         .expect(200);
       expect(after.body.items).toHaveLength(0);
+    });
+
+    it("auto-assigns a palette-key color on POST /tags matching assignColor(name)", async () => {
+      const cookie = await aliceCookie();
+      const res = await request(app.getHttpServer())
+        .post("/tags")
+        .set("Cookie", cookie)
+        .send({ name: "groceries" })
+        .expect(201);
+      expect(res.body.tag.color).toBe(assignColor("groceries"));
+
+      const list = await request(app.getHttpServer())
+        .get("/tags")
+        .set("Cookie", cookie)
+        .expect(200);
+      expect(list.body.items[0].color).toBe(assignColor("groceries"));
+    });
+
+    it("rejects POST /tags with a body color property (whitelisted DTO)", async () => {
+      const cookie = await aliceCookie();
+      await request(app.getHttpServer())
+        .post("/tags")
+        .set("Cookie", cookie)
+        .send({ name: "travel", color: "amber" })
+        .expect(400);
+    });
+
+    it("persists a new color on PATCH /tags/:id with a valid palette key", async () => {
+      const cookie = await aliceCookie();
+      const created = await request(app.getHttpServer())
+        .post("/tags")
+        .set("Cookie", cookie)
+        .send({ name: "travel" })
+        .expect(201);
+      const id = created.body.tag.id as string;
+
+      const patched = await request(app.getHttpServer())
+        .patch(`/tags/${id}`)
+        .set("Cookie", cookie)
+        .send({ color: "emerald" })
+        .expect(200);
+      expect(patched.body.tag.color).toBe("emerald");
+
+      const list = await request(app.getHttpServer())
+        .get("/tags")
+        .set("Cookie", cookie)
+        .expect(200);
+      expect(list.body.items[0].color).toBe("emerald");
+    });
+
+    it("rejects PATCH /tags/:id with an unknown color key and leaves the row unchanged", async () => {
+      const cookie = await aliceCookie();
+      const created = await request(app.getHttpServer())
+        .post("/tags")
+        .set("Cookie", cookie)
+        .send({ name: "travel" })
+        .expect(201);
+      const id = created.body.tag.id as string;
+      const originalColor = created.body.tag.color as string;
+
+      await request(app.getHttpServer())
+        .patch(`/tags/${id}`)
+        .set("Cookie", cookie)
+        .send({ color: "bogus" })
+        .expect(400);
+
+      const row = await dataSource
+        .getRepository(Tag)
+        .findOneOrFail({ where: { id } });
+      expect(row.color).toBe(originalColor);
+    });
+
+    it("rejects an empty PATCH body with 400", async () => {
+      const cookie = await aliceCookie();
+      const created = await request(app.getHttpServer())
+        .post("/tags")
+        .set("Cookie", cookie)
+        .send({ name: "travel" })
+        .expect(201);
+      await request(app.getHttpServer())
+        .patch(`/tags/${created.body.tag.id}`)
+        .set("Cookie", cookie)
+        .send({})
+        .expect(400);
+    });
+
+    it("returns 404 when patching a tag owned by another user", async () => {
+      const aliceC = await aliceCookie();
+      const { cookie: bobC } = await signInUser({
+        sub: "sub-b",
+        name: "Bob",
+        email: "bob@example.com",
+      });
+      const bobTag = await request(app.getHttpServer())
+        .post("/tags")
+        .set("Cookie", bobC)
+        .send({ name: "bob-tag" })
+        .expect(201);
+      await request(app.getHttpServer())
+        .patch(`/tags/${bobTag.body.tag.id}`)
+        .set("Cookie", aliceC)
+        .send({ color: "amber" })
+        .expect(404);
     });
 
     it("rejects a duplicate tag on create with 409", async () => {
@@ -611,6 +718,18 @@ describe("Cashflow integration", () => {
         order: { name: "ASC" },
       });
       expect(tags.map((t) => t.name)).toEqual(["lisbon", "travel"]);
+      // Implicit creation auto-assigns a color by the same rule.
+      expect(tags.map((t) => t.color)).toEqual([
+        assignColor("lisbon"),
+        assignColor("travel"),
+      ]);
+      // Backfill invariant: no row ever escapes without a color.
+      const nulls = await dataSource
+        .getRepository(Tag)
+        .createQueryBuilder("t")
+        .where("t.color IS NULL")
+        .getCount();
+      expect(nulls).toBe(0);
     });
   });
 
@@ -1164,6 +1283,7 @@ describe("Cashflow integration", () => {
           {
             tagId: foodTagId,
             tagName: "Food",
+            color: assignColor("Food"),
             income: "0.00",
             expense: "50.00",
             net: "-50.00",
@@ -1171,6 +1291,7 @@ describe("Cashflow integration", () => {
           {
             tagId: transportTagId,
             tagName: "Transport",
+            color: assignColor("Transport"),
             income: "0.00",
             expense: "15.00",
             net: "-15.00",
@@ -1178,6 +1299,7 @@ describe("Cashflow integration", () => {
           {
             tagId: null,
             tagName: null,
+            color: null,
             income: "1000.00",
             expense: "0.00",
             net: "1000.00",
@@ -1262,11 +1384,43 @@ describe("Cashflow integration", () => {
           {
             tagId: null,
             tagName: null,
+            color: null,
             income: "0.00",
             expense: "100.00",
             net: "-100.00",
           },
         ]);
+      });
+
+      it("exposes each non-null tagId bucket's color and null for the Untagged bucket", async () => {
+        const cookie = await aliceCookie();
+        await capture(cookie, {
+          date: "2026-06-07",
+          amount: "10.00",
+          kind: "expense",
+          tagNames: ["A"],
+          description: "tagged",
+        });
+        await capture(cookie, {
+          date: "2026-06-08",
+          amount: "5.00",
+          kind: "expense",
+          description: "untagged",
+        });
+
+        const res = await request(app.getHttpServer())
+          .get("/summary?month=2026-06")
+          .set("Cookie", cookie)
+          .expect(200);
+
+        const tagged = res.body.byTag.find(
+          (b: { tagId: string | null }) => b.tagId !== null,
+        );
+        const untagged = res.body.byTag.find(
+          (b: { tagId: string | null }) => b.tagId === null,
+        );
+        expect(tagged.color).toBe(assignColor("A"));
+        expect(untagged.color).toBeNull();
       });
 
       it("carries byTag and never byCategory", async () => {
@@ -1597,7 +1751,11 @@ describe("Cashflow integration", () => {
         .set("Cookie", cookie)
         .expect(200);
 
-      expect(res.body.tag).toEqual({ id: travelTagId, name: "travel" });
+      expect(res.body.tag).toEqual({
+        id: travelTagId,
+        name: "travel",
+        color: assignColor("travel"),
+      });
       expect(res.body.baseCurrency).toBe("USD");
       expect(res.body.transactions).toHaveLength(2);
       expect(
