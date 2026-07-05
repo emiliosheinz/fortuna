@@ -6,11 +6,17 @@ import {
 import { InjectRepository } from "@nestjs/typeorm";
 import { type EntityManager, In, QueryFailedError, Repository } from "typeorm";
 import { Tag } from "../entities/tag.entity";
-import { assignColor } from "../tag-colors";
+import { assignColor, type PaletteKey } from "../tag-colors";
 
 export interface TagResponse {
   id: string;
   name: string;
+  color: PaletteKey;
+}
+
+export interface UpdateTagPatch {
+  name?: string;
+  color?: PaletteKey;
 }
 
 const UNIQUE_VIOLATION = "23505";
@@ -42,17 +48,22 @@ export class TagsService {
     return rows.map(toResponse);
   }
 
-  async rename(userId: string, id: string, name: string): Promise<TagResponse> {
+  async update(
+    userId: string,
+    id: string,
+    patch: UpdateTagPatch,
+  ): Promise<TagResponse> {
     const row = await this.tags.findOne({ where: { id, userId } });
     if (!row) {
       throw new NotFoundException("Tag not found");
     }
-    row.name = name;
+    if (patch.name !== undefined) row.name = patch.name;
+    if (patch.color !== undefined) row.color = patch.color;
     try {
       const saved = await this.tags.save(row);
       return toResponse(saved);
     } catch (err) {
-      throw mapUniqueViolation(err, name);
+      throw mapUniqueViolation(err, patch.name ?? row.name);
     }
   }
 
@@ -117,7 +128,7 @@ function dedupe(names: readonly string[]): string[] {
 }
 
 function toResponse(row: Tag): TagResponse {
-  return { id: row.id, name: row.name };
+  return { id: row.id, name: row.name, color: row.color };
 }
 
 function mapUniqueViolation(err: unknown, name: string): Error {

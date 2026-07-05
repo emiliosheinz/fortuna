@@ -5,7 +5,12 @@ import { FxLookupService } from "@/fx/services/fx-lookup.service";
 import { UserSettingsService } from "@/users/services/user-settings.service";
 import { Tag } from "../entities/tag.entity";
 import { Transaction } from "../entities/transaction.entity";
-import { aggregate, type ConvertedRow, type TagBucket } from "./aggregations";
+import {
+  aggregate,
+  type ConvertedRow,
+  type TagBucket,
+  type TagInfo,
+} from "./aggregations";
 import { monthBounds } from "./month-window";
 import { TransactionsService } from "./transactions.service";
 
@@ -70,8 +75,8 @@ export class SummaryService {
       baseCurrency,
       this.fxLookup,
     );
-    const tagNameById = await this.loadTagNames(userId);
-    const result = aggregate(converted, tagNameById);
+    const tagInfoById = await this.loadTagInfo(userId);
+    const result = aggregate(converted, tagInfoById);
 
     return {
       month,
@@ -84,12 +89,14 @@ export class SummaryService {
     };
   }
 
-  private async loadTagNames(userId: string): Promise<Map<string, string>> {
+  private async loadTagInfo(userId: string): Promise<Map<string, TagInfo>> {
     const rows = await this.tags.find({
       where: { userId },
-      select: { id: true, name: true },
+      select: { id: true, name: true, color: true },
     });
-    return new Map(rows.map((row) => [row.id, row.name]));
+    return new Map(
+      rows.map((row) => [row.id, { name: row.name, color: row.color }]),
+    );
   }
 }
 
