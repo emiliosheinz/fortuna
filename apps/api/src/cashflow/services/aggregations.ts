@@ -2,9 +2,10 @@ import type { TransactionKind } from "../entities/transaction.entity";
 
 /**
  * A row already converted to the user's base currency. `tagIds` carries every
- * tag attached to the row (empty when the row has no tags) and drives the
- * `byTag` rollup below. Callers that don't need a tag dimension pass `[]`
- * (see `TrendService`).
+ * tag attached to the row (empty for untagged rows). `SummaryService` feeds
+ * these into `aggregate()`, where an empty `tagIds` puts the row in the
+ * synthetic `tagId: null` bucket. `TrendService` uses this shape but does
+ * not call `aggregate()`; it always passes `tagIds: []`.
  */
 export interface ConvertedRow {
   id: string;

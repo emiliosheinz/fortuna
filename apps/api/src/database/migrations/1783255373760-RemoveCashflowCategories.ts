@@ -41,8 +41,11 @@ export class RemoveCashflowCategories1783255373760
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     // Schema-only rollback — no category rows or category_id values are
-    // reconstructed from tags (AD-09). IF NOT EXISTS guards make the
-    // recreate DDL retriable under a partial-restore state (AD-20 rule #3).
+    // reconstructed from tags (AD-09). CREATE TABLE / ADD COLUMN / CREATE
+    // INDEX are IF NOT EXISTS-guarded (AD-20 rule 3); the ADD CONSTRAINT
+    // statements are not, so this down() is not safely retriable on a
+    // partial-restore state. The intended rollback path is restore-from-
+    // backup, not a down()-retry.
     await queryRunner.query(
       `CREATE TABLE IF NOT EXISTS "categories" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "user_id" uuid NOT NULL, "name" text NOT NULL, "created_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), "updated_at" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(), CONSTRAINT "categories_user_name_uq" UNIQUE ("user_id", "name"), CONSTRAINT "PK_24dbc6126a28ff948da33e97d3b" PRIMARY KEY ("id"))`,
     );
