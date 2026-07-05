@@ -8,6 +8,11 @@ import {
   KeyboardSafePopoverTrigger,
 } from "@/components/keyboard-safe-popover";
 import { Input } from "@/components/ui/input";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { useCreateTag, useTags } from "../hooks";
 import { PALETTE_KEYS } from "../tag-colors";
 import type { PaletteKey } from "../types";
@@ -30,15 +35,17 @@ export function TagInput({ value, onChange, id }: TagInputProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
 
+  const [creatingColor, setCreatingColor] = useState(false);
+
   async function createWithColor(name: string, color: PaletteKey) {
     try {
       await createMutation.mutateAsync({ name, color });
       add(name);
       setQuery("");
-      setOpen(false);
+      setCreatingColor(false);
     } catch {
-      // Leave popover open; the transaction submit path can still recover by
-      // resolving the name implicitly with a server-assigned color.
+      // Leave the picker open; the transaction submit path can still recover
+      // by resolving the name implicitly with a server-assigned color.
     }
   }
 
@@ -214,37 +221,51 @@ export function TagInput({ value, onChange, id }: TagInputProps) {
                 );
               })}
               {showCreate ? (
-                <div
-                  data-testid="tag-input-create"
-                  className="flex flex-col gap-1 rounded-sm px-2 py-1.5 text-sm"
-                >
-                  <span className="text-muted-foreground">
-                    Create "{trimmed}"
-                  </span>
-                  <div
-                    role="radiogroup"
-                    aria-label="Color for new tag"
+                <Popover open={creatingColor} onOpenChange={setCreatingColor}>
+                  <PopoverTrigger asChild>
+                    <button
+                      type="button"
+                      data-testid="tag-input-create"
+                      className="block w-full rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent"
+                    >
+                      Create "{trimmed}"
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent
+                    align="start"
+                    className="w-auto p-2"
                     data-testid="tag-input-create-color-picker"
-                    className="grid grid-cols-5 gap-1"
+                    onInteractOutside={(event) => {
+                      // The outer TagInput popover is another Radix layer;
+                      // without this the click on our swatch bubbles up to
+                      // its dismiss handler and both close together.
+                      event.preventDefault();
+                    }}
                   >
-                    {PALETTE_KEYS.map((key) => (
-                      // biome-ignore lint/a11y/useSemanticElements: radiogroup of styled swatches; matches the picker in EditTagDialog
-                      <button
-                        key={key}
-                        type="button"
-                        role="radio"
-                        aria-checked={false}
-                        aria-label={`Color ${key}`}
-                        data-testid={`tag-input-create-swatch-${key}`}
-                        disabled={createMutation.isPending}
-                        onClick={() => createWithColor(trimmed, key)}
-                        className="flex size-7 items-center justify-center rounded-full border-2 border-transparent hover:border-border"
-                      >
-                        <TagColorDot color={key} />
-                      </button>
-                    ))}
-                  </div>
-                </div>
+                    <div
+                      role="radiogroup"
+                      aria-label="Color for new tag"
+                      className="grid grid-cols-5 gap-1"
+                    >
+                      {PALETTE_KEYS.map((key) => (
+                        // biome-ignore lint/a11y/useSemanticElements: radiogroup of styled swatches; matches the picker in EditTagDialog
+                        <button
+                          key={key}
+                          type="button"
+                          role="radio"
+                          aria-checked={false}
+                          aria-label={`Color ${key}`}
+                          data-testid={`tag-input-create-swatch-${key}`}
+                          disabled={createMutation.isPending}
+                          onClick={() => createWithColor(trimmed, key)}
+                          className="flex size-7 items-center justify-center rounded-full border-2 border-transparent hover:border-border"
+                        >
+                          <TagColorDot color={key} />
+                        </button>
+                      ))}
+                    </div>
+                  </PopoverContent>
+                </Popover>
               ) : null}
             </div>
           </div>
