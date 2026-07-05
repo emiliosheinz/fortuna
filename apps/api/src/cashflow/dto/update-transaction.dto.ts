@@ -5,10 +5,8 @@ import {
   IsNotEmpty,
   IsOptional,
   IsString,
-  IsUUID,
   Matches,
   MaxLength,
-  ValidateIf,
 } from "class-validator";
 import { SUPPORTED_CURRENCIES } from "@/fx/constants";
 
@@ -22,10 +20,9 @@ export type TransactionKind = "income" | "expense";
 
 /**
  * Request body for `PATCH /transactions/:id`. Every field is optional;
- * absent fields are not touched. `categoryId: null` clears the link;
- * `tagNames: []` clears every tag. Passing `tagNames` reconciles the link
- * set: tags not present are detached, names not yet linked are attached
- * (creating the tag row on demand).
+ * absent fields are not touched. `tagNames: []` clears every tag. Passing
+ * `tagNames` reconciles the link set: tags not present are detached, names
+ * not yet linked are attached (creating the tag row on demand).
  */
 export class UpdateTransactionDto {
   @IsOptional()
@@ -56,11 +53,6 @@ export class UpdateTransactionDto {
   @IsOptional()
   @IsIn(["income", "expense"])
   declare kind?: TransactionKind;
-
-  @ValidateIf((_, value) => value !== null)
-  @IsOptional()
-  @IsUUID()
-  declare categoryId?: string | null;
 
   @IsOptional()
   @IsArray()

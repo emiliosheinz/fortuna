@@ -58,21 +58,6 @@ describe("CreateTransactionDto validation", () => {
     );
   });
 
-  it("accepts an optional categoryId in UUID form", async () => {
-    expect(
-      await check({
-        ...valid,
-        categoryId: "11111111-1111-4111-8111-111111111111",
-      }),
-    ).toEqual([]);
-  });
-
-  it("rejects a non-UUID categoryId", async () => {
-    expect(await check({ ...valid, categoryId: "not-a-uuid" })).toContain(
-      "isUuid",
-    );
-  });
-
   it("accepts a tagNames array of strings", async () => {
     expect(await check({ ...valid, tagNames: ["travel", "lisbon"] })).toEqual(
       [],
