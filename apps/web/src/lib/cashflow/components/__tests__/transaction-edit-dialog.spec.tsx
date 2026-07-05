@@ -15,10 +15,6 @@ jest.mock("../../api-client", () => ({
     listTransactions: jest.fn(),
     getBaseCurrency: jest.fn(),
     setBaseCurrency: jest.fn(),
-    listCategories: jest.fn().mockResolvedValue({ items: [] }),
-    createCategory: jest.fn(),
-    renameCategory: jest.fn(),
-    deleteCategory: jest.fn(),
     listTags: jest.fn().mockResolvedValue({ items: [] }),
     createTag: jest.fn(),
     renameTag: jest.fn(),
@@ -35,7 +31,6 @@ const baseTransaction: Transaction = {
   currency: "USD",
   description: "Lunch",
   kind: "expense",
-  categoryId: null,
   tagIds: [],
   baseAmount: "12.34",
   baseCurrency: "USD",
@@ -64,7 +59,6 @@ function renderDialog() {
 describe("TransactionEditDialog", () => {
   beforeEach(() => {
     useIsMobileMock.mockReset();
-    (cashflowApi.listCategories as jest.Mock).mockResolvedValue({ items: [] });
     (cashflowApi.listTags as jest.Mock).mockResolvedValue({ items: [] });
   });
 

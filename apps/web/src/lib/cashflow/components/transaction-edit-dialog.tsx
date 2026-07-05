@@ -4,7 +4,6 @@ import { format, parseISO } from "date-fns";
 import { CalendarIcon } from "lucide-react";
 import { useId, useRef, useState } from "react";
 import { flushSync } from "react-dom";
-import { KeyboardSafeCombobox } from "@/components/keyboard-safe-combobox";
 import {
   KeyboardSafePopover,
   KeyboardSafePopoverContent,
@@ -59,7 +58,6 @@ export function TransactionEditDialog({
   const dateId = useId();
   const kindId = useId();
   const currencyId = useId();
-  const categoryId = useId();
   const tagsId = useId();
   const tags = useTags();
   const initialTagNames = tags.data
@@ -73,9 +71,6 @@ export function TransactionEditDialog({
   const [currency, setCurrency] = useState(transaction.currency);
   const [description, setDescription] = useState(transaction.description);
   const [kind, setKind] = useState<TransactionKind>(transaction.kind);
-  const [categoryIdValue, setCategoryIdValue] = useState<string | null>(
-    transaction.categoryId,
-  );
   const [tagNames, setTagNames] = useState<string[]>(initialTagNames);
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -109,7 +104,6 @@ export function TransactionEditDialog({
       currency,
       description: description.trim(),
       kind,
-      categoryId: categoryIdValue,
       tagNames,
     };
 
@@ -233,15 +227,6 @@ export function TransactionEditDialog({
                 ))}
               </KeyboardSafeSelectContent>
             </KeyboardSafeSelect>
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor={categoryId}>Category</Label>
-            <KeyboardSafeCombobox
-              id={categoryId}
-              value={categoryIdValue}
-              onChange={setCategoryIdValue}
-            />
           </div>
 
           <div className="flex flex-col gap-1.5">

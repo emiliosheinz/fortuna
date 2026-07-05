@@ -10,10 +10,6 @@ jest.mock("../../api-client", () => ({
     listTransactions: jest.fn(),
     getBaseCurrency: jest.fn(),
     setBaseCurrency: jest.fn(),
-    listCategories: jest.fn(),
-    createCategory: jest.fn(),
-    renameCategory: jest.fn(),
-    deleteCategory: jest.fn(),
     listTags: jest.fn(),
     createTag: jest.fn(),
     renameTag: jest.fn(),
@@ -25,9 +21,6 @@ const createTransactionMock =
   cashflowApi.createTransaction as jest.MockedFunction<
     typeof cashflowApi.createTransaction
   >;
-const listCategoriesMock = cashflowApi.listCategories as jest.MockedFunction<
-  typeof cashflowApi.listCategories
->;
 const listTagsMock = cashflowApi.listTags as jest.MockedFunction<
   typeof cashflowApi.listTags
 >;
@@ -62,9 +55,7 @@ function submit() {
 describe("CaptureForm", () => {
   beforeEach(() => {
     createTransactionMock.mockReset();
-    listCategoriesMock.mockReset();
     listTagsMock.mockReset();
-    listCategoriesMock.mockResolvedValue({ items: [] });
     listTagsMock.mockResolvedValue({ items: [] });
   });
 
@@ -92,7 +83,6 @@ describe("CaptureForm", () => {
           currency: "USD",
           description: "Lunch",
           kind: "expense",
-          categoryId: null,
           tagIds: [],
           baseAmount: "12.34",
           baseCurrency: "USD",
@@ -120,9 +110,9 @@ describe("CaptureForm", () => {
       currency: "USD",
       description: "Lunch",
       kind: "expense",
-      categoryId: null,
       tagNames: [],
     });
+    expect(payload).not.toHaveProperty("categoryId");
     expect(payload?.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
 
@@ -188,7 +178,6 @@ describe("CaptureForm", () => {
           currency: "USD",
           description: "Phone",
           kind: "expense",
-          categoryId: null,
           tagIds: [],
           baseAmount: "100.00",
           baseCurrency: "USD",
@@ -251,7 +240,6 @@ describe("CaptureForm", () => {
           currency: "USD",
           description: "Phone",
           kind: "expense",
-          categoryId: null,
           tagIds: [],
           baseAmount: "100.00",
           baseCurrency: "USD",
@@ -304,7 +292,6 @@ describe("CaptureForm", () => {
           currency: "USD",
           description: "Lunch",
           kind: "expense",
-          categoryId: null,
           tagIds: [],
           baseAmount: "12.34",
           baseCurrency: "USD",
@@ -365,7 +352,6 @@ describe("CaptureForm", () => {
           currency: "USD",
           description: "Lunch",
           kind: "expense",
-          categoryId: null,
           tagIds: [],
           baseAmount: "12.34",
           baseCurrency: "USD",
