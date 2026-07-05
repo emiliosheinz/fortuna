@@ -14,7 +14,6 @@ import {
   GOOGLE_ID_TOKEN_VERIFIER_OPTIONS,
   type GoogleIdTokenVerifierOptions,
 } from "@/auth/services/google-id-token-verifier";
-import { Category } from "@/cashflow/entities/category.entity";
 import { Tag } from "@/cashflow/entities/tag.entity";
 import { Transaction } from "@/cashflow/entities/transaction.entity";
 import { TransactionTag } from "@/cashflow/entities/transaction-tag.entity";
@@ -263,7 +262,6 @@ describe("Cashflow integration", () => {
         currency: "USD",
         description: "Lunch",
         kind: "expense",
-        categoryId: null,
         tagIds: [],
         baseAmount: "12.34",
         baseCurrency: "USD",
@@ -274,9 +272,32 @@ describe("Cashflow integration", () => {
         createdAt: expect.any(String),
         updatedAt: expect.any(String),
       });
+      expect(res.body.transactions[0]).not.toHaveProperty("categoryId");
 
       const rows = await dataSource.getRepository(Transaction).find();
       expect(rows).toHaveLength(1);
+    });
+
+    it("rejects an unknown categoryId body field with 400", async () => {
+      const { cookie } = await signInUser({
+        sub: "sub-a",
+        name: "Alice",
+        email: "alice@example.com",
+      });
+
+      const res = await request(app.getHttpServer())
+        .post("/transactions")
+        .set("Cookie", cookie)
+        .send({
+          date: "2026-06-07",
+          amount: "12.34",
+          currency: "USD",
+          description: "Lunch",
+          kind: "expense",
+          categoryId: "11111111-1111-4111-8111-111111111111",
+        })
+        .expect(400);
+      expect(JSON.stringify(res.body)).toMatch(/categoryId/);
     });
 
     it("rejects malformed DTO fields with 400", async () => {
@@ -432,171 +453,6 @@ describe("Cashflow integration", () => {
     });
   });
 
-  describe("/categories CRUD", () => {
-    async function aliceCookie(): Promise<string> {
-      const { cookie } = await signInUser({
-        sub: "sub-a",
-        name: "Alice",
-        email: "alice@example.com",
-      });
-      return cookie;
-    }
-
-    it("creates, lists, renames, and deletes user-scoped categories", async () => {
-      const cookie = await aliceCookie();
-
-      const created = await request(app.getHttpServer())
-        .post("/categories")
-        .set("Cookie", cookie)
-        .send({ name: "Groceries" })
-        .expect(201);
-      const id = created.body.category.id as string;
-      expect(created.body.category).toEqual({ id, name: "Groceries" });
-
-      await request(app.getHttpServer())
-        .post("/categories")
-        .set("Cookie", cookie)
-        .send({ name: "Transport" })
-        .expect(201);
-
-      const list = await request(app.getHttpServer())
-        .get("/categories")
-        .set("Cookie", cookie)
-        .expect(200);
-      expect(list.body.items.map((c: { name: string }) => c.name)).toEqual([
-        "Groceries",
-        "Transport",
-      ]);
-
-      const renamed = await request(app.getHttpServer())
-        .patch(`/categories/${id}`)
-        .set("Cookie", cookie)
-        .send({ name: "Food" })
-        .expect(200);
-      expect(renamed.body.category.name).toBe("Food");
-
-      await request(app.getHttpServer())
-        .delete(`/categories/${id}`)
-        .set("Cookie", cookie)
-        .expect(204);
-
-      const after = await request(app.getHttpServer())
-        .get("/categories")
-        .set("Cookie", cookie)
-        .expect(200);
-      expect(after.body.items).toHaveLength(1);
-    });
-
-    it("rejects a duplicate name on create with 409", async () => {
-      const cookie = await aliceCookie();
-      await request(app.getHttpServer())
-        .post("/categories")
-        .set("Cookie", cookie)
-        .send({ name: "Groceries" })
-        .expect(201);
-      await request(app.getHttpServer())
-        .post("/categories")
-        .set("Cookie", cookie)
-        .send({ name: "Groceries" })
-        .expect(409);
-    });
-
-    it("rejects a rename that collides with another category for the same user", async () => {
-      const cookie = await aliceCookie();
-      const first = await request(app.getHttpServer())
-        .post("/categories")
-        .set("Cookie", cookie)
-        .send({ name: "Groceries" })
-        .expect(201);
-      await request(app.getHttpServer())
-        .post("/categories")
-        .set("Cookie", cookie)
-        .send({ name: "Transport" })
-        .expect(201);
-
-      await request(app.getHttpServer())
-        .patch(`/categories/${first.body.category.id}`)
-        .set("Cookie", cookie)
-        .send({ name: "Transport" })
-        .expect(409);
-    });
-
-    it("sets category_id to NULL on linked transactions when the category is deleted", async () => {
-      const cookie = await aliceCookie();
-      const cat = await request(app.getHttpServer())
-        .post("/categories")
-        .set("Cookie", cookie)
-        .send({ name: "Groceries" })
-        .expect(201);
-      const tx = await request(app.getHttpServer())
-        .post("/transactions")
-        .set("Cookie", cookie)
-        .send({
-          date: "2026-06-07",
-          amount: "10.00",
-          currency: "USD",
-          description: "row",
-          kind: "expense",
-          categoryId: cat.body.category.id,
-        })
-        .expect(201);
-      expect(tx.body.transactions[0].categoryId).toBe(cat.body.category.id);
-
-      await request(app.getHttpServer())
-        .delete(`/categories/${cat.body.category.id}`)
-        .set("Cookie", cookie)
-        .expect(204);
-
-      const reread = await request(app.getHttpServer())
-        .get("/transactions")
-        .set("Cookie", cookie)
-        .expect(200);
-      expect(reread.body.items[0].categoryId).toBeNull();
-      const txCount = await dataSource.getRepository(Transaction).count();
-      expect(txCount).toBe(1);
-    });
-
-    it("never leaks another user's categories through the list endpoint", async () => {
-      const aliceC = await aliceCookie();
-      const { cookie: bobC } = await signInUser({
-        sub: "sub-b",
-        name: "Bob",
-        email: "bob@example.com",
-      });
-
-      await request(app.getHttpServer())
-        .post("/categories")
-        .set("Cookie", aliceC)
-        .send({ name: "Alice-cat" })
-        .expect(201);
-      const bobCat = await request(app.getHttpServer())
-        .post("/categories")
-        .set("Cookie", bobC)
-        .send({ name: "Bob-cat" })
-        .expect(201);
-
-      const aliceList = await request(app.getHttpServer())
-        .get("/categories")
-        .set("Cookie", aliceC)
-        .expect(200);
-      expect(
-        aliceList.body.items.some(
-          (c: { name: string }) => c.name === "Bob-cat",
-        ),
-      ).toBe(false);
-
-      await request(app.getHttpServer())
-        .patch(`/categories/${bobCat.body.category.id}`)
-        .set("Cookie", aliceC)
-        .send({ name: "hijacked" })
-        .expect(404);
-      await request(app.getHttpServer())
-        .delete(`/categories/${bobCat.body.category.id}`)
-        .set("Cookie", aliceC)
-        .expect(404);
-    });
-  });
-
   describe("/tags CRUD", () => {
     async function aliceCookie(): Promise<string> {
       const { cookie } = await signInUser({
@@ -718,7 +574,7 @@ describe("Cashflow integration", () => {
     });
   });
 
-  describe("POST /transactions with categories and tags", () => {
+  describe("POST /transactions with tags", () => {
     async function aliceCookie(): Promise<string> {
       const { cookie } = await signInUser({
         sub: "sub-a",
@@ -728,13 +584,8 @@ describe("Cashflow integration", () => {
       return cookie;
     }
 
-    it("attaches an existing categoryId and resolves a mix of existing and new tag names in one DB transaction", async () => {
+    it("resolves a mix of existing and new tag names in one DB transaction", async () => {
       const cookie = await aliceCookie();
-      const cat = await request(app.getHttpServer())
-        .post("/categories")
-        .set("Cookie", cookie)
-        .send({ name: "Food" })
-        .expect(201);
       await request(app.getHttpServer())
         .post("/tags")
         .set("Cookie", cookie)
@@ -750,44 +601,16 @@ describe("Cashflow integration", () => {
           currency: "USD",
           description: "row",
           kind: "expense",
-          categoryId: cat.body.category.id,
           tagNames: ["travel", "lisbon"],
         })
         .expect(201);
-      expect(tx.body.transactions[0].categoryId).toBe(cat.body.category.id);
       expect(tx.body.transactions[0].tagIds).toHaveLength(2);
+      expect(tx.body.transactions[0]).not.toHaveProperty("categoryId");
 
       const tags = await dataSource.getRepository(Tag).find({
         order: { name: "ASC" },
       });
       expect(tags.map((t) => t.name)).toEqual(["lisbon", "travel"]);
-    });
-
-    it("rejects a categoryId that does not belong to the user with 400", async () => {
-      const aliceC = await aliceCookie();
-      const { cookie: bobC } = await signInUser({
-        sub: "sub-b",
-        name: "Bob",
-        email: "bob@example.com",
-      });
-      const bobCat = await request(app.getHttpServer())
-        .post("/categories")
-        .set("Cookie", bobC)
-        .send({ name: "Bob" })
-        .expect(201);
-
-      await request(app.getHttpServer())
-        .post("/transactions")
-        .set("Cookie", aliceC)
-        .send({
-          date: "2026-06-07",
-          amount: "10.00",
-          currency: "USD",
-          description: "row",
-          kind: "expense",
-          categoryId: bobCat.body.category.id,
-        })
-        .expect(400);
     });
   });
 
@@ -836,13 +659,8 @@ describe("Cashflow integration", () => {
       ]);
     });
 
-    it("clears the category when categoryId is null and changes the kind", async () => {
+    it("changes the kind and amount and never emits a categoryId on the response", async () => {
       const cookie = await aliceCookie();
-      const cat = await request(app.getHttpServer())
-        .post("/categories")
-        .set("Cookie", cookie)
-        .send({ name: "Food" })
-        .expect(201);
       const tx = await request(app.getHttpServer())
         .post("/transactions")
         .set("Cookie", cookie)
@@ -852,18 +670,39 @@ describe("Cashflow integration", () => {
           currency: "USD",
           description: "row",
           kind: "expense",
-          categoryId: cat.body.category.id,
         })
         .expect(201);
 
       const patched = await request(app.getHttpServer())
         .patch(`/transactions/${tx.body.transactions[0].id}`)
         .set("Cookie", cookie)
-        .send({ categoryId: null, kind: "income", amount: "20.00" })
+        .send({ kind: "income", amount: "20.00" })
         .expect(200);
-      expect(patched.body.transaction.categoryId).toBeNull();
       expect(patched.body.transaction.kind).toBe("income");
       expect(patched.body.transaction.amount).toBe("20.00");
+      expect(patched.body.transaction).not.toHaveProperty("categoryId");
+    });
+
+    it("rejects an unknown categoryId body field with 400", async () => {
+      const cookie = await aliceCookie();
+      const tx = await request(app.getHttpServer())
+        .post("/transactions")
+        .set("Cookie", cookie)
+        .send({
+          date: "2026-06-07",
+          amount: "10.00",
+          currency: "USD",
+          description: "row",
+          kind: "expense",
+        })
+        .expect(201);
+
+      const res = await request(app.getHttpServer())
+        .patch(`/transactions/${tx.body.transactions[0].id}`)
+        .set("Cookie", cookie)
+        .send({ categoryId: "11111111-1111-4111-8111-111111111111" })
+        .expect(400);
+      expect(JSON.stringify(res.body)).toMatch(/categoryId/);
     });
 
     it("returns 404 when patching another user's transaction", async () => {
@@ -1240,7 +1079,6 @@ describe("Cashflow integration", () => {
         currency: string;
         description: string;
         kind: "income" | "expense";
-        categoryId: string;
         tagNames: string[];
       }> = {},
     ): Promise<{ id: string }> {
@@ -1260,38 +1098,39 @@ describe("Cashflow integration", () => {
       return { id: res.body.transactions[0].id as string };
     }
 
-    it("returns income, expense, net, and byCategory in base currency for the chosen month", async () => {
+    async function tagId(cookie: string, name: string): Promise<string> {
+      const list = await request(app.getHttpServer())
+        .get("/tags")
+        .set("Cookie", cookie)
+        .expect(200);
+      const found = list.body.items.find(
+        (t: { name: string }) => t.name === name,
+      );
+      return found.id as string;
+    }
+
+    it("returns income, expense, net, and byTag in base currency for the chosen month", async () => {
       const cookie = await aliceCookie();
-      const food = await request(app.getHttpServer())
-        .post("/categories")
-        .set("Cookie", cookie)
-        .send({ name: "Food" })
-        .expect(201);
-      const transport = await request(app.getHttpServer())
-        .post("/categories")
-        .set("Cookie", cookie)
-        .send({ name: "Transport" })
-        .expect(201);
 
       await capture(cookie, {
         date: "2026-06-03",
         amount: "30.00",
         kind: "expense",
-        categoryId: food.body.category.id,
+        tagNames: ["Food"],
         description: "groceries",
       });
       await capture(cookie, {
         date: "2026-06-20",
         amount: "20.00",
         kind: "expense",
-        categoryId: food.body.category.id,
+        tagNames: ["Food"],
         description: "lunch",
       });
       await capture(cookie, {
         date: "2026-06-15",
         amount: "15.00",
         kind: "expense",
-        categoryId: transport.body.category.id,
+        tagNames: ["Transport"],
         description: "bus",
       });
       await capture(cookie, {
@@ -1307,6 +1146,9 @@ describe("Cashflow integration", () => {
         description: "out-of-window",
       });
 
+      const foodTagId = await tagId(cookie, "Food");
+      const transportTagId = await tagId(cookie, "Transport");
+
       const res = await request(app.getHttpServer())
         .get("/summary?month=2026-06")
         .set("Cookie", cookie)
@@ -1318,30 +1160,123 @@ describe("Cashflow integration", () => {
         income: "1000.00",
         expense: "65.00",
         net: "935.00",
-        byCategory: [
+        byTag: [
           {
-            categoryId: food.body.category.id,
-            categoryName: "Food",
+            tagId: foodTagId,
+            tagName: "Food",
             income: "0.00",
             expense: "50.00",
             net: "-50.00",
           },
           {
-            categoryId: transport.body.category.id,
-            categoryName: "Transport",
+            tagId: transportTagId,
+            tagName: "Transport",
             income: "0.00",
             expense: "15.00",
             net: "-15.00",
           },
           {
-            categoryId: null,
-            categoryName: null,
+            tagId: null,
+            tagName: null,
             income: "1000.00",
             expense: "0.00",
             net: "1000.00",
           },
         ],
         excludedUnconvertibleCount: 0,
+      });
+      expect(res.body).not.toHaveProperty("byCategory");
+    });
+
+    describe("byTag rollup", () => {
+      it("multi-counts a two-tag expense so bucket sums exceed totals", async () => {
+        const cookie = await aliceCookie();
+        await capture(cookie, {
+          date: "2026-06-07",
+          amount: "100.00",
+          kind: "expense",
+          tagNames: ["A", "B"],
+          description: "two-tag",
+        });
+
+        const res = await request(app.getHttpServer())
+          .get("/summary?month=2026-06")
+          .set("Cookie", cookie)
+          .expect(200);
+
+        const bucketA = res.body.byTag.find(
+          (b: { tagName: string | null }) => b.tagName === "A",
+        );
+        const bucketB = res.body.byTag.find(
+          (b: { tagName: string | null }) => b.tagName === "B",
+        );
+        expect(bucketA.expense).toBe("100.00");
+        expect(bucketB.expense).toBe("100.00");
+        expect(res.body.expense).toBe("100.00");
+        expect(
+          Number(bucketA.expense) + Number(bucketB.expense),
+        ).toBeGreaterThan(Number(res.body.expense));
+      });
+
+      it("multi-counts a two-tag income bucket", async () => {
+        const cookie = await aliceCookie();
+        await capture(cookie, {
+          date: "2026-06-07",
+          amount: "100.00",
+          kind: "income",
+          tagNames: ["A", "B"],
+          description: "two-tag-income",
+        });
+
+        const res = await request(app.getHttpServer())
+          .get("/summary?month=2026-06")
+          .set("Cookie", cookie)
+          .expect(200);
+
+        const bucketA = res.body.byTag.find(
+          (b: { tagName: string | null }) => b.tagName === "A",
+        );
+        const bucketB = res.body.byTag.find(
+          (b: { tagName: string | null }) => b.tagName === "B",
+        );
+        expect(bucketA.income).toBe("100.00");
+        expect(bucketB.income).toBe("100.00");
+        expect(res.body.income).toBe("100.00");
+      });
+
+      it("routes a tagless row into a single null-tag bucket", async () => {
+        const cookie = await aliceCookie();
+        await capture(cookie, {
+          date: "2026-06-07",
+          amount: "100.00",
+          kind: "expense",
+          description: "untagged",
+        });
+
+        const res = await request(app.getHttpServer())
+          .get("/summary?month=2026-06")
+          .set("Cookie", cookie)
+          .expect(200);
+
+        expect(res.body.byTag).toEqual([
+          {
+            tagId: null,
+            tagName: null,
+            income: "0.00",
+            expense: "100.00",
+            net: "-100.00",
+          },
+        ]);
+      });
+
+      it("carries byTag and never byCategory", async () => {
+        const cookie = await aliceCookie();
+        const res = await request(app.getHttpServer())
+          .get("/summary?month=2026-06")
+          .set("Cookie", cookie)
+          .expect(200);
+        expect(res.body).toHaveProperty("byTag");
+        expect(res.body).not.toHaveProperty("byCategory");
       });
     });
 
@@ -1607,7 +1542,6 @@ describe("Cashflow integration", () => {
         currency: string;
         description: string;
         kind: "income" | "expense";
-        categoryId: string;
         tagNames: string[];
       }> = {},
     ): Promise<{ id: string }> {
@@ -1636,20 +1570,14 @@ describe("Cashflow integration", () => {
       return res.body.tag.id as string;
     }
 
-    it("returns linked transactions plus by-category and by-month breakdowns", async () => {
+    it("returns linked transactions plus a by-month breakdown and no dimensional inner rollup", async () => {
       const cookie = await aliceCookie();
-      const food = await request(app.getHttpServer())
-        .post("/categories")
-        .set("Cookie", cookie)
-        .send({ name: "Food" })
-        .expect(201);
       const travelTagId = await createTag(cookie, "travel");
 
       await capture(cookie, {
         date: "2026-05-15",
         amount: "100.00",
         description: "Linked-1",
-        categoryId: food.body.category.id,
         tagNames: ["travel"],
       });
       await capture(cookie, {
@@ -1677,22 +1605,8 @@ describe("Cashflow integration", () => {
           (t: { description: string }) => t.description,
         ),
       ).toEqual(["Linked-2", "Linked-1"]);
-      expect(res.body.byCategory).toEqual([
-        {
-          categoryId: food.body.category.id,
-          categoryName: "Food",
-          income: "0.00",
-          expense: "100.00",
-          net: "-100.00",
-        },
-        {
-          categoryId: null,
-          categoryName: null,
-          income: "0.00",
-          expense: "50.00",
-          net: "-50.00",
-        },
-      ]);
+      expect(res.body).not.toHaveProperty("byCategory");
+      expect(res.body).not.toHaveProperty("byTag");
       expect(res.body.byMonth).toEqual([
         { month: "2026-05", income: "0.00", expense: "100.00", net: "-100.00" },
         { month: "2026-06", income: "0.00", expense: "50.00", net: "-50.00" },
@@ -1799,7 +1713,6 @@ describe("Cashflow integration", () => {
         amount: string;
         description: string;
         kind: "income" | "expense";
-        categoryId: string;
         tagNames: string[];
       }> = {},
     ): Promise<{ id: string }> {
@@ -1833,36 +1746,6 @@ describe("Cashflow integration", () => {
       expect(
         res.body.items.map((t: { description: string }) => t.description),
       ).toEqual(["May-31", "May-01"]);
-    });
-
-    it("filters by categoryId", async () => {
-      const cookie = await aliceCookie();
-      const food = await request(app.getHttpServer())
-        .post("/categories")
-        .set("Cookie", cookie)
-        .send({ name: "Food" })
-        .expect(201);
-      const transport = await request(app.getHttpServer())
-        .post("/categories")
-        .set("Cookie", cookie)
-        .send({ name: "Transport" })
-        .expect(201);
-      await capture(cookie, {
-        description: "lunch",
-        categoryId: food.body.category.id,
-      });
-      await capture(cookie, {
-        description: "bus",
-        categoryId: transport.body.category.id,
-      });
-
-      const res = await request(app.getHttpServer())
-        .get(`/transactions?categoryId=${food.body.category.id}`)
-        .set("Cookie", cookie)
-        .expect(200);
-      expect(
-        res.body.items.map((t: { description: string }) => t.description),
-      ).toEqual(["lunch"]);
     });
 
     it("filters by tagId via the join table", async () => {
@@ -1917,24 +1800,21 @@ describe("Cashflow integration", () => {
 
     it("combines filters and still paginates by keyset", async () => {
       const cookie = await aliceCookie();
-      const food = await request(app.getHttpServer())
-        .post("/categories")
-        .set("Cookie", cookie)
-        .send({ name: "Food" })
-        .expect(201);
       for (let day = 1; day <= 6; day += 1) {
         await capture(cookie, {
           date: `2026-06-0${day}`,
-          description: `food-${day}`,
-          categoryId: food.body.category.id,
+          description: `expense-${day}`,
+          kind: "expense",
         });
       }
-      await capture(cookie, { description: "other", date: "2026-06-07" });
+      await capture(cookie, {
+        description: "income-row",
+        date: "2026-06-07",
+        kind: "income",
+      });
 
       const first = await request(app.getHttpServer())
-        .get(
-          `/transactions?categoryId=${food.body.category.id}&kind=expense&limit=4`,
-        )
+        .get("/transactions?kind=expense&limit=4")
         .set("Cookie", cookie)
         .expect(200);
       expect(first.body.items).toHaveLength(4);
@@ -1942,7 +1822,7 @@ describe("Cashflow integration", () => {
 
       const second = await request(app.getHttpServer())
         .get(
-          `/transactions?categoryId=${food.body.category.id}&kind=expense&limit=4&cursor=${first.body.nextCursor}`,
+          `/transactions?kind=expense&limit=4&cursor=${first.body.nextCursor}`,
         )
         .set("Cookie", cookie)
         .expect(200);
@@ -1960,10 +1840,15 @@ describe("Cashflow integration", () => {
         .get("/transactions?kind=transfer")
         .set("Cookie", cookie)
         .expect(400);
-      await request(app.getHttpServer())
-        .get("/transactions?categoryId=not-a-uuid")
+    });
+
+    it("rejects an unknown categoryId query parameter with 400", async () => {
+      const cookie = await aliceCookie();
+      const res = await request(app.getHttpServer())
+        .get("/transactions?categoryId=11111111-1111-4111-8111-111111111111")
         .set("Cookie", cookie)
         .expect(400);
+      expect(JSON.stringify(res.body)).toMatch(/categoryId/);
     });
   });
 
@@ -2124,7 +2009,7 @@ describe("Cashflow integration", () => {
   });
 
   describe("erasure: deleting a user removes their cashflow rows", () => {
-    it("cascades transactions, installment groups, categories, tags, joins, and user_settings on user delete", async () => {
+    it("cascades transactions, installment groups, tags, joins, and user_settings on user delete", async () => {
       const { cookie } = await signInUser({
         sub: "sub-a",
         name: "Alice",
@@ -2135,11 +2020,6 @@ describe("Cashflow integration", () => {
         .set("Cookie", cookie)
         .send({ baseCurrency: "USD" })
         .expect(200);
-      const cat = await request(app.getHttpServer())
-        .post("/categories")
-        .set("Cookie", cookie)
-        .send({ name: "Food" })
-        .expect(201);
       await request(app.getHttpServer())
         .post("/transactions")
         .set("Cookie", cookie)
@@ -2149,7 +2029,6 @@ describe("Cashflow integration", () => {
           currency: "USD",
           description: "Lunch",
           kind: "expense",
-          categoryId: cat.body.category.id,
           tagNames: ["travel"],
         })
         .expect(201);
@@ -2176,7 +2055,6 @@ describe("Cashflow integration", () => {
 
       expect(await dataSource.getRepository(Transaction).count()).toBe(0);
       expect(await dataSource.getRepository(TransactionTag).count()).toBe(0);
-      expect(await dataSource.getRepository(Category).count()).toBe(0);
       expect(await dataSource.getRepository(Tag).count()).toBe(0);
       const settingsCount = await dataSource.query(
         'SELECT COUNT(*)::int AS c FROM "user_settings"',
