@@ -8,6 +8,7 @@ import { formatMoney } from "../format-money";
 import { useTagDrillDown } from "../hooks";
 import type { MonthBucket, Transaction } from "../types";
 import { MonthRangePicker } from "./month-range-picker";
+import { TagColorDot } from "./tag-color-dot";
 
 interface TagDrillDownViewProps {
   tagId: string;
@@ -32,8 +33,15 @@ export function TagDrillDownView({
     <section className="flex flex-col gap-6" data-testid="tag-drill-down-view">
       <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div className="flex flex-col gap-1">
-          <h1 className="text-2xl font-semibold">
-            {query.data ? `# ${query.data.tag.name}` : "Tag drill-down"}
+          <h1 className="flex items-center gap-2 text-2xl font-semibold">
+            {query.data ? (
+              <>
+                <TagColorDot color={query.data.tag.color} />
+                <span># {query.data.tag.name}</span>
+              </>
+            ) : (
+              <span>Tag drill-down</span>
+            )}
           </h1>
           <p className="text-sm text-muted-foreground">
             Transactions tagged with this label, grouped by month.

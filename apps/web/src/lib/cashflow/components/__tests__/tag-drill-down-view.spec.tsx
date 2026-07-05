@@ -75,7 +75,7 @@ describe("TagDrillDownView", () => {
 
   it("renders the tag name, transactions, and the month breakdown on success", async () => {
     getTagDrillDownMock.mockResolvedValue({
-      tag: { id: "tag-1", name: "travel" },
+      tag: { id: "tag-1", name: "travel", color: "sky" },
       baseCurrency: "USD",
       from: null,
       to: null,
@@ -93,11 +93,13 @@ describe("TagDrillDownView", () => {
     expect(screen.getByTestId("tag-drill-down-by-month")).toHaveTextContent(
       "Jun 2026",
     );
+    const dot = screen.getByTestId("tag-color-dot");
+    expect(dot.style.background).toBe("var(--tag-color-sky)");
   });
 
   it("shows the empty state when there are no linked transactions", async () => {
     getTagDrillDownMock.mockResolvedValue({
-      tag: { id: "tag-1", name: "travel" },
+      tag: { id: "tag-1", name: "travel", color: "sky" },
       baseCurrency: "USD",
       from: null,
       to: null,
