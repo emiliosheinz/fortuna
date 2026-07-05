@@ -228,7 +228,7 @@ export function TagInput({ value, onChange, id }: TagInputProps) {
                         disabled={createMutation.isPending}
                         onClick={() => createWithColor(trimmed, key)}
                         style={{ background: tagColorVar(key) }}
-                        className="size-6 rounded-full outline-none hover:opacity-80 focus-visible:ring-2 focus-visible:ring-ring"
+                        className="size-5 rounded-full outline-none hover:opacity-80 focus-visible:ring-2 focus-visible:ring-ring"
                       />
                     ))}
                   </div>
