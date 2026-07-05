@@ -8,7 +8,7 @@ function row(overrides: Partial<ConvertedRow>): ConvertedRow {
     id: "row",
     date: "2026-06-07",
     kind: "expense",
-    categoryId: null,
+    tagIds: [],
     baseAmount: "10.00",
     unconvertible: false,
     ...overrides,
@@ -32,13 +32,13 @@ describe("aggregate", () => {
     });
   });
 
-  it("groups by categoryId, treating null as its own bucket and resolving names", () => {
+  it("groups by tagId, resolving names and sorting named alphabetical with the null-tag bucket last", () => {
     const result = aggregate(
       [
-        row({ id: "a", categoryId: FOOD, baseAmount: "30.00" }),
-        row({ id: "b", categoryId: FOOD, baseAmount: "20.00" }),
-        row({ id: "c", categoryId: TRANSPORT, baseAmount: "15.00" }),
-        row({ id: "d", categoryId: null, baseAmount: "5.00" }),
+        row({ id: "a", tagIds: [FOOD], baseAmount: "30.00" }),
+        row({ id: "b", tagIds: [FOOD], baseAmount: "20.00" }),
+        row({ id: "c", tagIds: [TRANSPORT], baseAmount: "15.00" }),
+        row({ id: "d", tagIds: [], baseAmount: "5.00" }),
       ],
       new Map([
         [FOOD, "Food"],
@@ -46,27 +46,64 @@ describe("aggregate", () => {
       ]),
     );
 
-    expect(result.byCategory).toEqual([
+    expect(result.byTag).toEqual([
       {
-        categoryId: FOOD,
-        categoryName: "Food",
+        tagId: FOOD,
+        tagName: "Food",
         income: "0.00",
         expense: "50.00",
         net: "-50.00",
       },
       {
-        categoryId: TRANSPORT,
-        categoryName: "Transport",
+        tagId: TRANSPORT,
+        tagName: "Transport",
         income: "0.00",
         expense: "15.00",
         net: "-15.00",
       },
       {
-        categoryId: null,
-        categoryName: null,
+        tagId: null,
+        tagName: null,
         income: "0.00",
         expense: "5.00",
         net: "-5.00",
+      },
+    ]);
+  });
+
+  it("multi-counts a row across every tag it carries so bucket sums exceed the totals", () => {
+    const result = aggregate(
+      [row({ id: "a", tagIds: [FOOD, TRANSPORT], baseAmount: "100.00" })],
+      new Map([
+        [FOOD, "Food"],
+        [TRANSPORT, "Transport"],
+      ]),
+    );
+
+    const foodBucket = result.byTag.find((b) => b.tagId === FOOD);
+    const transportBucket = result.byTag.find((b) => b.tagId === TRANSPORT);
+    expect(foodBucket?.expense).toBe("100.00");
+    expect(transportBucket?.expense).toBe("100.00");
+    expect(result.totals.expense).toBe("100.00");
+
+    const bucketSum =
+      Number(foodBucket?.expense) + Number(transportBucket?.expense);
+    expect(bucketSum).toBeGreaterThan(Number(result.totals.expense));
+  });
+
+  it("routes a tagless row into a single synthetic null-tag bucket", () => {
+    const result = aggregate(
+      [row({ id: "a", tagIds: [], baseAmount: "42.00" })],
+      new Map(),
+    );
+
+    expect(result.byTag).toEqual([
+      {
+        tagId: null,
+        tagName: null,
+        income: "0.00",
+        expense: "42.00",
+        net: "-42.00",
       },
     ]);
   });
