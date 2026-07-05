@@ -20,7 +20,7 @@ jest.mock("../../api-client", () => ({
     setBaseCurrency: jest.fn(),
     listTags: jest.fn().mockResolvedValue({ items: [] }),
     createTag: jest.fn(),
-    renameTag: jest.fn(),
+    updateTag: jest.fn(),
     deleteTag: jest.fn(),
   },
 }));
@@ -102,6 +102,23 @@ describe("TransactionList", () => {
 
     expect(await screen.findByText("Lunch")).toBeInTheDocument();
     expect(screen.getByText(/-\$12\.34/)).toBeInTheDocument();
+  });
+
+  it("renders a colored dot on each per-row tag chip", async () => {
+    (cashflowApi.listTags as jest.Mock).mockResolvedValue({
+      items: [{ id: "t1", name: "travel", color: "emerald" }],
+    });
+    listMock.mockResolvedValue({
+      items: [{ ...baseRow, tagIds: ["t1"] }],
+      nextCursor: null,
+    });
+
+    renderList();
+
+    const chip = await screen.findByTestId("transaction-row-tag-chip");
+    expect(chip).toHaveTextContent("travel");
+    const dot = chip.querySelector<HTMLElement>("[data-testid=tag-color-dot]");
+    expect(dot?.style.background).toBe("var(--tag-color-emerald)");
   });
 
   it("shows the base-currency rollup for a foreign-currency row", async () => {

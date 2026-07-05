@@ -8,7 +8,8 @@ import { formatMoney } from "../format-money";
 import { useSummary } from "../hooks";
 import type { TagBucket } from "../types";
 import { MonthPicker } from "./month-picker";
-import { TagPie, tagColor } from "./tag-pie";
+import { TagColorDot } from "./tag-color-dot";
+import { TagPie } from "./tag-pie";
 
 interface SummaryViewProps {
   month: string;
@@ -206,12 +207,11 @@ function TagBreakdown({
         <TagPie buckets={expenseBuckets} baseCurrency={baseCurrency} />
       )}
       <ul className="flex flex-col divide-y divide-border border-t border-border">
-        {expenseBuckets.map((bucket, index) => (
+        {expenseBuckets.map((bucket) => (
           <TagRow
             key={bucket.tagId ?? "__untagged__"}
             bucket={bucket}
             baseCurrency={baseCurrency}
-            color={tagColor(index)}
           />
         ))}
       </ul>
@@ -222,11 +222,9 @@ function TagBreakdown({
 function TagRow({
   bucket,
   baseCurrency,
-  color,
 }: {
   bucket: TagBucket;
   baseCurrency: string;
-  color: string;
 }) {
   return (
     <li
@@ -234,11 +232,7 @@ function TagRow({
       className="flex items-center justify-between gap-4 px-3 py-2"
     >
       <span className="flex items-center gap-2 text-sm">
-        <span
-          aria-hidden
-          className="size-2.5 rounded-full"
-          style={{ background: color }}
-        />
+        <TagColorDot color={bucket.color} />
         {bucket.tagName ?? "Untagged"}
       </span>
       <span

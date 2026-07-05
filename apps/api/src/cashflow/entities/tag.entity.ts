@@ -8,6 +8,7 @@ import {
   Unique,
 } from "typeorm";
 import { User } from "@/auth/entities/user.entity";
+import type { PaletteKey } from "../tag-colors";
 
 /**
  * User-scoped, flat tag. Implicit creation by name during transaction capture
@@ -30,6 +31,9 @@ export class Tag {
 
   @Column({ type: "text" })
   declare name: string;
+
+  @Column({ type: "text" })
+  declare color: PaletteKey;
 
   @CreateDateColumn({ name: "created_at", type: "timestamptz" })
   declare createdAt: Date;

@@ -6,10 +6,17 @@ import {
 import { InjectRepository } from "@nestjs/typeorm";
 import { type EntityManager, In, QueryFailedError, Repository } from "typeorm";
 import { Tag } from "../entities/tag.entity";
+import { assignColor, type PaletteKey } from "../tag-colors";
 
 export interface TagResponse {
   id: string;
   name: string;
+  color: PaletteKey;
+}
+
+export interface UpdateTagPatch {
+  name?: string;
+  color?: PaletteKey;
 }
 
 const UNIQUE_VIOLATION = "23505";
@@ -22,9 +29,15 @@ export class TagsService {
     private readonly tags: Repository<Tag>,
   ) {}
 
-  async create(userId: string, name: string): Promise<TagResponse> {
+  async create(
+    userId: string,
+    name: string,
+    color?: PaletteKey,
+  ): Promise<TagResponse> {
     try {
-      const saved = await this.tags.save(this.tags.create({ userId, name }));
+      const saved = await this.tags.save(
+        this.tags.create({ userId, name, color: color ?? assignColor(name) }),
+      );
       return toResponse(saved);
     } catch (err) {
       throw mapUniqueViolation(err, name);
@@ -39,17 +52,22 @@ export class TagsService {
     return rows.map(toResponse);
   }
 
-  async rename(userId: string, id: string, name: string): Promise<TagResponse> {
+  async update(
+    userId: string,
+    id: string,
+    patch: UpdateTagPatch,
+  ): Promise<TagResponse> {
     const row = await this.tags.findOne({ where: { id, userId } });
     if (!row) {
       throw new NotFoundException("Tag not found");
     }
-    row.name = name;
+    if (patch.name !== undefined) row.name = patch.name;
+    if (patch.color !== undefined) row.color = patch.color;
     try {
       const saved = await this.tags.save(row);
       return toResponse(saved);
     } catch (err) {
-      throw mapUniqueViolation(err, name);
+      throw mapUniqueViolation(err, patch.name ?? row.name);
     }
   }
 
@@ -83,7 +101,9 @@ export class TagsService {
     const missing = unique.filter((name) => !existingByName.has(name));
     if (missing.length > 0) {
       const created = await repo.save(
-        missing.map((name) => repo.create({ userId, name })),
+        missing.map((name) =>
+          repo.create({ userId, name, color: assignColor(name) }),
+        ),
       );
       for (const row of created) {
         existingByName.set(row.name, row);
@@ -112,7 +132,7 @@ function dedupe(names: readonly string[]): string[] {
 }
 
 function toResponse(row: Tag): TagResponse {
-  return { id: row.id, name: row.name };
+  return { id: row.id, name: row.name, color: row.color };
 }
 
 function mapUniqueViolation(err: unknown, name: string): Error {

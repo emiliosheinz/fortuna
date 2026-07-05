@@ -1,3 +1,7 @@
+import type { PaletteKey } from "./tag-colors";
+
+export type { PaletteKey };
+
 export type TransactionKind = "income" | "expense";
 
 export interface TransactionGroup {
@@ -31,6 +35,7 @@ export interface BaseCurrencyResponse {
 export interface Tag {
   id: string;
   name: string;
+  color: PaletteKey;
 }
 
 export interface CreateTransactionInput {
@@ -41,6 +46,11 @@ export interface CreateTransactionInput {
   kind: TransactionKind;
   tagNames?: string[];
   installments?: { count: number };
+}
+
+export interface UpdateTagInput {
+  name?: string;
+  color?: PaletteKey;
 }
 
 export interface UpdateTransactionInput {
@@ -76,6 +86,7 @@ export interface ListTransactionsParams {
 export interface TagBucket {
   tagId: string | null;
   tagName: string | null;
+  color: PaletteKey | null;
   income: string;
   expense: string;
   net: string;
@@ -107,7 +118,7 @@ export interface TrendResponse {
 }
 
 export interface TagDrillDownResponse {
-  tag: { id: string; name: string };
+  tag: { id: string; name: string; color: PaletteKey };
   baseCurrency: string;
   from: string | null;
   to: string | null;

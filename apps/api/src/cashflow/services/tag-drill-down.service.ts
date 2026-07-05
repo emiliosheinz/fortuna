@@ -5,6 +5,7 @@ import { FxLookupService } from "@/fx/services/fx-lookup.service";
 import { UserSettingsService } from "@/users/services/user-settings.service";
 import { Tag } from "../entities/tag.entity";
 import { Transaction } from "../entities/transaction.entity";
+import type { PaletteKey } from "../tag-colors";
 import { aggregate, type ConvertedRow, type MonthBucket } from "./aggregations";
 import { loadGroupContext } from "./group-context";
 import { monthRangeBounds } from "./month-window";
@@ -20,7 +21,7 @@ export interface TagDrillDownQuery {
 }
 
 export interface TagDrillDownResponse {
-  tag: { id: string; name: string };
+  tag: { id: string; name: string; color: PaletteKey };
   baseCurrency: string;
   from: string | null;
   to: string | null;
@@ -48,7 +49,7 @@ export class TagDrillDownService {
   ): Promise<TagDrillDownResponse> {
     const tag = await this.tags.findOne({
       where: { id: tagId, userId },
-      select: { id: true, name: true },
+      select: { id: true, name: true, color: true },
     });
     if (!tag) {
       throw new NotFoundException("Tag not found");

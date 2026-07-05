@@ -17,7 +17,7 @@ jest.mock("../../api-client", () => ({
     setBaseCurrency: jest.fn(),
     listTags: jest.fn().mockResolvedValue({ items: [] }),
     createTag: jest.fn(),
-    renameTag: jest.fn(),
+    updateTag: jest.fn(),
     deleteTag: jest.fn(),
   },
 }));

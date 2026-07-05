@@ -15,7 +15,7 @@ import {
 } from "@nestjs/common";
 import type { Request } from "express";
 import { SessionGuard } from "@/auth/guards/session.guard";
-import { TagDto } from "../dto/tag.dto";
+import { CreateTagDto, UpdateTagDto } from "../dto/tag.dto";
 import { TagDrillDownQueryDto } from "../dto/tag-drill-down-query.dto";
 import {
   TagDrillDownResponse,
@@ -39,10 +39,10 @@ export class TagsController {
   @HttpCode(201)
   async create(
     @Req() req: AuthedRequest,
-    @Body() body: TagDto,
+    @Body() body: CreateTagDto,
   ): Promise<{ tag: TagResponse }> {
     const principal = requirePrincipal(req);
-    const tag = await this.tags.create(principal.userId, body.name);
+    const tag = await this.tags.create(principal.userId, body.name, body.color);
     return { tag };
   }
 
@@ -56,13 +56,13 @@ export class TagsController {
 
   @UseGuards(SessionGuard)
   @Patch(":id")
-  async rename(
+  async update(
     @Req() req: AuthedRequest,
     @Param("id", new ParseUUIDPipe()) id: string,
-    @Body() body: TagDto,
+    @Body() body: UpdateTagDto,
   ): Promise<{ tag: TagResponse }> {
     const principal = requirePrincipal(req);
-    const tag = await this.tags.rename(principal.userId, id, body.name);
+    const tag = await this.tags.update(principal.userId, id, body);
     return { tag };
   }
 

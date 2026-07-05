@@ -12,8 +12,14 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatMoney } from "../format-money";
 import { type TransactionFilters, useTags, useTransactions } from "../hooks";
-import type { Transaction, TransactionGroup } from "../types";
+import type { PaletteKey, Transaction, TransactionGroup } from "../types";
+import { TagColorDot } from "./tag-color-dot";
 import { TransactionEditDialog } from "./transaction-edit-dialog";
+
+interface TagChip {
+  name: string;
+  color: PaletteKey | null;
+}
 
 interface TransactionListProps {
   filters?: TransactionFilters;
@@ -88,8 +94,8 @@ export function TransactionList({
     );
   }
 
-  const tagNameById = new Map(
-    (tags.data?.items ?? []).map((t) => [t.id, t.name]),
+  const tagById = new Map(
+    (tags.data?.items ?? []).map((t) => [t.id, t] as const),
   );
 
   return (
@@ -106,9 +112,10 @@ export function TransactionList({
           <TransactionRow
             key={row.id}
             row={row}
-            tagNames={row.tagIds
-              .map((id) => tagNameById.get(id))
-              .filter((n): n is string => Boolean(n))}
+            tagChips={row.tagIds
+              .map((id) => tagById.get(id))
+              .filter((t): t is NonNullable<typeof t> => Boolean(t))
+              .map((t) => ({ name: t.name, color: t.color }))}
             onSelect={setEditing}
           />
         ))}
@@ -135,11 +142,11 @@ export function TransactionList({
 
 function TransactionRow({
   row,
-  tagNames,
+  tagChips,
   onSelect,
 }: {
   row: Transaction;
-  tagNames: string[];
+  tagChips: TagChip[];
   onSelect: (row: Transaction) => void;
 }) {
   function handleActivate() {
@@ -177,14 +184,16 @@ function TransactionRow({
               </>
             ) : null}
           </span>
-          {tagNames.length > 0 ? (
+          {tagChips.length > 0 ? (
             <span className="flex flex-wrap gap-1 pt-1">
-              {tagNames.map((name) => (
+              {tagChips.map((chip) => (
                 <span
-                  key={name}
-                  className="rounded-full bg-accent px-2 py-0.5 text-xs text-muted-foreground"
+                  key={chip.name}
+                  data-testid="transaction-row-tag-chip"
+                  className="inline-flex items-center gap-1 rounded-full bg-accent px-2 py-0.5 text-xs text-muted-foreground"
                 >
-                  {name}
+                  <TagColorDot color={chip.color} />
+                  <span>{chip.name}</span>
                 </span>
               ))}
             </span>

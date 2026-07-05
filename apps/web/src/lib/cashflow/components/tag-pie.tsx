@@ -10,19 +10,8 @@ import {
   ChartTooltipContent,
 } from "@/components/ui/chart";
 import { formatMoney } from "../format-money";
+import { tagColorVar } from "../tag-colors";
 import type { TagBucket } from "../types";
-
-const PIE_COLORS = [
-  "var(--chart-1)",
-  "var(--chart-2)",
-  "var(--chart-3)",
-  "var(--chart-4)",
-  "var(--chart-5)",
-];
-
-export function tagColor(index: number): string {
-  return (PIE_COLORS[index % PIE_COLORS.length] ?? PIE_COLORS[0]) as string;
-}
 
 type LabelMode = "none" | "legend" | "leader";
 
@@ -33,6 +22,29 @@ interface TagPieProps {
   innerRadius?: number;
   outerRadius?: number;
   labels?: LabelMode;
+}
+
+export interface TagPieSlice {
+  key: string;
+  name: string;
+  value: number;
+  color: string;
+}
+
+/**
+ * Pure transform: each bucket becomes a slice whose fill is
+ * `tagColorVar(bucket.color)` — real tags use `--tag-color-<key>`; the
+ * synthetic Untagged bucket (`color: null`) falls back to
+ * `--muted-foreground`. Exported so the render surface can be asserted
+ * without booting recharts in JSDOM.
+ */
+export function computeTagPieSlices(buckets: TagBucket[]): TagPieSlice[] {
+  return buckets.map((bucket) => ({
+    key: bucket.tagId ?? "__untagged__",
+    name: bucket.tagName ?? "Untagged",
+    value: Number(bucket.expense),
+    color: tagColorVar(bucket.color),
+  }));
 }
 
 interface LeaderLabelProps {
@@ -76,12 +88,7 @@ export function TagPie({
   outerRadius = 100,
   labels = "none",
 }: TagPieProps) {
-  const chartData = buckets.map((bucket, index) => ({
-    key: bucket.tagId ?? "__untagged__",
-    name: bucket.tagName ?? "Untagged",
-    value: Number(bucket.expense),
-    color: tagColor(index),
-  }));
+  const chartData = computeTagPieSlices(buckets);
   const chartConfig = chartData.reduce<ChartConfig>((acc, entry) => {
     acc[entry.name] = { label: entry.name, color: entry.color };
     return acc;

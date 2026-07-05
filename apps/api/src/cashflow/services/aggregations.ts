@@ -1,4 +1,5 @@
 import type { TransactionKind } from "../entities/transaction.entity";
+import type { PaletteKey } from "../tag-colors";
 
 /**
  * A row already converted to the user's base currency. `tagIds` carries every
@@ -34,6 +35,12 @@ export interface BucketTotals {
 export interface TagBucket extends BucketTotals {
   tagId: string | null;
   tagName: string | null;
+  color: PaletteKey | null;
+}
+
+export interface TagInfo {
+  name: string;
+  color: PaletteKey;
 }
 
 export interface MonthBucket extends BucketTotals {
@@ -59,7 +66,7 @@ const NULL_TAG_KEY = "__null__";
  */
 export function aggregate(
   rows: readonly ConvertedRow[],
-  tagNameById: ReadonlyMap<string, string>,
+  tagInfoById: ReadonlyMap<string, TagInfo>,
 ): AggregationResult {
   let income = 0;
   let expense = 0;
@@ -116,13 +123,17 @@ export function aggregate(
   }
 
   const byTag: TagBucket[] = [...tagBuckets.values()]
-    .map((bucket) => ({
-      tagId: bucket.tagId,
-      tagName: bucket.tagId ? (tagNameById.get(bucket.tagId) ?? null) : null,
-      income: bucket.income.toFixed(2),
-      expense: bucket.expense.toFixed(2),
-      net: (bucket.income - bucket.expense).toFixed(2),
-    }))
+    .map((bucket) => {
+      const info = bucket.tagId ? tagInfoById.get(bucket.tagId) : undefined;
+      return {
+        tagId: bucket.tagId,
+        tagName: info?.name ?? null,
+        color: info?.color ?? null,
+        income: bucket.income.toFixed(2),
+        expense: bucket.expense.toFixed(2),
+        net: (bucket.income - bucket.expense).toFixed(2),
+      };
+    })
     .sort(compareTagBuckets);
 
   const byMonth: MonthBucket[] = [...monthBuckets.entries()]

@@ -12,8 +12,10 @@ import type {
   CreateTransactionInput,
   ListTransactionsPage,
   ListTransactionsParams,
+  PaletteKey,
   TagDrillDownParams,
   TrendParams,
+  UpdateTagInput,
   UpdateTransactionInput,
 } from "./types";
 
@@ -114,18 +116,19 @@ export function useTags() {
 export function useCreateTag() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (name: string) => cashflowApi.createTag(name),
+    mutationFn: (input: { name: string; color?: PaletteKey }) =>
+      cashflowApi.createTag(input),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: CASHFLOW_QUERY_KEYS.tags });
     },
   });
 }
 
-export function useRenameTag() {
+export function useUpdateTag() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, name }: { id: string; name: string }) =>
-      cashflowApi.renameTag(id, name),
+    mutationFn: ({ id, input }: { id: string; input: UpdateTagInput }) =>
+      cashflowApi.updateTag(id, input),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: CASHFLOW_QUERY_KEYS.tags });
       queryClient.invalidateQueries({

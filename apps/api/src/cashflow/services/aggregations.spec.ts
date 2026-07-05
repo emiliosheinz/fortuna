@@ -1,4 +1,9 @@
-import { aggregate, type ConvertedRow, enumerateMonths } from "./aggregations";
+import {
+  aggregate,
+  type ConvertedRow,
+  enumerateMonths,
+  type TagInfo,
+} from "./aggregations";
 
 const FOOD = "11111111-1111-1111-1111-111111111111";
 const TRANSPORT = "22222222-2222-2222-2222-222222222222";
@@ -14,6 +19,11 @@ function row(overrides: Partial<ConvertedRow>): ConvertedRow {
     ...overrides,
   };
 }
+
+const TAG_INFO = new Map<string, TagInfo>([
+  [FOOD, { name: "Food", color: "emerald" }],
+  [TRANSPORT, { name: "Transport", color: "sky" }],
+]);
 
 describe("aggregate", () => {
   it("rolls up income, expense, and net in two-decimal strings", () => {
@@ -32,7 +42,7 @@ describe("aggregate", () => {
     });
   });
 
-  it("groups by tagId, resolving names and sorting named alphabetical with the null-tag bucket last", () => {
+  it("groups by tagId, resolving names and colors, sorting named alphabetical with the null-tag bucket last", () => {
     const result = aggregate(
       [
         row({ id: "a", tagIds: [FOOD], baseAmount: "30.00" }),
@@ -40,16 +50,14 @@ describe("aggregate", () => {
         row({ id: "c", tagIds: [TRANSPORT], baseAmount: "15.00" }),
         row({ id: "d", tagIds: [], baseAmount: "5.00" }),
       ],
-      new Map([
-        [FOOD, "Food"],
-        [TRANSPORT, "Transport"],
-      ]),
+      TAG_INFO,
     );
 
     expect(result.byTag).toEqual([
       {
         tagId: FOOD,
         tagName: "Food",
+        color: "emerald",
         income: "0.00",
         expense: "50.00",
         net: "-50.00",
@@ -57,6 +65,7 @@ describe("aggregate", () => {
       {
         tagId: TRANSPORT,
         tagName: "Transport",
+        color: "sky",
         income: "0.00",
         expense: "15.00",
         net: "-15.00",
@@ -64,6 +73,7 @@ describe("aggregate", () => {
       {
         tagId: null,
         tagName: null,
+        color: null,
         income: "0.00",
         expense: "5.00",
         net: "-5.00",
@@ -74,10 +84,7 @@ describe("aggregate", () => {
   it("multi-counts a row across every tag it carries so bucket sums exceed the totals", () => {
     const result = aggregate(
       [row({ id: "a", tagIds: [FOOD, TRANSPORT], baseAmount: "100.00" })],
-      new Map([
-        [FOOD, "Food"],
-        [TRANSPORT, "Transport"],
-      ]),
+      TAG_INFO,
     );
 
     const foodBucket = result.byTag.find((b) => b.tagId === FOOD);
@@ -91,7 +98,7 @@ describe("aggregate", () => {
     expect(bucketSum).toBeGreaterThan(Number(result.totals.expense));
   });
 
-  it("routes a tagless row into a single synthetic null-tag bucket", () => {
+  it("routes a tagless row into a single synthetic null-tag bucket with null color", () => {
     const result = aggregate(
       [row({ id: "a", tagIds: [], baseAmount: "42.00" })],
       new Map(),
@@ -101,11 +108,21 @@ describe("aggregate", () => {
       {
         tagId: null,
         tagName: null,
+        color: null,
         income: "0.00",
         expense: "42.00",
         net: "-42.00",
       },
     ]);
+  });
+
+  it("emits null color when the tag id is unknown to the tagInfoById map", () => {
+    const result = aggregate(
+      [row({ id: "a", tagIds: [FOOD], baseAmount: "10.00" })],
+      new Map(),
+    );
+    expect(result.byTag[0]?.color).toBeNull();
+    expect(result.byTag[0]?.tagName).toBeNull();
   });
 
   it("excludes unconvertible rows from totals and reports the count", () => {
