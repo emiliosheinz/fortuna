@@ -26,7 +26,7 @@ import {
   useTrend,
 } from "../hooks";
 import type { MonthBucket, Transaction } from "../types";
-import { CategoryPie } from "./category-pie";
+import { TagPie } from "./tag-pie";
 
 const TOP_EXPENSES = 5;
 const TREND_MONTHS = 6;
@@ -213,7 +213,7 @@ function renderThisMonth(
   if (query.isPending) return <CardSkeleton lines={4} />;
   if (query.isError || !query.data) return <CardError />;
 
-  const expenseBuckets = query.data.byCategory.filter(
+  const expenseBuckets = query.data.byTag.filter(
     (bucket) => Number(bucket.expense) > 0,
   );
 
@@ -243,7 +243,7 @@ function renderThisMonth(
         {expenseBuckets.length === 0 ? (
           <CardEmpty>No expenses this month yet.</CardEmpty>
         ) : (
-          <CategoryPie
+          <TagPie
             buckets={expenseBuckets}
             baseCurrency={baseCurrency}
             className="mx-auto h-60 w-full"
