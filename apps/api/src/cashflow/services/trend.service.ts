@@ -43,11 +43,18 @@ export class TrendService {
         amount: true,
         currency: true,
         kind: true,
-        categoryId: true,
       },
     });
 
-    const converted = await convertRows(rows, baseCurrency, this.fxLookup);
+    const convertible = rows.map((row) => ({
+      id: row.id,
+      date: row.date,
+      amount: row.amount,
+      currency: row.currency,
+      kind: row.kind,
+      tagIds: [] as string[],
+    }));
+    const converted = await convertRows(convertible, baseCurrency, this.fxLookup);
     const result = aggregate(converted, new Map());
     const bucketByMonth = new Map(
       result.byMonth.map((bucket) => [bucket.month, bucket]),
