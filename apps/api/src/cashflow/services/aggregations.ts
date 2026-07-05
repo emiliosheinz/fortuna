@@ -1,11 +1,16 @@
 import type { TransactionKind } from "../entities/transaction.entity";
 
-/** A row already converted to the user's base currency. */
+/**
+ * A row already converted to the user's base currency. `tagIds` carries every
+ * tag attached to the row (empty when the row has no tags) and drives the
+ * `byTag` rollup below. Callers that don't need a tag dimension pass `[]`
+ * (see `TrendService`).
+ */
 export interface ConvertedRow {
   id: string;
   date: string;
   kind: TransactionKind;
-  categoryId: string | null;
+  tagIds: string[];
   /** Base-currency value, decimal string. `null` when unconvertible. */
   baseAmount: string | null;
   unconvertible: boolean;
@@ -17,9 +22,17 @@ export interface BucketTotals {
   net: string;
 }
 
-export interface CategoryBucket extends BucketTotals {
-  categoryId: string | null;
-  categoryName: string | null;
+/**
+ * Per-tag rollup bucket. `tagId === null` is the synthetic "no tags" bucket.
+ *
+ * Multi-count property: a row with `tagIds: [A, B]` contributes its full
+ * amount to bucket `A` and bucket `B`, so `sum(byTag.expense)` is not
+ * required to equal the period `totals.expense`. Callers must not treat
+ * bucket amounts as a partition of the totals.
+ */
+export interface TagBucket extends BucketTotals {
+  tagId: string | null;
+  tagName: string | null;
 }
 
 export interface MonthBucket extends BucketTotals {
@@ -28,28 +41,31 @@ export interface MonthBucket extends BucketTotals {
 
 export interface AggregationResult {
   totals: BucketTotals;
-  byCategory: CategoryBucket[];
+  byTag: TagBucket[];
   byMonth: MonthBucket[];
   excludedUnconvertibleCount: number;
 }
 
 const ZERO = "0.00";
+const NULL_TAG_KEY = "__null__";
 
 /**
- * Aggregate converted rows into headline totals plus per-category and per-month
- * buckets. The caller decides which slices to expose. Sums run in JS numbers and
- * are rounded once at the response boundary.
+ * Aggregate converted rows into headline totals plus per-tag and per-month
+ * buckets. Totals sum each row once; `byTag` multi-counts across every tag
+ * on the row (see `TagBucket` JSDoc). A row with no tags contributes to the
+ * synthetic `tagId: null` bucket. Sums run in JS numbers and are rounded
+ * once at the response boundary.
  */
 export function aggregate(
   rows: readonly ConvertedRow[],
-  categoryNameById: ReadonlyMap<string, string>,
+  tagNameById: ReadonlyMap<string, string>,
 ): AggregationResult {
   let income = 0;
   let expense = 0;
   let excludedUnconvertibleCount = 0;
-  const categoryBuckets = new Map<
+  const tagBuckets = new Map<
     string,
-    { income: number; expense: number; categoryId: string | null }
+    { income: number; expense: number; tagId: string | null }
   >();
   const monthBuckets = new Map<string, { income: number; expense: number }>();
 
@@ -69,18 +85,24 @@ export function aggregate(
       expense += value;
     }
 
-    const categoryKey = row.categoryId ?? "__null__";
-    const category = categoryBuckets.get(categoryKey) ?? {
-      income: 0,
-      expense: 0,
-      categoryId: row.categoryId,
-    };
-    if (row.kind === "income") {
-      category.income += value;
-    } else {
-      category.expense += value;
+    const keys: Array<{ key: string; tagId: string | null }> =
+      row.tagIds.length === 0
+        ? [{ key: NULL_TAG_KEY, tagId: null }]
+        : row.tagIds.map((tagId) => ({ key: tagId, tagId }));
+
+    for (const { key, tagId } of keys) {
+      const bucket = tagBuckets.get(key) ?? {
+        income: 0,
+        expense: 0,
+        tagId,
+      };
+      if (row.kind === "income") {
+        bucket.income += value;
+      } else {
+        bucket.expense += value;
+      }
+      tagBuckets.set(key, bucket);
     }
-    categoryBuckets.set(categoryKey, category);
 
     const monthKey = row.date.slice(0, 7);
     const month = monthBuckets.get(monthKey) ?? { income: 0, expense: 0 };
@@ -92,17 +114,17 @@ export function aggregate(
     monthBuckets.set(monthKey, month);
   }
 
-  const byCategory: CategoryBucket[] = [...categoryBuckets.values()]
+  const byTag: TagBucket[] = [...tagBuckets.values()]
     .map((bucket) => ({
-      categoryId: bucket.categoryId,
-      categoryName: bucket.categoryId
-        ? (categoryNameById.get(bucket.categoryId) ?? null)
+      tagId: bucket.tagId,
+      tagName: bucket.tagId
+        ? (tagNameById.get(bucket.tagId) ?? null)
         : null,
       income: bucket.income.toFixed(2),
       expense: bucket.expense.toFixed(2),
       net: (bucket.income - bucket.expense).toFixed(2),
     }))
-    .sort(compareCategoryBuckets);
+    .sort(compareTagBuckets);
 
   const byMonth: MonthBucket[] = [...monthBuckets.entries()]
     .map(([month, bucket]) => ({
@@ -119,7 +141,7 @@ export function aggregate(
       expense: expense.toFixed(2),
       net: (income - expense).toFixed(2),
     },
-    byCategory,
+    byTag,
     byMonth,
     excludedUnconvertibleCount,
   };
@@ -150,10 +172,10 @@ export function enumerateMonths(from: string, to: string): string[] {
   return out;
 }
 
-function compareCategoryBuckets(a: CategoryBucket, b: CategoryBucket): number {
-  if (a.categoryId === null && b.categoryId !== null) return 1;
-  if (b.categoryId === null && a.categoryId !== null) return -1;
-  const an = a.categoryName ?? "";
-  const bn = b.categoryName ?? "";
+function compareTagBuckets(a: TagBucket, b: TagBucket): number {
+  if (a.tagId === null && b.tagId !== null) return 1;
+  if (b.tagId === null && a.tagId !== null) return -1;
+  const an = a.tagName ?? "";
+  const bn = b.tagName ?? "";
   return an.localeCompare(bn);
 }
