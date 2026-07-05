@@ -245,7 +245,7 @@ export function TagInput({ value, onChange, id }: TagInputProps) {
                     <div
                       role="radiogroup"
                       aria-label="Color for new tag"
-                      className="grid grid-cols-5 gap-1"
+                      className="grid grid-cols-5 place-items-center gap-1"
                     >
                       {PALETTE_KEYS.map((key) => (
                         // biome-ignore lint/a11y/useSemanticElements: radiogroup of styled swatches; matches the picker in EditTagDialog
