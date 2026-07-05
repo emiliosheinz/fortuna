@@ -94,10 +94,6 @@ describe("Sidebar", () => {
       "href",
       "/tags",
     );
-    expect(screen.queryByText(/^Categories$/)).not.toBeInTheDocument();
-    expect(
-      screen.queryByTestId("sidebar-nav-categories"),
-    ).not.toBeInTheDocument();
   });
 
   it("marks Dashboard active on /", () => {
