@@ -8,11 +8,6 @@ import {
   KeyboardSafePopoverTrigger,
 } from "@/components/keyboard-safe-popover";
 import { Input } from "@/components/ui/input";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import { useCreateTag, useTags } from "../hooks";
 import { PALETTE_KEYS } from "../tag-colors";
 import type { PaletteKey } from "../types";
@@ -35,18 +30,10 @@ export function TagInput({ value, onChange, id }: TagInputProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
 
-  const [creatingColor, setCreatingColor] = useState(false);
-
   async function createWithColor(name: string, color: PaletteKey) {
-    try {
-      await createMutation.mutateAsync({ name, color });
-      add(name);
-      setQuery("");
-      setCreatingColor(false);
-    } catch {
-      // Leave the picker open; the transaction submit path can still recover
-      // by resolving the name implicitly with a server-assigned color.
-    }
+    await createMutation.mutateAsync({ name, color });
+    add(name);
+    setQuery("");
   }
 
   const trimmed = query.trim();
@@ -221,51 +208,32 @@ export function TagInput({ value, onChange, id }: TagInputProps) {
                 );
               })}
               {showCreate ? (
-                <Popover open={creatingColor} onOpenChange={setCreatingColor}>
-                  <PopoverTrigger asChild>
-                    <button
-                      type="button"
-                      data-testid="tag-input-create"
-                      className="block w-full rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent"
-                    >
-                      Create "{trimmed}"
-                    </button>
-                  </PopoverTrigger>
-                  <PopoverContent
-                    align="start"
-                    className="w-auto p-2"
+                <div
+                  data-testid="tag-input-create"
+                  className="flex flex-col gap-1.5 px-2 py-1.5 text-sm"
+                >
+                  <span className="text-xs text-muted-foreground">
+                    Create "{trimmed}" with color
+                  </span>
+                  <div
                     data-testid="tag-input-create-color-picker"
-                    onInteractOutside={(event) => {
-                      // The outer TagInput popover is another Radix layer;
-                      // without this the click on our swatch bubbles up to
-                      // its dismiss handler and both close together.
-                      event.preventDefault();
-                    }}
+                    className="flex flex-wrap gap-2"
                   >
-                    <div
-                      role="radiogroup"
-                      aria-label="Color for new tag"
-                      className="grid grid-cols-[repeat(5,1.75rem)] gap-1"
-                    >
-                      {PALETTE_KEYS.map((key) => (
-                        // biome-ignore lint/a11y/useSemanticElements: radiogroup of styled swatches; matches the picker in EditTagDialog
-                        <button
-                          key={key}
-                          type="button"
-                          role="radio"
-                          aria-checked={false}
-                          aria-label={`Color ${key}`}
-                          data-testid={`tag-input-create-swatch-${key}`}
-                          disabled={createMutation.isPending}
-                          onClick={() => createWithColor(trimmed, key)}
-                          className="flex size-7 shrink-0 items-center justify-center overflow-visible rounded-full border-2 border-transparent bg-transparent p-0 outline-none hover:border-border focus-visible:ring-1 focus-visible:ring-ring"
-                        >
-                          <TagColorDot color={key} />
-                        </button>
-                      ))}
-                    </div>
-                  </PopoverContent>
-                </Popover>
+                    {PALETTE_KEYS.map((key) => (
+                      <button
+                        key={key}
+                        type="button"
+                        aria-label={`Color ${key}`}
+                        data-testid={`tag-input-create-swatch-${key}`}
+                        disabled={createMutation.isPending}
+                        onClick={() => createWithColor(trimmed, key)}
+                        className="rounded-full outline-none hover:opacity-70 focus-visible:ring-2 focus-visible:ring-ring"
+                      >
+                        <TagColorDot color={key} />
+                      </button>
+                    ))}
+                  </div>
+                </div>
               ) : null}
             </div>
           </div>
