@@ -99,7 +99,7 @@ beforeEach(() => {
       income: "0.00",
       expense: "0.00",
       net: "0.00",
-      byCategory: [],
+      byTag: [],
       excludedUnconvertibleCount: 0,
     }),
   );
@@ -165,7 +165,7 @@ describe("Dashboard", () => {
           income: "50000.00",
           expense: "4177.00",
           net: "45823.00",
-          byCategory: [],
+          byTag: [],
           excludedUnconvertibleCount: 0,
         }),
       );
@@ -178,18 +178,15 @@ describe("Dashboard", () => {
       expect(card).toHaveTextContent("R$ 45.823,00");
     });
 
-    it("renders the expense pie when there are expense buckets", () => {
+    it("renders the expense pie when tag buckets are present", () => {
       useSummaryMock.mockReturnValue(
         summarySuccess({
           month: "2026-06",
           baseCurrency: "BRL",
           income: "0.00",
-          expense: "300.00",
-          net: "-300.00",
-          byCategory: [
-            cat("c1", "Moradia", "200.00"),
-            cat("c2", "Lazer", "100.00"),
-          ],
+          expense: "150.00",
+          net: "-150.00",
+          byTag: [tag("t1", "Food", "100.00"), tag(null, null, "50.00")],
           excludedUnconvertibleCount: 0,
         }),
       );
@@ -198,6 +195,34 @@ describe("Dashboard", () => {
 
       const card = screen.getByTestId("dashboard-this-month");
       expect(within(card).queryByText(/No expenses this month/i)).toBeNull();
+    });
+
+    it("omits income-only tag buckets from the expense pie", () => {
+      useSummaryMock.mockReturnValue(
+        summarySuccess({
+          month: "2026-06",
+          baseCurrency: "BRL",
+          income: "500.00",
+          expense: "0.00",
+          net: "500.00",
+          byTag: [
+            {
+              tagId: "t-salary",
+              tagName: "salary",
+              income: "500.00",
+              expense: "0.00",
+              net: "500.00",
+            },
+          ],
+          excludedUnconvertibleCount: 0,
+        }),
+      );
+
+      renderDashboard();
+
+      const card = screen.getByTestId("dashboard-this-month");
+      expect(within(card).getByText(/No expenses this month/i)).toBeInTheDocument();
+      expect(within(card).queryByText("salary")).toBeNull();
     });
   });
 
@@ -262,10 +287,10 @@ describe("Dashboard", () => {
   });
 });
 
-function cat(id: string | null, name: string, expense: string) {
+function tag(id: string | null, name: string | null, expense: string) {
   return {
-    categoryId: id,
-    categoryName: name,
+    tagId: id,
+    tagName: name,
     income: "0.00",
     expense,
     net: `-${expense}`,
@@ -289,7 +314,6 @@ function tx(
     currency,
     description,
     kind: "expense",
-    categoryId: null,
     tagIds: [],
     baseAmount: amount,
     baseCurrency: "BRL",
