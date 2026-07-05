@@ -9,6 +9,8 @@ import {
 } from "@/components/keyboard-safe-popover";
 import { Input } from "@/components/ui/input";
 import { useTags } from "../hooks";
+import type { PaletteKey } from "../types";
+import { TagColorDot } from "./tag-color-dot";
 
 interface TagInputProps {
   value: string[];
@@ -28,6 +30,13 @@ export function TagInput({ value, onChange, id }: TagInputProps) {
 
   const trimmed = query.trim();
   const known = tags.data?.items ?? [];
+  const colorByName = useMemo(() => {
+    const map = new Map<string, PaletteKey>();
+    for (const tag of known) {
+      map.set(tag.name.toLowerCase(), tag.color);
+    }
+    return map;
+  }, [known]);
 
   const filtered = useMemo(() => {
     if (!trimmed) return known;
@@ -119,6 +128,9 @@ export function TagInput({ value, onChange, id }: TagInputProps) {
                     data-testid="tag-input-chip"
                     className="inline-flex min-w-0 items-center gap-1 rounded-full bg-accent px-2 py-0.5 text-xs"
                   >
+                    <TagColorDot
+                      color={colorByName.get(name.toLowerCase()) ?? null}
+                    />
                     <span className="truncate">{name}</span>
                     <button
                       type="button"
@@ -182,6 +194,7 @@ export function TagInput({ value, onChange, id }: TagInputProps) {
                     <span className="flex size-4 shrink-0 items-center justify-center rounded-xs border border-input">
                       {selected ? <CheckIcon className="size-3" /> : null}
                     </span>
+                    <TagColorDot color={tag.color} />
                     <span className="truncate">{tag.name}</span>
                   </button>
                 );

@@ -12,7 +12,7 @@ jest.mock("../../api-client", () => ({
     setBaseCurrency: jest.fn(),
     listTags: jest.fn(),
     createTag: jest.fn(),
-    renameTag: jest.fn(),
+    updateTag: jest.fn(),
     deleteTag: jest.fn(),
   },
 }));
@@ -382,5 +382,31 @@ describe("CaptureForm", () => {
     });
     const payload = createTransactionMock.mock.calls[0]?.[0];
     expect(payload?.tagNames).toEqual(["travel", "lisbon"]);
+  });
+
+  it("renders a colored dot beside each TagInput dropdown option and selected chip", async () => {
+    listTagsMock.mockResolvedValue({
+      items: [
+        { id: "t1", name: "travel", color: "amber" },
+        { id: "t2", name: "lisbon", color: "sky" },
+      ],
+    });
+    renderForm();
+
+    fireEvent.click(screen.getByTestId("tag-input-trigger"));
+    const options = await screen.findAllByTestId("tag-input-option");
+    expect(options).toHaveLength(2);
+    const dots = options.map((o) =>
+      o.querySelector<HTMLElement>("[data-testid=tag-color-dot]"),
+    );
+    expect(dots[0]?.style.background).toBe("var(--tag-color-amber)");
+    expect(dots[1]?.style.background).toBe("var(--tag-color-sky)");
+
+    fireEvent.click(options[0] as HTMLElement);
+    const chip = await screen.findByTestId("tag-input-chip");
+    const chipDot = chip.querySelector<HTMLElement>(
+      "[data-testid=tag-color-dot]",
+    );
+    expect(chipDot?.style.background).toBe("var(--tag-color-amber)");
   });
 });
