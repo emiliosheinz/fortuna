@@ -258,7 +258,7 @@ export function TagInput({ value, onChange, id }: TagInputProps) {
                           data-testid={`tag-input-create-swatch-${key}`}
                           disabled={createMutation.isPending}
                           onClick={() => createWithColor(trimmed, key)}
-                          className="flex size-7 items-center justify-center rounded-full border-2 border-transparent hover:border-border focus:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                          className="flex size-7 shrink-0 items-center justify-center overflow-visible rounded-full border-2 border-transparent bg-transparent p-0 outline-none hover:border-border focus-visible:ring-1 focus-visible:ring-ring"
                         >
                           <TagColorDot color={key} />
                         </button>

@@ -239,8 +239,8 @@ function EditTagDialog({ tag, onClose }: { tag: Tag; onClose: () => void }) {
                       onClick={() => setColor(key)}
                       className={
                         color === key
-                          ? "flex size-7 items-center justify-center rounded-full border-2 border-foreground focus:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                          : "flex size-7 items-center justify-center rounded-full border-2 border-transparent hover:border-border focus:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                          ? "flex size-7 shrink-0 items-center justify-center rounded-full border-2 border-foreground bg-transparent p-0 outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                          : "flex size-7 shrink-0 items-center justify-center rounded-full border-2 border-transparent bg-transparent p-0 outline-none hover:border-border focus-visible:ring-1 focus-visible:ring-ring"
                       }
                     >
                       <TagColorDot color={key} />
