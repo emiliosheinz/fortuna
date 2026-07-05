@@ -67,7 +67,7 @@ export function AuthGuard({ children, sidebarOpen = true }: AuthGuardProps) {
   );
 }
 
-const NAV_KEYS = ["dashboard", "transactions", "categories", "tags"] as const;
+const NAV_KEYS = ["dashboard", "transactions", "tags"] as const;
 const FOOTER_KEYS = ["theme", "collapse"] as const;
 
 function AuthGuardSkeleton({ sidebarOpen }: { sidebarOpen: boolean }) {

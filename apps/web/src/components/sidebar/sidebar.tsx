@@ -3,7 +3,6 @@
 import { useMutation } from "@tanstack/react-query";
 import {
   CoinsIcon,
-  FolderIcon,
   LaptopMinimalIcon,
   LayoutDashboardIcon,
   LogOutIcon,
@@ -58,7 +57,6 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { label: "Dashboard", href: "/", icon: LayoutDashboardIcon },
   { label: "Transactions", href: "/transactions", icon: CoinsIcon },
-  { label: "Categories", href: "/categories", icon: FolderIcon },
   { label: "Tags", href: "/tags", icon: TagIcon },
 ];
 
