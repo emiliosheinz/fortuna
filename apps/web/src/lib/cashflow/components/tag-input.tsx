@@ -179,7 +179,7 @@ export function TagInput({ value, onChange, id }: TagInputProps) {
                     onClick={() => toggle(tag.name)}
                     className="flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent"
                   >
-                    <span className="flex size-4 shrink-0 items-center justify-center rounded-sm border border-input">
+                    <span className="flex size-4 shrink-0 items-center justify-center rounded-xs border border-input">
                       {selected ? <CheckIcon className="size-3" /> : null}
                     </span>
                     <span className="truncate">{tag.name}</span>
