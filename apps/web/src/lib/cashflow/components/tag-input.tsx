@@ -181,7 +181,8 @@ export function TagInput({ value, onChange, id }: TagInputProps) {
             />
             <div
               data-testid="tag-input-menu"
-              className="max-h-56 overflow-y-auto"
+              onWheel={(event) => event.stopPropagation()}
+              className="max-h-56 overflow-y-auto overscroll-contain"
             >
               {filtered.length === 0 && !showCreate ? (
                 <p className="px-2 py-1.5 text-xs text-muted-foreground">
