@@ -409,4 +409,31 @@ describe("CaptureForm", () => {
     );
     expect(chipDot?.style.background).toBe("var(--tag-color-amber)");
   });
+
+  it("opens a color popover on Create and calls createTag with the picked palette key", async () => {
+    listTagsMock.mockResolvedValue({ items: [] });
+    const createTagMock = cashflowApi.createTag as jest.Mock;
+    createTagMock.mockResolvedValue({
+      tag: { id: "t_new", name: "Lisbon", color: "emerald" },
+    });
+    renderForm();
+
+    fireEvent.click(screen.getByTestId("tag-input-trigger"));
+    const search = (await screen.findByTestId(
+      "tag-input-search",
+    )) as HTMLInputElement;
+    fireEvent.change(search, { target: { value: "Lisbon" } });
+
+    fireEvent.click(await screen.findByTestId("tag-input-create"));
+    fireEvent.click(
+      await screen.findByTestId("tag-input-create-swatch-emerald"),
+    );
+
+    await waitFor(() =>
+      expect(createTagMock).toHaveBeenCalledWith({
+        name: "Lisbon",
+        color: "emerald",
+      }),
+    );
+  });
 });

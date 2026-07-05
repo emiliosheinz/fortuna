@@ -77,9 +77,9 @@ export const cashflowApi = {
 
   listTags: () => apiClient.get<{ items: Tag[] }>(`${PREFIX}/tags`),
 
-  createTag: (name: string) =>
+  createTag: (input: { name: string; color?: Tag["color"] }) =>
     apiClient.post<{ tag: Tag }>(`${PREFIX}/tags`, {
-      body: { name },
+      body: input,
     }),
 
   updateTag: (id: string, input: UpdateTagInput) =>

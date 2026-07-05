@@ -12,6 +12,7 @@ import type {
   CreateTransactionInput,
   ListTransactionsPage,
   ListTransactionsParams,
+  PaletteKey,
   TagDrillDownParams,
   TrendParams,
   UpdateTagInput,
@@ -115,7 +116,8 @@ export function useTags() {
 export function useCreateTag() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (name: string) => cashflowApi.createTag(name),
+    mutationFn: (input: { name: string; color?: PaletteKey }) =>
+      cashflowApi.createTag(input),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: CASHFLOW_QUERY_KEYS.tags });
     },
