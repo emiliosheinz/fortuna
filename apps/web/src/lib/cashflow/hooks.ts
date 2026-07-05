@@ -104,53 +104,6 @@ export function useTransactions(filters: TransactionFilters = {}, limit = 50) {
   });
 }
 
-export function useCategories() {
-  return useQuery({
-    queryKey: CASHFLOW_QUERY_KEYS.categories,
-    queryFn: () => cashflowApi.listCategories(),
-  });
-}
-
-export function useCreateCategory() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (name: string) => cashflowApi.createCategory(name),
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: CASHFLOW_QUERY_KEYS.categories,
-      });
-    },
-  });
-}
-
-export function useRenameCategory() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ id, name }: { id: string; name: string }) =>
-      cashflowApi.renameCategory(id, name),
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: CASHFLOW_QUERY_KEYS.categories,
-      });
-    },
-  });
-}
-
-export function useDeleteCategory() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (id: string) => cashflowApi.deleteCategory(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: CASHFLOW_QUERY_KEYS.categories,
-      });
-      queryClient.invalidateQueries({
-        queryKey: CASHFLOW_QUERY_KEYS.transactions,
-      });
-    },
-  });
-}
-
 export function useTags() {
   return useQuery({
     queryKey: CASHFLOW_QUERY_KEYS.tags,
