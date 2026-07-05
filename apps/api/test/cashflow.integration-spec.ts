@@ -121,7 +121,7 @@ describe("Cashflow integration", () => {
   beforeEach(async () => {
     if (!dataSource) return;
     await dataSource.query(
-      'TRUNCATE TABLE "transaction_tags", "tags", "categories", "transactions", "user_settings", "sign_in_events", "sessions", "device_fingerprints", "identities", "users", "fx_rates", "fx_coverage" RESTART IDENTITY CASCADE',
+      'TRUNCATE TABLE "transaction_tags", "tags", "transactions", "user_settings", "sign_in_events", "sessions", "device_fingerprints", "identities", "users", "fx_rates", "fx_coverage" RESTART IDENTITY CASCADE',
     );
     if (redisAdmin?.status === "ready" || redisAdmin?.status === "connect") {
       await redisAdmin.flushdb().catch(() => undefined);
