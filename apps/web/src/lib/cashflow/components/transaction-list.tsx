@@ -13,7 +13,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { formatMoney } from "../format-money";
 import {
   type TransactionFilters,
-  useCategories,
   useTags,
   useTransactions,
 } from "../hooks";
@@ -38,7 +37,6 @@ export function TransactionList({
     hasNextPage,
     isFetchingNextPage,
   } = useTransactions(filters);
-  const categories = useCategories();
   const tags = useTags();
   const sentinelRef = useRef<HTMLLIElement | null>(null);
   const [editing, setEditing] = useState<Transaction | null>(null);
@@ -94,9 +92,6 @@ export function TransactionList({
     );
   }
 
-  const categoryNameById = new Map(
-    (categories.data?.items ?? []).map((c) => [c.id, c.name]),
-  );
   const tagNameById = new Map(
     (tags.data?.items ?? []).map((t) => [t.id, t.name]),
   );
@@ -115,9 +110,6 @@ export function TransactionList({
           <TransactionRow
             key={row.id}
             row={row}
-            categoryName={
-              row.categoryId ? categoryNameById.get(row.categoryId) : undefined
-            }
             tagNames={row.tagIds
               .map((id) => tagNameById.get(id))
               .filter((n): n is string => Boolean(n))}
@@ -147,12 +139,10 @@ export function TransactionList({
 
 function TransactionRow({
   row,
-  categoryName,
   tagNames,
   onSelect,
 }: {
   row: Transaction;
-  categoryName: string | undefined;
   tagNames: string[];
   onSelect: (row: Transaction) => void;
 }) {
@@ -180,12 +170,6 @@ function TransactionRow({
           <span className="text-sm font-medium">{row.description}</span>
           <span className="flex flex-wrap items-center gap-x-1.5 text-xs text-muted-foreground">
             <span>{format(parseISO(row.date), "PPP")}</span>
-            {categoryName ? (
-              <>
-                <span aria-hidden>·</span>
-                <span>{categoryName}</span>
-              </>
-            ) : null}
             {row.group ? (
               <>
                 <span aria-hidden>·</span>
