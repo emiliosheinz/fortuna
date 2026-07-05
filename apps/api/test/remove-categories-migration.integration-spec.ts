@@ -228,6 +228,33 @@ describe("RemoveCashflowCategories migration", () => {
       ]);
     });
 
+    it("does not spuriously link a transaction to the user's other tags", async () => {
+      const userId = "3a3a3a3a-3a3a-3a3a-3a3a-3a3a3a3a3a3a";
+      const categoryId = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaa3a3a";
+      const unrelatedTagId = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbb3a3a";
+      const transactionId = "cccccccc-cccc-cccc-cccc-cccccccc3a3a";
+      await seedUser(dataSource, userId, "cara@example.com");
+      await seedCategory(dataSource, categoryId, userId, "Food");
+      await seedTag(dataSource, unrelatedTagId, userId, "Travel");
+      await seedTransaction(dataSource, transactionId, userId, categoryId);
+
+      await dataSource.runMigrations();
+
+      const [{ id: resolvedTagId }]: Array<{ id: string }> =
+        await dataSource.query(
+          `SELECT "id" FROM "tags" WHERE "user_id" = $1 AND "name" = $2`,
+          [userId, "Food"],
+        );
+      const links: Array<{ transaction_id: string; tag_id: string }> =
+        await dataSource.query(
+          `SELECT "transaction_id", "tag_id" FROM "transaction_tags" WHERE "transaction_id" = $1`,
+          [transactionId],
+        );
+      expect(links).toEqual([
+        { transaction_id: transactionId, tag_id: resolvedTagId },
+      ]);
+    });
+
     it("absorbs duplicate transaction_tag links via ON CONFLICT DO NOTHING", async () => {
       const userId = "44444444-4444-4444-4444-444444444444";
       const categoryId = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa4";
