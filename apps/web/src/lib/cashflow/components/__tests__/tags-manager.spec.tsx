@@ -83,6 +83,27 @@ describe("TagsManager edit dialog", () => {
     expect(preselected.getAttribute("aria-checked")).toBe("true");
   });
 
+  it("sends only name when the user renames without touching the color picker", async () => {
+    useIsMobileMock.mockReturnValue(false);
+    updateTagMock.mockResolvedValue({
+      tag: { id: "tag_1", name: "Vacation", color: "amber" },
+    });
+    renderManager();
+
+    await waitFor(() =>
+      expect(screen.getByLabelText("Edit Travel")).toBeInTheDocument(),
+    );
+    fireEvent.click(screen.getByLabelText("Edit Travel"));
+
+    const nameInput = screen.getByLabelText("Name") as HTMLInputElement;
+    fireEvent.change(nameInput, { target: { value: "Vacation" } });
+    fireEvent.click(screen.getByRole("button", { name: /save/i }));
+
+    await waitFor(() =>
+      expect(updateTagMock).toHaveBeenCalledWith("tag_1", { name: "Vacation" }),
+    );
+  });
+
   it("sends only color when the user picks a new palette key and Save is clicked", async () => {
     useIsMobileMock.mockReturnValue(false);
     updateTagMock.mockResolvedValue({
