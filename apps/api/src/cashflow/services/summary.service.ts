@@ -5,11 +5,7 @@ import { FxLookupService } from "@/fx/services/fx-lookup.service";
 import { UserSettingsService } from "@/users/services/user-settings.service";
 import { Tag } from "../entities/tag.entity";
 import { Transaction } from "../entities/transaction.entity";
-import {
-  aggregate,
-  type ConvertedRow,
-  type TagBucket,
-} from "./aggregations";
+import { aggregate, type ConvertedRow, type TagBucket } from "./aggregations";
 import { monthBounds } from "./month-window";
 import { TransactionsService } from "./transactions.service";
 
@@ -69,7 +65,11 @@ export class SummaryService {
       tagIds: tagIdsByTransaction.get(row.id) ?? [],
     }));
 
-    const converted = await convertRows(convertible, baseCurrency, this.fxLookup);
+    const converted = await convertRows(
+      convertible,
+      baseCurrency,
+      this.fxLookup,
+    );
     const tagNameById = await this.loadTagNames(userId);
     const result = aggregate(converted, tagNameById);
 
