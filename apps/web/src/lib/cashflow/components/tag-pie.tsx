@@ -10,7 +10,7 @@ import {
   ChartTooltipContent,
 } from "@/components/ui/chart";
 import { formatMoney } from "../format-money";
-import type { CategoryBucket } from "../types";
+import type { TagBucket } from "../types";
 
 const PIE_COLORS = [
   "var(--chart-1)",
@@ -20,14 +20,14 @@ const PIE_COLORS = [
   "var(--chart-5)",
 ];
 
-export function categoryColor(index: number): string {
+export function tagColor(index: number): string {
   return (PIE_COLORS[index % PIE_COLORS.length] ?? PIE_COLORS[0]) as string;
 }
 
 type LabelMode = "none" | "legend" | "leader";
 
-interface CategoryPieProps {
-  buckets: CategoryBucket[];
+interface TagPieProps {
+  buckets: TagBucket[];
   baseCurrency: string;
   className?: string;
   innerRadius?: number;
@@ -68,19 +68,19 @@ function LeaderLabel({
   );
 }
 
-export function CategoryPie({
+export function TagPie({
   buckets,
   baseCurrency,
   className = "mx-auto aspect-square h-72",
   innerRadius = 60,
   outerRadius = 100,
   labels = "none",
-}: CategoryPieProps) {
+}: TagPieProps) {
   const chartData = buckets.map((bucket, index) => ({
-    key: bucket.categoryId ?? "__uncategorized__",
-    name: bucket.categoryName ?? "Uncategorized",
+    key: bucket.tagId ?? "__untagged__",
+    name: bucket.tagName ?? "Untagged",
     value: Number(bucket.expense),
-    color: categoryColor(index),
+    color: tagColor(index),
   }));
   const chartConfig = chartData.reduce<ChartConfig>((acc, entry) => {
     acc[entry.name] = { label: entry.name, color: entry.color };
