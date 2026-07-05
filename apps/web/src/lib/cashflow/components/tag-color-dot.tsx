@@ -20,7 +20,7 @@ export function TagColorDot({ color, label }: TagColorDotProps) {
         data-color={color ?? "untagged"}
         role="img"
         aria-label={label}
-        className="inline-block size-2.5 shrink-0 rounded-full"
+        className="block size-2.5 shrink-0 rounded-full"
         style={{ background: tagColorVar(color) }}
       />
     );
@@ -30,7 +30,7 @@ export function TagColorDot({ color, label }: TagColorDotProps) {
       data-testid="tag-color-dot"
       data-color={color ?? "untagged"}
       aria-hidden
-      className="inline-block size-2.5 shrink-0 rounded-full"
+      className="block size-2.5 shrink-0 rounded-full"
       style={{ background: tagColorVar(color) }}
     />
   );
