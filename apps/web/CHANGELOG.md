@@ -1,3 +1,13 @@
+## 0.8.0 (2026-07-05)
+
+### 🚀 Features
+
+- give tags a color across every surface ([#19](https://github.com/emiliosheinz/fortuna/pull/19))
+
+### ❤️ Thank You
+
+- Emilio Heinzmann @emiliosheinz
+
 ## 0.7.0 (2026-07-05)
 
 ### 🚀 Features
