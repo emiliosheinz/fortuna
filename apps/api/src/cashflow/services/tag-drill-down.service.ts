@@ -3,12 +3,10 @@ import { InjectDataSource, InjectRepository } from "@nestjs/typeorm";
 import { DataSource, Repository } from "typeorm";
 import { FxLookupService } from "@/fx/services/fx-lookup.service";
 import { UserSettingsService } from "@/users/services/user-settings.service";
-import { Category } from "../entities/category.entity";
 import { Tag } from "../entities/tag.entity";
 import { Transaction } from "../entities/transaction.entity";
 import {
   aggregate,
-  type CategoryBucket,
   type ConvertedRow,
   type MonthBucket,
 } from "./aggregations";
@@ -31,7 +29,6 @@ export interface TagDrillDownResponse {
   from: string | null;
   to: string | null;
   transactions: TransactionResponse[];
-  byCategory: CategoryBucket[];
   byMonth: MonthBucket[];
   excludedUnconvertibleCount: number;
 }
@@ -42,8 +39,6 @@ export class TagDrillDownService {
     @InjectRepository(Tag) private readonly tags: Repository<Tag>,
     @InjectRepository(Transaction)
     private readonly transactions: Repository<Transaction>,
-    @InjectRepository(Category)
-    private readonly categories: Repository<Category>,
     @InjectDataSource() private readonly dataSource: DataSource,
     private readonly fxLookup: FxLookupService,
     private readonly userSettings: UserSettingsService,
@@ -71,7 +66,6 @@ export class TagDrillDownService {
       await this.transactionsService.loadTagIdsByTransaction(
         rows.map((r) => r.id),
       );
-    const categoryNameById = await this.loadCategoryNames(userId);
     const groupContext = await loadGroupContext(
       this.dataSource.manager,
       userId,
@@ -100,20 +94,19 @@ export class TagDrillDownService {
         id: row.id,
         date: row.date,
         kind: row.kind,
-        categoryId: row.categoryId,
+        tagIds: [],
         baseAmount,
         unconvertible: resolution.unconvertible,
       });
     }
 
-    const result = aggregate(converted, categoryNameById);
+    const result = aggregate(converted, new Map());
     return {
       tag,
       baseCurrency,
       from: window?.from ?? null,
       to: window?.to ?? null,
       transactions,
-      byCategory: result.byCategory,
       byMonth: result.byMonth,
       excludedUnconvertibleCount: result.excludedUnconvertibleCount,
     };
@@ -139,16 +132,6 @@ export class TagDrillDownService {
       });
     }
     return qb.getMany();
-  }
-
-  private async loadCategoryNames(
-    userId: string,
-  ): Promise<Map<string, string>> {
-    const rows = await this.categories.find({
-      where: { userId },
-      select: { id: true, name: true },
-    });
-    return new Map(rows.map((row) => [row.id, row.name]));
   }
 }
 
