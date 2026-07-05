@@ -4,7 +4,6 @@ import {
   type StartedPostgreSqlContainer,
 } from "@testcontainers/postgresql";
 import { DataSource, type QueryRunner } from "typeorm";
-import { RemoveCashflowCategories1783255373760 } from "@/database/migrations/1783255373760-RemoveCashflowCategories";
 
 const TARGET_MIGRATION_NAME = "RemoveCashflowCategories1783255373760";
 
