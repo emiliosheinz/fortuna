@@ -6,6 +6,7 @@ import {
 import { InjectRepository } from "@nestjs/typeorm";
 import { type EntityManager, In, QueryFailedError, Repository } from "typeorm";
 import { Tag } from "../entities/tag.entity";
+import { assignColor } from "../tag-colors";
 
 export interface TagResponse {
   id: string;
@@ -24,7 +25,9 @@ export class TagsService {
 
   async create(userId: string, name: string): Promise<TagResponse> {
     try {
-      const saved = await this.tags.save(this.tags.create({ userId, name }));
+      const saved = await this.tags.save(
+        this.tags.create({ userId, name, color: assignColor(name) }),
+      );
       return toResponse(saved);
     } catch (err) {
       throw mapUniqueViolation(err, name);
@@ -83,7 +86,9 @@ export class TagsService {
     const missing = unique.filter((name) => !existingByName.has(name));
     if (missing.length > 0) {
       const created = await repo.save(
-        missing.map((name) => repo.create({ userId, name })),
+        missing.map((name) =>
+          repo.create({ userId, name, color: assignColor(name) }),
+        ),
       );
       for (const row of created) {
         existingByName.set(row.name, row);
