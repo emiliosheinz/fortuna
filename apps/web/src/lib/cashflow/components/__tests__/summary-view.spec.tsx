@@ -61,24 +61,24 @@ describe("SummaryView", () => {
     expect(screen.getByTestId("summary-loading")).toBeInTheDocument();
   });
 
-  it("renders totals and the per-category breakdown on success", async () => {
+  it("renders totals and the per-tag breakdown on success", async () => {
     getSummaryMock.mockResolvedValue({
       month: "2026-06",
       baseCurrency: "USD",
       income: "1000.00",
       expense: "300.00",
       net: "700.00",
-      byCategory: [
+      byTag: [
         {
-          categoryId: "cat-1",
-          categoryName: "Food",
+          tagId: "tag-1",
+          tagName: "Food",
           income: "0.00",
           expense: "200.00",
           net: "-200.00",
         },
         {
-          categoryId: null,
-          categoryName: null,
+          tagId: null,
+          tagName: null,
           income: "0.00",
           expense: "100.00",
           net: "-100.00",
@@ -98,32 +98,33 @@ describe("SummaryView", () => {
     expect(screen.getByTestId("summary-total-net")).toHaveTextContent(
       "$700.00",
     );
-    const rows = screen.getAllByTestId("summary-category-row");
+    expect(screen.getByRole("heading", { name: "By tag" })).toBeInTheDocument();
+    const rows = screen.getAllByTestId("summary-tag-row");
     expect(rows).toHaveLength(2);
     expect(rows[0]).toHaveTextContent("Food");
     expect(rows[0]).toHaveTextContent("-$200.00");
-    expect(rows[1]).toHaveTextContent("Uncategorized");
+    expect(rows[1]).toHaveTextContent("Untagged");
     expect(rows[1]).toHaveTextContent("-$100.00");
   });
 
-  it("hides income-only buckets from the per-category breakdown", async () => {
+  it("hides income-only buckets from the per-tag breakdown", async () => {
     getSummaryMock.mockResolvedValue({
       month: "2026-06",
       baseCurrency: "USD",
       income: "5000.00",
       expense: "200.00",
       net: "4800.00",
-      byCategory: [
+      byTag: [
         {
-          categoryId: "cat-1",
-          categoryName: "Food",
+          tagId: "tag-1",
+          tagName: "Food",
           income: "0.00",
           expense: "200.00",
           net: "-200.00",
         },
         {
-          categoryId: null,
-          categoryName: null,
+          tagId: "tag-salary",
+          tagName: "salary",
           income: "5000.00",
           expense: "0.00",
           net: "5000.00",
@@ -134,7 +135,7 @@ describe("SummaryView", () => {
 
     renderView();
 
-    const rows = await screen.findAllByTestId("summary-category-row");
+    const rows = await screen.findAllByTestId("summary-tag-row");
     expect(rows).toHaveLength(1);
     expect(rows[0]).toHaveTextContent("Food");
   });
@@ -146,10 +147,10 @@ describe("SummaryView", () => {
       income: "0.00",
       expense: "100.00",
       net: "-100.00",
-      byCategory: [
+      byTag: [
         {
-          categoryId: null,
-          categoryName: null,
+          tagId: null,
+          tagName: null,
           income: "0.00",
           expense: "100.00",
           net: "-100.00",
@@ -171,7 +172,7 @@ describe("SummaryView", () => {
       income: "0.00",
       expense: "0.00",
       net: "0.00",
-      byCategory: [],
+      byTag: [],
       excludedUnconvertibleCount: 0,
     });
 
