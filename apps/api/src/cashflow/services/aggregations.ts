@@ -117,9 +117,7 @@ export function aggregate(
   const byTag: TagBucket[] = [...tagBuckets.values()]
     .map((bucket) => ({
       tagId: bucket.tagId,
-      tagName: bucket.tagId
-        ? (tagNameById.get(bucket.tagId) ?? null)
-        : null,
+      tagName: bucket.tagId ? (tagNameById.get(bucket.tagId) ?? null) : null,
       income: bucket.income.toFixed(2),
       expense: bucket.expense.toFixed(2),
       net: (bucket.income - bucket.expense).toFixed(2),

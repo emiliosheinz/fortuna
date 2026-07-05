@@ -5,11 +5,7 @@ import { FxLookupService } from "@/fx/services/fx-lookup.service";
 import { UserSettingsService } from "@/users/services/user-settings.service";
 import { Tag } from "../entities/tag.entity";
 import { Transaction } from "../entities/transaction.entity";
-import {
-  aggregate,
-  type ConvertedRow,
-  type MonthBucket,
-} from "./aggregations";
+import { aggregate, type ConvertedRow, type MonthBucket } from "./aggregations";
 import { loadGroupContext } from "./group-context";
 import { monthRangeBounds } from "./month-window";
 import {
