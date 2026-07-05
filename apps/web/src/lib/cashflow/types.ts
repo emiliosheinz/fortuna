@@ -13,7 +13,6 @@ export interface Transaction {
   currency: string;
   description: string;
   kind: TransactionKind;
-  categoryId: string | null;
   tagIds: string[];
   baseAmount: string | null;
   baseCurrency: string;
@@ -29,11 +28,6 @@ export interface BaseCurrencyResponse {
   baseCurrency: string;
 }
 
-export interface Category {
-  id: string;
-  name: string;
-}
-
 export interface Tag {
   id: string;
   name: string;
@@ -45,7 +39,6 @@ export interface CreateTransactionInput {
   currency: string;
   description: string;
   kind: TransactionKind;
-  categoryId?: string | null;
   tagNames?: string[];
   installments?: { count: number };
 }
@@ -56,7 +49,6 @@ export interface UpdateTransactionInput {
   currency?: string;
   description?: string;
   kind?: TransactionKind;
-  categoryId?: string | null;
   tagNames?: string[];
 }
 
@@ -70,16 +62,20 @@ export interface ListTransactionsParams {
   limit?: number;
   from?: string;
   to?: string;
-  categoryId?: string;
   tagId?: string;
   groupId?: string;
   kind?: TransactionKind;
   q?: string;
 }
 
-export interface CategoryBucket {
-  categoryId: string | null;
-  categoryName: string | null;
+/**
+ * A bucket on the "by tag" rollup. A transaction with N tags contributes to
+ * N buckets on its kind side; a transaction with no tags contributes to the
+ * synthetic bucket with `tagId: null`. Buckets therefore do not sum to totals.
+ */
+export interface TagBucket {
+  tagId: string | null;
+  tagName: string | null;
   income: string;
   expense: string;
   net: string;
@@ -98,7 +94,7 @@ export interface SummaryResponse {
   income: string;
   expense: string;
   net: string;
-  byCategory: CategoryBucket[];
+  byTag: TagBucket[];
   excludedUnconvertibleCount: number;
 }
 
@@ -116,7 +112,6 @@ export interface TagDrillDownResponse {
   from: string | null;
   to: string | null;
   transactions: Transaction[];
-  byCategory: CategoryBucket[];
   byMonth: MonthBucket[];
   excludedUnconvertibleCount: number;
 }

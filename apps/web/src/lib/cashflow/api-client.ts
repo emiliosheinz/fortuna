@@ -1,7 +1,6 @@
 import { apiClient } from "@/lib/api-client";
 import type {
   BaseCurrencyResponse,
-  Category,
   CreateTransactionInput,
   ListTransactionsPage,
   ListTransactionsParams,
@@ -23,7 +22,6 @@ function buildListUrl(params: ListTransactionsParams): string {
   if (params.limit !== undefined) query.set("limit", String(params.limit));
   if (params.from) query.set("from", params.from);
   if (params.to) query.set("to", params.to);
-  if (params.categoryId) query.set("categoryId", params.categoryId);
   if (params.tagId) query.set("tagId", params.tagId);
   if (params.groupId) query.set("groupId", params.groupId);
   if (params.kind) query.set("kind", params.kind);
@@ -75,22 +73,6 @@ export const cashflowApi = {
 
   listTransactions: (params: ListTransactionsParams = {}) =>
     apiClient.get<ListTransactionsPage>(buildListUrl(params)),
-
-  listCategories: () =>
-    apiClient.get<{ items: Category[] }>(`${PREFIX}/categories`),
-
-  createCategory: (name: string) =>
-    apiClient.post<{ category: Category }>(`${PREFIX}/categories`, {
-      body: { name },
-    }),
-
-  renameCategory: (id: string, name: string) =>
-    apiClient.patch<{ category: Category }>(`${PREFIX}/categories/${id}`, {
-      body: { name },
-    }),
-
-  deleteCategory: (id: string) =>
-    apiClient.delete<void>(`${PREFIX}/categories/${id}`),
 
   listTags: () => apiClient.get<{ items: Tag[] }>(`${PREFIX}/tags`),
 
