@@ -4,7 +4,6 @@ import { format, parseISO } from "date-fns";
 import { CalendarIcon, MinusIcon, PlusIcon } from "lucide-react";
 import { useEffect, useId, useRef, useState } from "react";
 import { flushSync } from "react-dom";
-import { KeyboardSafeCombobox } from "@/components/keyboard-safe-combobox";
 import {
   KeyboardSafePopover,
   KeyboardSafePopoverContent,
@@ -45,7 +44,6 @@ interface FormState {
   date: string;
   kind: TransactionKind;
   currency: string;
-  categoryId: string | null;
   tagNames: string[];
   installmentsCount: number;
 }
@@ -60,7 +58,6 @@ export function CaptureForm({ baseCurrency, onCaptured }: CaptureFormProps) {
   const dateId = useId();
   const kindId = useId();
   const currencyId = useId();
-  const categoryId = useId();
   const tagsId = useId();
   const [form, setForm] = useState<FormState>(() => ({
     description: "",
@@ -68,7 +65,6 @@ export function CaptureForm({ baseCurrency, onCaptured }: CaptureFormProps) {
     date: todayIso(),
     kind: "expense",
     currency: baseCurrency,
-    categoryId: null,
     tagNames: [],
     installmentsCount: 1,
   }));
@@ -117,7 +113,6 @@ export function CaptureForm({ baseCurrency, onCaptured }: CaptureFormProps) {
       currency: form.currency,
       description: form.description.trim(),
       kind: form.kind,
-      categoryId: form.categoryId,
       tagNames: form.tagNames,
     };
     if (form.installmentsCount > 1) {
@@ -130,7 +125,6 @@ export function CaptureForm({ baseCurrency, onCaptured }: CaptureFormProps) {
         ...prev,
         description: "",
         amount: "",
-        categoryId: null,
         tagNames: [],
         installmentsCount: 1,
       }));
@@ -266,15 +260,6 @@ export function CaptureForm({ baseCurrency, onCaptured }: CaptureFormProps) {
             ))}
           </KeyboardSafeSelectContent>
         </KeyboardSafeSelect>
-      </div>
-
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor={categoryId}>Category</Label>
-        <KeyboardSafeCombobox
-          id={categoryId}
-          value={form.categoryId}
-          onChange={(next) => update("categoryId", next)}
-        />
       </div>
 
       <div className="flex flex-col gap-1.5">
