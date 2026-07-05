@@ -52,16 +52,22 @@ describe("AddTagColor migration", () => {
     return id;
   }
 
-  it("backfills every pre-existing tag row via assignColor(name), then rolls the column back on down()", async () => {
-    // Roll back to the pre-AddTagColor schema so the fresh `up()` runs the
-    // backfill loop over the seeded rows.
-    await dataSource.undoLastMigration();
-
-    const columnBefore: { column_name: string }[] = await dataSource.query(
+  async function hasTagColorColumn(): Promise<boolean> {
+    const rows: { column_name: string }[] = await dataSource.query(
       `SELECT "column_name" FROM information_schema.columns
        WHERE table_name = 'tags' AND column_name = 'color'`,
     );
-    expect(columnBefore).toHaveLength(0);
+    return rows.length > 0;
+  }
+
+  it("backfills every pre-existing tag row via assignColor(name), then rolls the column back on down()", async () => {
+    // Roll migrations back one at a time until `tags.color` is gone. Robust
+    // to newer migrations landing on top of AddTagColor.
+    let safety = 20;
+    while ((await hasTagColorColumn()) && safety-- > 0) {
+      await dataSource.undoLastMigration();
+    }
+    expect(await hasTagColorColumn()).toBe(false);
 
     const userId = await seedUser();
     const names = ["groceries", "rent", "travel", "food", "transport"];
@@ -95,12 +101,11 @@ describe("AddTagColor migration", () => {
       ),
     ).rejects.toThrow(/tags_color_valid/);
 
-    // `down()` removes the column.
-    await dataSource.undoLastMigration();
-    const columnAfter: { column_name: string }[] = await dataSource.query(
-      `SELECT "column_name" FROM information_schema.columns
-       WHERE table_name = 'tags' AND column_name = 'color'`,
-    );
-    expect(columnAfter).toHaveLength(0);
+    // `down()` removes the column. Loop again for the same reason.
+    let safety2 = 20;
+    while ((await hasTagColorColumn()) && safety2-- > 0) {
+      await dataSource.undoLastMigration();
+    }
+    expect(await hasTagColorColumn()).toBe(false);
   });
 });

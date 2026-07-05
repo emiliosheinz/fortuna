@@ -2,10 +2,10 @@ import { Transform } from "class-transformer";
 import {
   IsIn,
   IsNotEmpty,
-  IsOptional,
   IsString,
   MaxLength,
   registerDecorator,
+  ValidateIf,
   type ValidationOptions,
 } from "class-validator";
 import { PALETTE_KEYS, type PaletteKey } from "../tag-colors";
@@ -25,7 +25,8 @@ export class CreateTagDto {
   @MaxLength(NAME_MAX)
   declare name: string;
 
-  @IsOptional()
+  // ValidateIf(defined) — unlike @IsOptional, which silently accepts null.
+  @ValidateIf((_, value) => value !== undefined)
   @IsIn([...PALETTE_KEYS])
   declare color?: PaletteKey;
 }
@@ -35,14 +36,14 @@ export class CreateTagDto {
  * least one is required. `color` must be a member of the frozen palette.
  */
 export class UpdateTagDto {
-  @IsOptional()
+  @ValidateIf((_, value) => value !== undefined)
   @IsString()
   @Transform(TRIM)
   @IsNotEmpty()
   @MaxLength(NAME_MAX)
   declare name?: string;
 
-  @IsOptional()
+  @ValidateIf((_, value) => value !== undefined)
   @IsIn([...PALETTE_KEYS])
   declare color?: PaletteKey;
 

@@ -61,6 +61,12 @@ describe("CreateTagDto", () => {
     ).toContain("isIn");
   });
 
+  it("rejects an explicit null color instead of treating it as omitted", async () => {
+    expect(
+      (await checkCreate({ name: "travel", color: null })).errors,
+    ).toContain("isIn");
+  });
+
   it("rejects an unknown property under whitelist", async () => {
     const dto = plainToInstance(CreateTagDto, {
       name: "travel",
@@ -106,5 +112,17 @@ describe("UpdateTagDto", () => {
 
   it("rejects a name that trims to empty", async () => {
     expect((await checkUpdate({ name: "   " })).errors).toContain("isNotEmpty");
+  });
+
+  it("rejects an explicit null color instead of treating it as omitted", async () => {
+    expect(
+      (await checkUpdate({ name: "travel", color: null })).errors,
+    ).toContain("isIn");
+  });
+
+  it("rejects an explicit null name instead of treating it as omitted", async () => {
+    expect(
+      (await checkUpdate({ name: null, color: "amber" })).errors,
+    ).toContain("isString");
   });
 });
