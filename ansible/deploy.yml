@@ -103,6 +103,25 @@
       retries: "{{ (healthcheck_timeout_seconds | int / healthcheck_poll_seconds | int) | round(0, 'ceil') | int }}"
       delay: "{{ healthcheck_poll_seconds }}"
 
+    # `docker/nginx/nginx.conf` is a single-file bind mount. Docker resolves
+    # that mount to an inode at container creation. rsync updates the file via
+    # write-to-tmp + rename(), which allocates a new inode at the same path, so
+    # the running nginx keeps serving the pre-rsync inode until it is recreated.
+    # (Directory bind mounts like conf.d/ resolve children by name per access
+    # and don't have this issue.) Force-recreating nginx here re-resolves the
+    # bind mount to the current on-disk inode.
+    - name: Force-recreate nginx so single-file bind mounts pick up rsynced config
+      community.docker.docker_compose_v2:
+        project_src: "{{ fortuna_root }}"
+        files:
+          - "{{ fortuna_compose_file }}"
+        services:
+          - nginx
+        state: present
+        recreate: always
+        dependencies: false
+        pull: never
+
     - name: Report deploy success
       ansible.builtin.debug:
         msg: >-
