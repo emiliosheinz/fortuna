@@ -1,6 +1,6 @@
 # Ansible
 
-> **Deployments paused: VPS decommissioned.** Every automated production deploy is disabled; the pipeline, playbooks, secrets, and this document remain intact for a future resume. See [.specs/disable-deployments/spec.md](../.specs/disable-deployments/spec.md).
+> **Deployments paused: VPS decommissioned.** Every automated production deploy is disabled; the pipeline, playbooks, secrets, and this document remain intact for a future resume.
 
 Host configuration and release delivery for the Fortuna production VPS.
 

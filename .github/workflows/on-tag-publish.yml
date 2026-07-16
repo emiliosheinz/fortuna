@@ -155,7 +155,7 @@ jobs:
   deploy:
     name: Deploy to production
     needs: [setup, manifest]
-    # Paused, VPS decommissioned. See .specs/disable-deployments/spec.md
+    # Paused, VPS decommissioned.
     if: false
     runs-on: ubuntu-latest
     environment:

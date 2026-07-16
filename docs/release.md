@@ -1,6 +1,6 @@
 # Release and deployment
 
-> **Deployments paused: VPS decommissioned.** Every automated production deploy is disabled; the pipeline, playbooks, secrets, and this document remain intact for a future resume. See [.specs/disable-deployments/spec.md](../.specs/disable-deployments/spec.md).
+> **Deployments paused: VPS decommissioned.** Every automated production deploy is disabled; the pipeline, playbooks, secrets, and this document remain intact for a future resume.
 
 Fortuna ships independently versioned projects from a single repo. Conventional Commits drive everything: version bumps, changelogs, and what gets published.
 
