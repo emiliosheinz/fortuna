@@ -1,5 +1,7 @@
 # Release and deployment
 
+> **Deployments paused: VPS decommissioned.** Every automated production deploy is disabled; the pipeline, playbooks, secrets, and this document remain intact for a future resume. See [.specs/disable-deployments/spec.md](../.specs/disable-deployments/spec.md).
+
 Fortuna ships independently versioned projects from a single repo. Conventional Commits drive everything: version bumps, changelogs, and what gets published.
 
 The full rationale is in [ADR-0006](./architecture/decisions/0006-conventional-commits-and-nx-driven-release.md). This page is the operational reference.

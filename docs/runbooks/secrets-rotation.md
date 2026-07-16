@@ -1,5 +1,7 @@
 # Secrets Rotation Playbook
 
+> **Deployments paused: VPS decommissioned.** Every automated production deploy is disabled; the pipeline, playbooks, secrets, and this document remain intact for a future resume. See [.specs/disable-deployments/spec.md](../../.specs/disable-deployments/spec.md).
+
 Fortuna reads every secret at process start. There is no hot-reload path
 — rotating any secret requires a container restart (and in some cases a
 coordinated update at the IdP / provider side too).
