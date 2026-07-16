@@ -155,7 +155,10 @@ jobs:
   deploy:
     name: Deploy to production
     needs: [setup, manifest]
-    if: needs.setup.outputs.type == 'app'
+    # ponytail: paused, VPS decommissioned. See .specs/disable-deployments/spec.md
+    if: false
+    # Original guard, restored on re-enable:
+    # if: needs.setup.outputs.type == 'app'
     runs-on: ubuntu-latest
     environment:
       name: production
