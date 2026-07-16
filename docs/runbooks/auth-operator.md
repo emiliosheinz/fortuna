@@ -1,5 +1,7 @@
 # Operator Runbook — Authentication
 
+> **Deployments paused: VPS decommissioned.** Every automated production deploy is disabled; the pipeline, playbooks, secrets, and this document remain intact for a future resume.
+
 Fortuna runs as a single-host Docker compose deployment. This document is
 the on-call entry point for the authentication surface.
 
